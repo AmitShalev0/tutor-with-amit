@@ -35,13 +35,11 @@
 
     <div class="field-row">
       <label>How many students?*</label>
-<select name="duration_hours" id="duration-hours" required>
-  <option value="">Select duration…</option>
-  <option value="1">1 hour</option>
-  <option value="1.25">1 hour 15 min</option>
-  <option value="1.5">1 hour 30 min</option>
-  <option value="1.75">1 hour 45 min</option>
-  <option value="2">2 hours</option>
+      <select name="num_students" id="num-students" required>
+        <option value="1" selected>1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
       </select>
     </div>
 
@@ -55,7 +53,7 @@
     <div class="field-row">
       <label>Choose a time from the availability calendar*</label>
       <p class="help-text">
-        Click on a blue block of time (at least 1 hour). Then choose the exact duration below it.
+        Click on a blue block of time (at least 1 hour). Then choose the exact duration below.
       </p>
       <div id="availability-calendar" class="availability-calendar">
         <!-- Filled by JS using availability from Apps Script -->
@@ -73,6 +71,19 @@
         <option value="1.5">1.5 hours</option>
         <option value="1.75">1.75 hours</option>
         <option value="2">2 hours</option>
+        <option value="2.25">2.25 hours</option>
+        <option value="2.5">2.5 hours</option>
+        <option value="2.75">2.75 hours</option>
+        <option value="3">3 hours</option>
+        <option value="3.5">3.5 hours</option>
+        <option value="4">4 hours</option>
+        <option value="4.5">4.5 hours</option>
+        <option value="5">5 hours</option>
+        <option value="6">6 hours</option>
+        <option value="7">7 hours</option>
+        <option value="8">8 hours</option>
+        <option value="9">9 hours</option>
+        <option value="10">10 hours</option>
       </select>
     </div>
 
