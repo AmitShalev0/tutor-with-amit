@@ -1,6 +1,6 @@
 // main.js
 
-const APPS_SCRIPT_URL = "YOUR_APPS_SCRIPT_URL_HERE"; // <- set after deploying script
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw8vZBIIIbbZxLxfeCUbbisRiaadpHox4SjuwdbTWEQ-JM0ZzUucNukgn2uFZQ98aFccQ/exec";
 
 document.addEventListener("DOMContentLoaded", () => {
   const yearSpan = document.getElementById("year");
