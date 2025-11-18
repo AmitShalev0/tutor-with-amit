@@ -223,6 +223,11 @@ nav a:hover { color: var(--text); }
   color: #020203;
 }
 
+#duration-hours option:disabled {
+  color: #555;
+  background: #222;
+}
+
 /* Helpers */
 .hidden { display: none; }
 .help-text { color: var(--muted); font-size: 0.85rem; }
