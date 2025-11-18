@@ -1,6 +1,6 @@
 // main.js
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw8vZBIIIbbZxLxfeCUbbisRiaadpHox4SjuwdbTWEQ-JM0ZzUucNukgn2uFZQ98aFccQ/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw8vZBIIIbbZxLxfeCUbbisRiaadpHox4SjuwdbTWEQ-JM0ZzUucNukgn2uFZQ98aFccQ/exec"; // <- set after deploying script
 
 document.addEventListener("DOMContentLoaded", () => {
   const yearSpan = document.getElementById("year");
@@ -95,7 +95,7 @@ function setupBookingForm() {
     input.required = recurringCb.checked;
   });
 
-  // Availability calendar + duration logic
+  // Availability calendar
   const calElem = document.getElementById("availability-calendar");
   const hiddenDate = document.getElementById("selected-date");
   const hiddenStart = document.getElementById("selected-start");
@@ -104,10 +104,12 @@ function setupBookingForm() {
   let selectedBlockId = null;
 
   async function loadAvailability() {
+    // For now: fake availability (Mon–Fri, 8–20). Later: fetch from Apps Script.
     const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
     const startHour = 8, endHour = 20;
 
-    // TEMP demo availability – later we’ll replace with real data
+    // Example data structure: available blocks per day as [startMin, endMin]
+    // You will replace this with data from Apps Script.
     const demoAvailable = {
       0: [[8 * 60, 17 * 60], [19 * 60, 20 * 60]],
       1: [[8 * 60, 14 * 60], [15 * 60, 16 * 60], [17 * 60 + 15, 20 * 60]],
@@ -116,17 +118,19 @@ function setupBookingForm() {
       4: [[8 * 60, 13 * 60]],
     };
 
+    // Clear and build header row
     calElem.innerHTML = "";
 
-    // Header row
     const headerRow = document.createElement("div");
     headerRow.className = "av-row";
     headerRow.innerHTML =
       `<div></div>` +
-      days.map(d => `<div class="av-row-header">${d}</div>`).join("");
+      days
+        .map((d) => `<div class="av-row-header">${d}</div>`)
+        .join("");
     calElem.appendChild(headerRow);
 
-    // Hour rows
+    // Build rows for each hour
     for (let h = startHour; h < endHour; h++) {
       const row = document.createElement("div");
       row.className = "av-row";
@@ -140,6 +144,7 @@ function setupBookingForm() {
         const cell = document.createElement("div");
         cell.className = "av-slot";
 
+        // Check if this whole hour is within any available block (>= 60 mins)
         const blocks = demoAvailable[dayIdx] || [];
         const startMin = h * 60;
         const endMin = (h + 1) * 60;
@@ -153,57 +158,25 @@ function setupBookingForm() {
           block.textContent = "Available";
           const blockId = `${dayIdx}-${h}`;
           block.dataset.blockId = blockId;
-
-          // 🔥 NEW CLICK HANDLER (replaces the old one)
           block.addEventListener("click", () => {
-            // Clear previous selection
-            calElem.querySelectorAll(".av-block.selected").forEach(el =>
+            // Clear previous
+            calElem.querySelectorAll(".av-block.selected").forEach((el) =>
               el.classList.remove("selected")
             );
             block.classList.add("selected");
             selectedBlockId = blockId;
 
-            // Compute selected date (current week Monday + dayIdx)
+            // For now: assume current week; we only need weekday + hour
             const today = new Date();
             const monday = new Date(today);
             const day = monday.getDay();
-            const diff = (day === 0 ? -6 : 1) - day; // Monday offset
+            const diff = (day === 0 ? -6 : 1) - day; // Monday of this week
             monday.setDate(today.getDate() + diff);
-
             const date = new Date(monday);
             date.setDate(monday.getDate() + dayIdx);
             hiddenDate.value = date.toISOString().slice(0, 10);
             hiddenStart.value = `${String(h).padStart(2, "0")}:00`;
-
-            // ---- duration filtering ----
-            const startMinClick = h * 60;
-            let availableEnd = null;
-
-            for (const [s, e] of blocks) {
-              if (s <= startMinClick && e > startMinClick) {
-                availableEnd = e;
-                break;
-              }
-            }
-            if (availableEnd === null) return;
-
-            const remainingMinutes = availableEnd - startMinClick;
-
-            for (const opt of durationSel.options) {
-              if (!opt.value) continue;
-              const durHrs = parseFloat(opt.value);
-              const durMin = durHrs * 60;
-              opt.disabled = durMin > remainingMinutes;
-            }
-
-            if (
-              durationSel.value &&
-              parseFloat(durationSel.value) * 60 > remainingMinutes
-            ) {
-              durationSel.value = "";
-            }
           });
-
           cell.appendChild(block);
         }
 
@@ -237,6 +210,7 @@ function setupBookingForm() {
     const obj = Object.fromEntries(formData.entries());
     obj.type = "booking_request";
 
+    // Build friendly title: [subject] – [first, second, third...]
     const num = parseInt(obj.num_students || "1", 10);
     const firstNames = [];
     for (let i = 1; i <= num; i++) {
@@ -260,7 +234,7 @@ function setupBookingForm() {
       renderStudentFields();
       hiddenDate.value = "";
       hiddenStart.value = "";
-      calElem.querySelectorAll(".av-block.selected").forEach(el =>
+      calElem.querySelectorAll(".av-block.selected").forEach((el) =>
         el.classList.remove("selected")
       );
     } catch (err) {
@@ -270,7 +244,6 @@ function setupBookingForm() {
     }
   });
 }
-
 
 function formatHour(h) {
   const ampm = h >= 12 ? "PM" : "AM";
