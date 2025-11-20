@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tutoring with Amit – Calgary Math & Science Tutor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <h1 class="logo">Tutoring with Amit</h1>
+
+      <nav>
+        <a href="index.html">Home</a>
+        <a href="signup.html">New Student</a>
+        <a href="booking.html">Book a Session</a>
+        <a href="contact.html">Contact</a>
+      </nav>
+
+      <div class="header-right">
+        <div class="time-display">
+          <span id="current-time" class="current-time"></span>
+          <label class="theme-switch" title="Toggle light/dark mode">
+            <input type="checkbox" id="theme-toggle" aria-label="Toggle theme">
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h2>Math, Physics, Chemistry & Biology Tutoring (Gr. 5 – University)</h2>
+      <p>
+        Hi, I'm Amit – a Calgary-based tutor and “big-hair scientist” who loves helping
+        students actually understand what they’re learning, not just survive the tests.
+      </p>
+      <div class="hero-actions">
+        <a class="btn primary" href="signup.html">Start as a New Student</a>
+        <a class="btn secondary" href="booking.html">Book a Session</a>
+      </div>
+    </section>
+
+    <section class="section">
+      <h3>Weekly Availability</h3>
+      <p>
+        The calendar below shows my current available times (Calgary time).
+        Click “Book a Session” at the top when you're ready.
+      </p>
+      <!-- Later you can also embed Google Calendar as a fallback -->
+      <iframeiframe
+        class="gcal-embed"
+        src="https://calendar.google.com/calendar/embed?src=YOUR_PUBLIC_TUTORING_CALENDAR_ID&mode=WEEK&ctz=America%2FEdmonton"
+        title="Weekly Tutoring Availability Calendar"
+        frameborder="0"
+        scrolling="no">
+      </iframe>
+    </section>
+
+    <section class="section">
+      <h3>About Me</h3>
+      <p>
+        (Write a short personal blurb here – your Big Hair Science Guy story, degrees,
+        teaching style, focus on confidence + curiosity, etc.)
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>
+        © <span id="year"></span> Tutoring with Amit ·
+        <a href="contact.html">Contact me</a>
+      </p>
+    </div>
+    <script src="main.js"></script>
+  </footer>
+</body>
+</html>
