@@ -326,7 +326,7 @@ function setupBookingForm() {
     }
   }
 
-  // Function to update start time availability based on selected day
+  // Function to update start time availability based on selected day and end time
   function updateStartTimeAvailability() {
     if (!startTimeInput || !daySelect) return;
     
@@ -342,6 +342,13 @@ function setupBookingForm() {
     // Get available blocks for the selected day
     const blocks = demoAvailable[selectedDay] || [];
     
+    // Get the selected duration (if any)
+    const selectedDuration = durationSel.value ? parseFloat(durationSel.value) : 1;
+    const durationMinutes = Math.round(selectedDuration * 60);
+    
+    // Get existing bookings for this day
+    const bookedSlots = demoBooked[selectedDay] || [];
+    
     // Update each time option
     Array.from(startTimeInput.options).forEach(opt => {
       if (!opt.value) {
@@ -351,11 +358,18 @@ function setupBookingForm() {
       
       const [h, m] = opt.value.split(':').map(Number);
       const timeMin = h * 60 + m;
-      const endMin = timeMin + 60; // Need at least 1 hour available
+      const endMin = timeMin + durationMinutes;
       
-      // Check if this time slot has at least 1 hour available
+      // Check if this time slot has enough availability for the duration
       const isAvailable = blocks.some(([s, e]) => s <= timeMin && e >= endMin);
-      opt.disabled = !isAvailable;
+      
+      // Check if this time slot conflicts with any existing bookings
+      const hasConflict = bookedSlots.some(([bs, be]) => {
+        // Check if there's any overlap between requested time and booked time
+        return !(be <= timeMin || bs >= endMin);
+      });
+      
+      opt.disabled = !isAvailable || hasConflict;
     });
   }
 
@@ -619,6 +633,9 @@ function setupBookingForm() {
 
   // Update the selected block label when duration changes
   durationSel.addEventListener("change", () => {
+    // Update start time availability based on new duration
+    updateStartTimeAvailability();
+    
     if (!selectedBlockElem || !selectedBlockId) return;
     const val = durationSel.value;
     if (!val) {
