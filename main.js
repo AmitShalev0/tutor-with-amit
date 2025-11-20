@@ -1,6 +1,6 @@
 // main.js
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzMt8Dc-MN5ry_pHGTnFtdVPSBCJwtzI8l0pUm8qyJAXlr-vHYOcbQCgQ9ONWUatpV1/exec"; // <- set after deploying script
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzMt8Dc-MN5ry_pHGTnFtdVPSBCJwtzI8l0pUm8qyJAXlr-vHYOcbQCgQ9ONWUatpV1/exec";
 
 document.addEventListener("DOMContentLoaded", () => {
   const yearSpan = document.getElementById("year");
@@ -326,7 +326,7 @@ function setupBookingForm() {
     }
   }
 
-  // Function to update start time availability based on selected day and end time
+  // Function to update start time availability based on selected day
   function updateStartTimeAvailability() {
     if (!startTimeInput || !daySelect) return;
     
@@ -342,13 +342,6 @@ function setupBookingForm() {
     // Get available blocks for the selected day
     const blocks = demoAvailable[selectedDay] || [];
     
-    // Get the selected duration (if any)
-    const selectedDuration = durationSel.value ? parseFloat(durationSel.value) : 1;
-    const durationMinutes = Math.round(selectedDuration * 60);
-    
-    // Get existing bookings for this day
-    const bookedSlots = demoBooked[selectedDay] || [];
-    
     // Update each time option
     Array.from(startTimeInput.options).forEach(opt => {
       if (!opt.value) {
@@ -358,18 +351,11 @@ function setupBookingForm() {
       
       const [h, m] = opt.value.split(':').map(Number);
       const timeMin = h * 60 + m;
-      const endMin = timeMin + durationMinutes;
+      const endMin = timeMin + 60; // Need at least 1 hour available
       
-      // Check if this time slot has enough availability for the duration
+      // Check if this time slot has at least 1 hour available
       const isAvailable = blocks.some(([s, e]) => s <= timeMin && e >= endMin);
-      
-      // Check if this time slot conflicts with any existing bookings
-      const hasConflict = bookedSlots.some(([bs, be]) => {
-        // Check if there's any overlap between requested time and booked time
-        return !(be <= timeMin || bs >= endMin);
-      });
-      
-      opt.disabled = !isAvailable || hasConflict;
+      opt.disabled = !isAvailable;
     });
   }
 
@@ -488,7 +474,13 @@ function setupBookingForm() {
           monday.setDate(today.getDate() + diff + (currentWeekOffset * 7));
           const date = new Date(monday);
           date.setDate(monday.getDate() + selectedDay);
-          hiddenDate.value = date.toISOString().slice(0, 10);
+          
+          // Use local date format instead of UTC to avoid timezone issues
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day_of_month = String(date.getDate()).padStart(2, '0');
+          hiddenDate.value = `${year}-${month}-${day_of_month}`;
+          
           hiddenStart.value = startTime;
 
           // Update the label
@@ -548,7 +540,13 @@ function setupBookingForm() {
         monday.setDate(today.getDate() + diff + (currentWeekOffset * 7));
         const date = new Date(monday);
         date.setDate(monday.getDate() + selectedDay);
-        hiddenDate.value = date.toISOString().slice(0, 10);
+        
+        // Use local date format instead of UTC to avoid timezone issues
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day_of_month = String(date.getDate()).padStart(2, '0');
+        hiddenDate.value = `${year}-${month}-${day_of_month}`;
+        
         hiddenStart.value = startTime;
 
         // Update the label
@@ -633,9 +631,6 @@ function setupBookingForm() {
 
   // Update the selected block label when duration changes
   durationSel.addEventListener("change", () => {
-    // Update start time availability based on new duration
-    updateStartTimeAvailability();
-    
     if (!selectedBlockElem || !selectedBlockId) return;
     const val = durationSel.value;
     if (!val) {
