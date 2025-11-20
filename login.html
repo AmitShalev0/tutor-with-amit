@@ -104,13 +104,12 @@
     </form>
 
     <p class="hint">
-        Don’t have an account yet? <br />
-        Ask Amit to create one for you.
+        Don't have an account yet? <a href="register.html">Create one here</a>
     </p>
     </div>
 
     <!-- Firebase init -->
-    <script type="module" src="firebase-init.js"></script>
+    <script type="module" src="firebase.js"></script>
 
   <!-- Login logic -->
   <script type="module">
@@ -125,7 +124,7 @@
     // If already logged in, go straight to the private page
     onAuth(auth, (user) => {
         if (user) {
-            window.location.href = "clients.html"; // change if you use a different page name
+            window.location.href = "dashboard.html";
         }
     });
 
@@ -139,7 +138,7 @@
 
       try {
         await signIn(auth, email, password);
-        window.location.href = "clients.html"; // private page
+        window.location.href = "dashboard.html";
       } catch (err) {
         console.error(err);
         const code = err.code || "";

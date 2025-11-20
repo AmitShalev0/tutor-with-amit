@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Create Account – Tutor with Amit</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+    body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #0f172a;
+        color: #e5e7eb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: 20px;
+    }
+    .card {
+        background: #111827;
+        padding: 2rem 2.5rem;
+        border-radius: 1rem;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        max-width: 420px;
+        width: 100%;
+    }
+    h1 {
+        margin-top: 0;
+        font-size: 1.4rem;
+        margin-bottom: 0.25rem;
+    }
+    p.subtitle {
+        margin-top: 0;
+        font-size: 0.9rem;
+        color: #9ca3af;
+        margin-bottom: 1.5rem;
+    }
+    label {
+        display: block;
+        font-size: 0.9rem;
+        margin-bottom: 0.25rem;
+        margin-top: 0.7rem;
+    }
+    input {
+        width: 100%;
+        padding: 0.5rem 0.6rem;
+        border-radius: 0.4rem;
+        border: 1px solid #4b5563;
+        background: #020617;
+        color: #e5e7eb;
+        box-sizing: border-box;
+        margin-bottom: 0.5rem;
+    }
+    input:focus {
+        outline: 2px solid #38bdf8;
+        outline-offset: 1px;
+        border-color: transparent;
+    }
+    button {
+        width: 100%;
+        padding: 0.6rem 0.8rem;
+        border-radius: 0.4rem;
+        border: none;
+        background: #38bdf8;
+        color: #0f172a;
+        font-weight: 600;
+        cursor: pointer;
+        margin-top: 0.75rem;
+    }
+    button:disabled {
+        opacity: 0.6;
+        cursor: default;
+    }
+    .error {
+        margin-top: 0.75rem;
+        color: #fecaca;
+        font-size: 0.85rem;
+        min-height: 1.1rem;
+    }
+    .success {
+        margin-top: 0.75rem;
+        color: #86efac;
+        font-size: 0.85rem;
+    }
+    .hint {
+        margin-top: 1rem;
+        font-size: 0.75rem;
+        color: #6b7280;
+        text-align: center;
+    }
+    a {
+        color: #38bdf8;
+        text-decoration: none;
+    }
+    .help-text {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-top: -0.3rem;
+        margin-bottom: 0.5rem;
+    }
+    </style>
+</head>
+<body>
+    <div class="card">
+    <h1>Create Your Account</h1>
+    <p class="subtitle">Join Amit's tutoring families.</p>
+
+    <form id="register-form">
+        <label for="full-name">Your Full Name*</label>
+        <input id="full-name" type="text" autocomplete="name" required 
+               pattern="^[a-zA-Z][a-zA-Z'-]* [a-zA-Z][a-zA-Z'-]*$" 
+               title="Full name must be two words, each with only letters, apostrophes, or dashes."
+               placeholder="Jane Smith" />
+
+        <label for="email">Email*</label>
+        <input id="email" type="email" autocomplete="email" required placeholder="your.email@example.com" />
+        <p class="help-text">You'll use this email to log in</p>
+
+        <label for="phone">Phone Number*</label>
+        <input id="phone" type="tel" autocomplete="tel" required 
+               pattern="^[0-9]{10}$" 
+               title="Please enter a valid 10-digit phone number."
+               placeholder="5871234567" />
+
+        <label for="password">Password*</label>
+        <input id="password" type="password" autocomplete="new-password" required minlength="6" placeholder="At least 6 characters" />
+        <p class="help-text">Must be at least 6 characters</p>
+
+        <label for="confirm-password">Confirm Password*</label>
+        <input id="confirm-password" type="password" autocomplete="new-password" required minlength="6" />
+
+        <button type="submit" id="register-btn">Create Account</button>
+        <div class="error" id="error"></div>
+        <div class="success" id="success"></div>
+    </form>
+
+    <p class="hint">
+        Already have an account? <a href="login.html">Log in</a>
+    </p>
+    </div>
+
+    <!-- Firebase init -->
+    <script type="module" src="firebase.js"></script>
+
+    <!-- Registration logic -->
+    <script type="module">
+    const form = document.getElementById("register-form");
+    const btn = document.getElementById("register-btn");
+    const errorEl = document.getElementById("error");
+    const successEl = document.getElementById("success");
+
+    const auth = window.firebaseAuth;
+    const signUp = window.firebaseSignUp;
+    const updateProfile = window.firebaseUpdateProfile;
+    const db = window.firebaseDb;
+    const setDoc = window.firestoreSetDoc;
+    const addDoc = window.firestoreAddDoc;
+    const collection = window.firestoreCollection;
+    const doc = window.firestoreDoc;
+    const serverTimestamp = window.firestoreServerTimestamp;
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        errorEl.textContent = "";
+        successEl.textContent = "";
+        btn.disabled = true;
+
+        const fullName = document.getElementById("full-name").value.trim();
+        const email = document.getElementById("email").value.trim();
+        const phone = document.getElementById("phone").value.trim();
+        const password = document.getElementById("password").value;
+        const confirmPassword = document.getElementById("confirm-password").value;
+
+        // Validate passwords match
+        if (password !== confirmPassword) {
+            errorEl.textContent = "Passwords do not match.";
+            btn.disabled = false;
+            return;
+        }
+
+        try {
+            // Create Firebase Auth user
+            const userCredential = await signUp(auth, email, password);
+            const user = userCredential.user;
+
+            // Update user profile with display name
+            await updateProfile(user, {
+                displayName: fullName
+            });
+
+            // Create user profile document in Firestore
+            await setDoc(doc(db, "users", user.uid), {
+                fullName: fullName,
+                email: email,
+                phone: phone,
+                createdAt: serverTimestamp(),
+                students: [] // Array to store student IDs
+            });
+
+            // Automatically create a student profile for the user (themselves)
+            await addDoc(collection(db, "students"), {
+                userId: user.uid,
+                studentName: fullName,
+                birthdate: null, // User can update this later
+                pronouns: null,
+                subject: null,
+                school: null,
+                relationship: "self",
+                notes: "Primary account holder",
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            });
+
+            successEl.textContent = "Account created successfully! Redirecting...";
+            
+            // Redirect to dashboard after 1.5 seconds
+            setTimeout(() => {
+                window.location.href = "dashboard.html";
+            }, 1500);
+
+        } catch (err) {
+            console.error(err);
+            const code = err.code || "";
+            
+            if (code.includes("email-already-in-use")) {
+                errorEl.textContent = "This email is already registered. Try logging in instead.";
+            } else if (code.includes("weak-password")) {
+                errorEl.textContent = "Password is too weak. Use at least 6 characters.";
+            } else if (code.includes("invalid-email")) {
+                errorEl.textContent = "Invalid email address.";
+            } else {
+                errorEl.textContent = "Registration failed. Please try again.";
+            }
+            
+            btn.disabled = false;
+        }
+    });
+    </script>
+</body>
+</html>

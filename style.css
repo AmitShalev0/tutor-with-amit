@@ -222,6 +222,22 @@ nav a:hover { color: var(--text); }
 .header-inner nav { justify-self: center; }
 .header-inner .logo { justify-self: start; }
 
+/* Login link styling */
+nav .login-link {
+  color: #38bdf8;
+  font-weight: 500;
+  padding: 0.4rem 0.8rem;
+  border-radius: 0.4rem;
+  border: 1px solid #38bdf8;
+  transition: all 0.2s ease;
+}
+
+nav .login-link:hover {
+  background: #38bdf8;
+  color: #0f172a;
+  text-decoration: none;
+}
+
 .hero {
   padding: 32px 0 16px;
 }
@@ -281,6 +297,19 @@ nav a:hover { color: var(--text); }
   flex-direction: row !important;
   margin-bottom: 0 !important;
   cursor: pointer;
+}
+
+.students-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+@media (min-width: 768px) {
+  .students-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 .checkbox-row input[type="checkbox"] {
@@ -350,6 +379,7 @@ nav a:hover { color: var(--text); }
 .availability-calendar {
   margin-top: 10px;
   overflow-x: auto;
+  overflow-y: visible;
   background: var(--surface-alt);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
@@ -361,6 +391,7 @@ nav a:hover { color: var(--text); }
   display: grid;
   grid-template-columns: 70px repeat(5, 1fr);
   align-items: stretch;
+  overflow: visible;
 }
 
 .av-row-header {
@@ -380,6 +411,7 @@ nav a:hover { color: var(--text); }
   min-height: 32px;
   position: relative;
   cursor: pointer;
+  overflow: visible;
 }
 
 .av-slot.available {
@@ -391,7 +423,7 @@ nav a:hover { color: var(--text); }
 }
 
 .av-slot.selected {
-  background: rgba(79, 157, 255, 0.9);
+  background: transparent;
   color: #020203;
   font-size: 0.7rem;
   display: flex;
@@ -724,4 +756,84 @@ nav a:hover { color: var(--text); }
   .theme-toggle .toggle-label {
     display: inline;
   }
+}
+
+/* Dashboard and form utility classes */
+.hidden-content {
+  display: none;
+}
+
+.loading-text {
+  color: #9ca3af;
+}
+
+.flex-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.week-nav-btn {
+  padding: 6px 12px;
+}
+
+.week-display {
+  font-weight: bold;
+  font-size: 0.95rem;
+}
+
+.time-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.pointer-cursor {
+  cursor: pointer;
+}
+
+.sliding-scale-container {
+  margin-top: 20px;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.slider-label {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.slider-input {
+  flex: 1;
+}
+
+.discount-display {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: #666;
+  text-align: center;
+}
+
+.cost-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+}
+
+.cost-display {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #3b82f6;
 }

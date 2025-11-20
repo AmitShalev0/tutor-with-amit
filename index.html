@@ -2,20 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Tutoring with Amit – Calgary Math & Science Tutor</title>
+  <title>Amit Tutoring – Calgary Math & Science Tutor</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header class="site-header">
     <div class="container header-inner">
-      <h1 class="logo">Tutoring with Amit</h1>
+      <h1 class="logo">Amit Tutoring</h1>
 
       <nav>
-        <a href="index.html">Home</a>
+        <a href="dashboard.html">My Dashboard</a>
         <a href="signup.html">New Student</a>
         <a href="booking.html">Book a Session</a>
-        <a href="contact.html">Contact</a>
+        <a href="login.html" class="login-link" id="login-link">Login</a>
       </nav>
 
       <div class="header-right">
@@ -32,14 +32,19 @@
 
   <main class="container">
     <section class="hero">
-      <h2>Math, Physics, Chemistry & Biology Tutoring (Gr. 5 – University)</h2>
-      <p>
-        Hi, I'm Amit – a Calgary-based tutor and “big-hair scientist” who loves helping
-        students actually understand what they’re learning, not just survive the tests.
-      </p>
-      <div class="hero-actions">
-        <a class="btn primary" href="signup.html">Start as a New Student</a>
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+        <h2 style="margin: 0;">Tutoring STEM (Grade 0 – University Level)</h2>
+        <button id="auth-action-btn" class="btn primary" style="white-space: nowrap;">Create Account</button>
+      </div>
+      <p>Hi, I'm Amit, nice to A-meet you!</p>
+      <p>I am a Woodbiner-based (Calgary) tutor and "big-hair scientist" who loves helping
+        students actually understand what they're learning.</p>
+      <p>Please <strong>Create an account</strong> and then you can book sessions with me! :)</p>
+      <p><small>BTW did you get the pun in my website title? "I meet tutoring" xD</small></p>
+      <div class="hero-actions" id="hero-actions">
+        <a class="btn primary" href="register.html">Create Account</a>
         <a class="btn secondary" href="booking.html">Book a Session</a>
+        <a class="btn tertiary" href="login.html">Existing User? Login</a>
       </div>
     </section>
 
@@ -71,11 +76,64 @@
   <footer class="site-footer">
     <div class="container">
       <p>
-        © <span id="year"></span> Tutoring with Amit ·
+        © <span id="year"></span> Amit Tutoring ·
         <a href="contact.html">Contact me</a>
       </p>
     </div>
     <script src="main.js"></script>
   </footer>
+
+  <!-- Firebase init -->
+  <script type="module" src="firebase.js"></script>
+
+  <!-- Index page auth logic -->
+  <script type="module">
+    const auth = window.firebaseAuth;
+    const onAuth = window.firebaseOnAuth;
+    const signOut = window.firebaseSignOut;
+
+    const authBtn = document.getElementById("auth-action-btn");
+    const heroActions = document.getElementById("hero-actions");
+    const loginLink = document.getElementById("login-link");
+
+    // Check authentication status
+    onAuth(auth, (user) => {
+      if (user) {
+        // User is logged in
+        authBtn.textContent = "Log Out";
+        authBtn.onclick = async () => {
+          try {
+            await signOut(auth);
+            window.location.reload();
+          } catch (err) {
+            console.error("Logout error:", err);
+            alert("Failed to log out. Please try again.");
+          }
+        };
+        
+        // Hide the hero action buttons and login link for logged-in users
+        if (heroActions) {
+          heroActions.style.display = "none";
+        }
+        if (loginLink) {
+          loginLink.style.display = "none";
+        }
+      } else {
+        // User is not logged in
+        authBtn.textContent = "Create Account";
+        authBtn.onclick = () => {
+          window.location.href = "register.html";
+        };
+        
+        // Show the hero action buttons and login link for guests
+        if (heroActions) {
+          heroActions.style.display = "flex";
+        }
+        if (loginLink) {
+          loginLink.style.display = "inline";
+        }
+      }
+    });
+  </script>
 </body>
 </html>

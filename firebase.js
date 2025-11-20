@@ -1,19 +1,38 @@
+// Import Firebase modules from CDN
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { 
+import {
+  createUserWithEmailAndPassword,
   getAuth,
   onAuthStateChanged,
   signInWithEmailAndPassword,
-  signOut 
+  signOut,
+  updateProfile
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  getFirestore,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import {
+  deleteObject,
+  getDownloadURL,
+  getStorage,
+  ref,
+  uploadBytes
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
 // Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyCaGn37wfc76LOCg5UejFG4GswxQZNNEUA",
   authDomain: "tutordesk-3cafb.firebaseapp.com",
@@ -27,12 +46,39 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
-
-const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
 
-// Expose helpers globally so other scripts can use them
+// Expose Firebase services and helpers globally
+window.firebaseApp = app;
 window.firebaseAuth = auth;
+window.firebaseDb = db;
+window.firebaseStorage = storage;
+
+// Auth functions
 window.firebaseSignIn = signInWithEmailAndPassword;
+window.firebaseSignUp = createUserWithEmailAndPassword;
 window.firebaseSignOut = signOut;
 window.firebaseOnAuth = onAuthStateChanged;
+window.firebaseUpdateProfile = updateProfile;
+
+// Firestore functions
+window.firestoreCollection = collection;
+window.firestoreDoc = doc;
+window.firestoreGetDoc = getDoc;
+window.firestoreGetDocs = getDocs;
+window.firestoreSetDoc = setDoc;
+window.firestoreUpdateDoc = updateDoc;
+window.firestoreDeleteDoc = deleteDoc;
+window.firestoreQuery = query;
+window.firestoreWhere = where;
+window.firestoreOrderBy = orderBy;
+window.firestoreAddDoc = addDoc;
+window.firestoreServerTimestamp = serverTimestamp;
+
+// Storage functions
+window.storageRef = ref;
+window.storageUploadBytes = uploadBytes;
+window.storageGetDownloadURL = getDownloadURL;
+window.storageDeleteObject = deleteObject;

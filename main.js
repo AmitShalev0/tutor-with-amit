@@ -1,13 +1,17 @@
 // main.js
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzMt8Dc-MN5ry_pHGTnFtdVPSBCJwtzI8l0pUm8qyJAXlr-vHYOcbQCgQ9ONWUatpV1/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbKeFr3aAq9tmosxniada0DP2oW0Vv91G0H681BYk34yMy0_iC3PqnRzpqVO_CnRVN/exec";
 
 document.addEventListener("DOMContentLoaded", () => {
   const yearSpan = document.getElementById("year");
   if (yearSpan) yearSpan.textContent = new Date().getFullYear();
 
-  setupStudentForm();
-  setupBookingForm();
+  // Skip auto-initialization if page has data-no-auto-init attribute
+  if (document.body.dataset.noAutoInit !== "true") {
+    setupStudentForm();
+    setupBookingForm();
+  }
+  
   setupThemeToggle();
   setupCurrentTime();
 });
@@ -85,14 +89,13 @@ function setupCurrentTime() {
 
     const hours = String(now.getHours()).padStart(2, "0");
     const minutes = String(now.getMinutes()).padStart(2, "0");
-    const seconds = String(now.getSeconds()).padStart(2, "0");
     const ampm = now.getHours() >= 12 ? "pm" : "am";
     const dayName = days[now.getDay()];
     const monthName = months[now.getMonth()];
     const date = now.getDate();
     const year = now.getFullYear();
 
-    timeElem.textContent = `${dayName}, ${monthName} ${date}, ${year}, ${hours}:${minutes}:${seconds}${ampm}`;
+    timeElem.textContent = `${dayName}, ${monthName} ${date}, ${year}, ${hours}:${minutes}${ampm}`;
   }
 
   // Update immediately and then every second
@@ -172,7 +175,7 @@ function setupBookingForm() {
 
   // Function to calculate and display cost
   function updateCost() {
-    const numStudents = parseInt(numSel.value || "1", 10);
+    const numStudents = numSel ? parseInt(numSel.value || "1", 10) : 1;
     const duration = parseFloat(document.getElementById("duration-hours")?.value || "1");
     const includeSummary = includeSummaryCb ? includeSummaryCb.checked : false;
     const discountSlider = document.getElementById("income-slider");
@@ -274,19 +277,24 @@ function setupBookingForm() {
     // Update cost when number of students changes
     updateCost();
   }
-  numSel.addEventListener("change", renderStudentFields);
-  renderStudentFields();
+  
+  if (numSel) {
+    numSel.addEventListener("change", renderStudentFields);
+    renderStudentFields();
+  }
 
   // Recurring toggle
-  recurringCb.addEventListener("change", () => {
-    recurringRow.style.display = recurringCb.checked ? "flex" : "none";
-    if (recurringEndSel) recurringEndSel.required = recurringCb.checked;
-    // If the user turns on recurring and a date is already selected, populate options
-    if (recurringCb.checked && hiddenDate.value && recurringEndSel) {
-      const d = new Date(hiddenDate.value);
-      populateRecurringEndOptions(d);
-    }
-  });
+  if (recurringCb) {
+    recurringCb.addEventListener("change", () => {
+      recurringRow.style.display = recurringCb.checked ? "flex" : "none";
+      if (recurringEndSel) recurringEndSel.required = recurringCb.checked;
+      // If the user turns on recurring and a date is already selected, populate options
+      if (recurringCb.checked && hiddenDate.value && recurringEndSel) {
+        const d = new Date(hiddenDate.value);
+        populateRecurringEndOptions(d);
+      }
+    });
+  }
 
   // Availability calendar
   const calElem = document.getElementById("availability-calendar");
@@ -298,6 +306,11 @@ function setupBookingForm() {
   const weekDisplay = document.getElementById("week-display");
   const prevWeekBtn = document.getElementById("prev-week");
   const nextWeekBtn = document.getElementById("next-week");
+
+  // Skip calendar setup if essential elements don't exist
+  if (!calElem || !hiddenDate || !hiddenStart || !durationSel) {
+    return;
+  }
 
   let selectedBlockId = null;
   let selectedBlockElem = null;
@@ -339,8 +352,13 @@ function setupBookingForm() {
       return;
     }
 
-    // Get available blocks for the selected day
-    const blocks = demoAvailable[selectedDay] || [];
+    // Get the selected duration (default to 1 hour if not selected)
+    const durationHours = durationSel ? parseFloat(durationSel.value || "1") : 1;
+    const durationMin = Math.round(durationHours * 60);
+
+    // Get available and booked blocks for the selected day
+    const availableBlocks = demoAvailable[selectedDay] || [];
+    const bookedBlocks = demoBooked[selectedDay] || [];
     
     // Update each time option
     Array.from(startTimeInput.options).forEach(opt => {
@@ -350,12 +368,20 @@ function setupBookingForm() {
       }
       
       const [h, m] = opt.value.split(':').map(Number);
-      const timeMin = h * 60 + m;
-      const endMin = timeMin + 60; // Need at least 1 hour available
+      const startMin = h * 60 + m;
+      const endMin = startMin + durationMin;
       
-      // Check if this time slot has at least 1 hour available
-      const isAvailable = blocks.some(([s, e]) => s <= timeMin && e >= endMin);
-      opt.disabled = !isAvailable;
+      // Check if this time slot fits within available blocks
+      const fitsInAvailable = availableBlocks.some(([s, e]) => s <= startMin && e >= endMin);
+      
+      // Check if this time slot conflicts with any bookings
+      const hasConflict = bookedBlocks.some(([bs, be]) => {
+        // Check if there's any overlap between requested time and booked time
+        return !(be <= startMin || bs >= endMin);
+      });
+      
+      // Time is available if it fits in available blocks AND has no conflicts
+      opt.disabled = !fitsInAvailable || hasConflict;
     });
   }
 
@@ -638,6 +664,7 @@ function setupBookingForm() {
       const overlay = selectedBlockElem.querySelector('.selection-overlay');
       if (overlay) overlay.remove();
       updateCost(); // Update cost when duration changes
+      updateStartTimeAvailability(); // Update available start times
       return;
     }
 
@@ -646,6 +673,7 @@ function setupBookingForm() {
       const overlay = selectedBlockElem.querySelector('.selection-overlay');
       if (overlay) overlay.remove();
       updateCost(); // Update cost when duration changes
+      updateStartTimeAvailability(); // Update available start times
       return;
     }
 
@@ -657,8 +685,9 @@ function setupBookingForm() {
     const startMin = startHour * 60 + (startMinute || 0);
     const endMin = startMin + Math.round(durHours * 60);
     
-    // Update cost
+    // Update cost and available start times
     updateCost();
+    updateStartTimeAvailability();
 
     function fmt(min) {
       const h = Math.floor(min / 60);
@@ -670,9 +699,14 @@ function setupBookingForm() {
 
     const labelText = `${fmt(startMin)} - ${fmt(endMin)}`;
     
-    // Calculate vertical position and height based on minutes
-    const startMinuteOffset = startMinute / 60; // 0 to 1 fraction of hour
-    const durationInHours = durHours;
+    // Calculate which hour cell to start in and the fractional offset
+    const startHourCell = Math.floor(startMin / 60); // Which hour row (e.g., 11 for 11:45)
+    const startMinuteInHour = startMin % 60; // Minutes within that hour (e.g., 45 for 11:45)
+    const startFraction = startMinuteInHour / 60; // 0 to 1 (e.g., 0.75 for 45 minutes)
+    
+    const endHourCell = Math.floor(endMin / 60);
+    const endMinuteInHour = endMin % 60;
+    const endFraction = endMinuteInHour / 60;
     
     // Remove existing overlay if any
     let overlay = selectedBlockElem.querySelector('.selection-overlay');
@@ -683,15 +717,26 @@ function setupBookingForm() {
     }
     
     // Position overlay based on start minute within the hour cell
-    // The cell represents one hour (e.g., 11:00-12:00), so we offset by the minutes
     overlay.style.position = 'absolute';
     overlay.style.left = '0';
     overlay.style.right = '0';
-    overlay.style.top = `${startMinuteOffset * 100}%`;
-    // Height needs to account for how much extends into following hours
-    const cellHeight = selectedBlockElem.offsetHeight || 50; // Get actual cell height
-    const totalHeight = durationInHours * cellHeight;
-    overlay.style.height = `${totalHeight}px`;
+    overlay.style.top = `${startFraction * 100}%`;
+    
+    // Calculate height based on how many cells it spans
+    const cellHeight = selectedBlockElem.offsetHeight || 50;
+    
+    if (startHourCell === endHourCell) {
+      // Starts and ends in same hour - just show the fraction
+      overlay.style.height = `${(endFraction - startFraction) * cellHeight}px`;
+    } else {
+      // Spans multiple hours
+      // Height = remainder of start hour + full middle hours + fraction of end hour
+      const remainderOfStartHour = (1 - startFraction) * cellHeight;
+      const fullMiddleHours = (endHourCell - startHourCell - 1) * cellHeight;
+      const fractionOfEndHour = endFraction * cellHeight;
+      overlay.style.height = `${remainderOfStartHour + fullMiddleHours + fractionOfEndHour}px`;
+    }
+    
     overlay.style.backgroundColor = 'rgba(59, 130, 246, 0.8)';
     overlay.style.borderRadius = '4px';
     overlay.style.display = 'flex';
@@ -832,6 +877,31 @@ function setupBookingForm() {
               minutes = 30;
             } else {
               minutes = 45;
+            }
+            
+            // Calculate the start time in minutes
+            const clickStartMin = h * 60 + minutes;
+            
+            // Check if at least 1 hour is available from this click point
+            const minEndMin = clickStartMin + 60; // Need at least 1 hour
+            
+            // Check if this time fits within available blocks
+            const fitsInAvailable = blocks.some(([s, e]) => s <= clickStartMin && e >= minEndMin);
+            
+            if (!fitsInAvailable) {
+              // Can't select this time - not enough availability
+              return;
+            }
+            
+            // Check if this time conflicts with any bookings
+            const bookedBlocks = demoBooked[dayIdx] || [];
+            const hasConflict = bookedBlocks.some(([bs, be]) => {
+              return !(be <= clickStartMin || bs >= minEndMin);
+            });
+            
+            if (hasConflict) {
+              // Can't select this time - conflicts with booking
+              return;
             }
             
             // Clear previous selected block(s) and restore their label

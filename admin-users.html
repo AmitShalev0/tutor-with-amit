@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Manage Users – Amit Tutoring</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .users-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      margin-top: 1.5rem;
+    }
+    .users-table th,
+    .users-table td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .users-table th {
+      background: var(--surface-alt);
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .users-table tr:last-child td {
+      border-bottom: none;
+    }
+    .users-table tbody tr {
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .users-table tbody tr:hover {
+      background: var(--surface-alt);
+    }
+    .users-table tbody tr.expanded {
+      background: var(--surface-alt);
+    }
+    .students-dropdown {
+      padding: 1rem;
+      background: var(--surface);
+      border-left: 3px solid var(--accent);
+      margin: 0.5rem 0;
+    }
+    .students-dropdown h4 {
+      margin: 0 0 0.75rem 0;
+      font-size: 0.95rem;
+      color: var(--accent);
+    }
+    .student-item {
+      padding: 0.5rem;
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+    }
+    .student-item:last-child {
+      margin-bottom: 0;
+    }
+    .student-item strong {
+      color: var(--text);
+    }
+    .student-item span {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .action-btn {
+      padding: 0.25rem 0.75rem;
+      font-size: 0.85rem;
+      margin-left: 0.5rem;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      align-items: center;
+      justify-content: center;
+    }
+    .modal.active {
+      display: flex;
+    }
+    .modal-content {
+      background: var(--surface);
+      padding: 2rem;
+      border-radius: var(--radius-md);
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+    .modal-header h3 {
+      margin: 0;
+    }
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--muted);
+      padding: 0;
+      width: 30px;
+      height: 30px;
+      line-height: 1;
+    }
+    .close-btn:hover {
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+<header class="site-header">
+  <div class="container header-inner">
+    <h1 class="logo"><a href="index.html">Amit Tutoring</a></h1>
+
+    <nav>
+      <a href="dashboard.html">My Dashboard</a>
+      <a href="sessions.html">Sessions</a>
+      <a href="book-session.html">Book Session</a>
+      <a href="admin-users.html" class="active">Manage Users</a>
+    </nav>
+
+    <div class="header-right">
+      <label class="theme-switch" title="Toggle light/dark mode">
+        <input type="checkbox" id="theme-toggle" aria-label="Toggle theme">
+        <span class="switch-slider"></span>
+      </label>
+      <div id="current-time" class="current-time"></div>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <h2>Manage Users</h2>
+  <p>View and manage all registered users and their students.</p>
+
+  <div id="loading" class="loading">Loading users...</div>
+
+  <div id="users-content" class="hidden-content">
+    <table class="users-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Registered</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="users-table-body">
+        <!-- Populated by JavaScript -->
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>
+      © <span id="year"></span> Amit Tutoring ·
+      <a href="contact.html">Contact me</a>
+    </p>
+  </div>
+  <script src="main.js"></script>
+</footer>
+
+<!-- Edit User Modal -->
+<div id="edit-modal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Edit User</h3>
+      <button class="close-btn" onclick="closeEditModal()">&times;</button>
+    </div>
+    <form id="edit-user-form">
+      <input type="hidden" id="edit-user-id" />
+      
+      <div class="field-row">
+        <label>Full Name*</label>
+        <input type="text" name="fullName" id="edit-fullName" required />
+      </div>
+
+      <div class="field-row">
+        <label>Email*</label>
+        <input type="email" name="email" id="edit-email" disabled />
+        <p class="help-text">Email cannot be changed.</p>
+      </div>
+
+      <div class="field-row">
+        <label>Phone Number*</label>
+        <input type="tel" name="phone" id="edit-phone" placeholder="(123) 456-7890" required />
+      </div>
+
+      <div class="field-row">
+        <label>Time Zone</label>
+        <select name="timezone" id="edit-timezone">
+          <option value="America/New_York">Eastern Time (ET)</option>
+          <option value="America/Chicago">Central Time (CT)</option>
+          <option value="America/Denver">Mountain Time (MT)</option>
+          <option value="America/Phoenix">Arizona (MST)</option>
+          <option value="America/Los_Angeles">Pacific Time (PT)</option>
+          <option value="America/Anchorage">Alaska Time (AKT)</option>
+          <option value="Pacific/Honolulu">Hawaii Time (HST)</option>
+        </select>
+      </div>
+
+      <div id="modal-error-message" class="error-message"></div>
+      <div id="modal-success-message" class="success-message"></div>
+
+      <div class="field-row">
+        <button type="submit" class="btn primary">Save Changes</button>
+        <button type="button" class="btn tertiary" onclick="closeEditModal()" style="margin-top: 0.5rem;">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Firebase init -->
+<script type="module" src="firebase.js"></script>
+
+<!-- Admin Users logic -->
+<script type="module">
+  const auth = window.firebaseAuth;
+  const db = window.firebaseDb;
+  const onAuth = window.firebaseOnAuth;
+  const getDocs = window.firestoreGetDocs;
+  const getDoc = window.firestoreGetDoc;
+  const collection = window.firestoreCollection;
+  const query = window.firestoreQuery;
+  const where = window.firestoreWhere;
+  const doc = window.firestoreDoc;
+  const updateDoc = window.firestoreUpdateDoc;
+
+  let currentUser = null;
+  let allUsers = [];
+  let expandedRows = new Set();
+
+  // Check authentication (in production, check for admin role)
+  onAuth(auth, async (user) => {
+    if (!user) {
+      window.location.href = "login.html";
+      return;
+    }
+    currentUser = user;
+    await loadUsers();
+  });
+
+  async function loadUsers() {
+    try {
+      const usersSnapshot = await getDocs(collection(db, "users"));
+      allUsers = [];
+      
+      usersSnapshot.forEach((doc) => {
+        allUsers.push({ id: doc.id, ...doc.data() });
+      });
+
+      // Sort by registration date (newest first)
+      allUsers.sort((a, b) => {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
+        return dateB - dateA;
+      });
+
+      displayUsers();
+      
+      document.getElementById("loading").style.display = "none";
+      document.getElementById("users-content").classList.remove("hidden-content");
+    } catch (err) {
+      console.error("Error loading users:", err);
+      document.getElementById("loading").innerHTML = 
+        '<p class="error-message">Error loading users. Please try again later.</p>';
+    }
+  }
+
+  function displayUsers() {
+    const tbody = document.getElementById("users-table-body");
+    tbody.innerHTML = "";
+
+    allUsers.forEach(user => {
+      const tr = document.createElement("tr");
+      tr.setAttribute("data-user-id", user.id);
+      
+      const registeredDate = user.createdAt?.toDate 
+        ? user.createdAt.toDate().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+        : 'N/A';
+
+      tr.innerHTML = `
+        <td>${user.fullName || 'N/A'}</td>
+        <td>${user.email || 'N/A'}</td>
+        <td>${user.phone || 'N/A'}</td>
+        <td>${registeredDate}</td>
+        <td>
+          <button class="btn tertiary action-btn" onclick="event.stopPropagation(); openEditModal('${user.id}')">Edit</button>
+        </td>
+      `;
+
+      tr.addEventListener("click", () => toggleUserRow(user.id));
+      tbody.appendChild(tr);
+
+      // Add students dropdown row (hidden by default)
+      const studentsRow = document.createElement("tr");
+      studentsRow.id = `students-${user.id}`;
+      studentsRow.style.display = "none";
+      studentsRow.innerHTML = `
+        <td colspan="5">
+          <div class="students-dropdown" id="students-content-${user.id}">
+            <p class="loading-text">Loading students...</p>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(studentsRow);
+    });
+  }
+
+  async function toggleUserRow(userId) {
+    const studentsRow = document.getElementById(`students-${userId}`);
+    const userRow = document.querySelector(`tr[data-user-id="${userId}"]`);
+    
+    if (expandedRows.has(userId)) {
+      // Collapse
+      studentsRow.style.display = "none";
+      userRow.classList.remove("expanded");
+      expandedRows.delete(userId);
+    } else {
+      // Expand
+      studentsRow.style.display = "table-row";
+      userRow.classList.add("expanded");
+      expandedRows.add(userId);
+      
+      // Load students if not already loaded
+      await loadUserStudents(userId);
+    }
+  }
+
+  async function loadUserStudents(userId) {
+    const contentDiv = document.getElementById(`students-content-${userId}`);
+    
+    try {
+      const studentsQuery = query(
+        collection(db, "students"),
+        where("userId", "==", userId)
+      );
+      
+      const studentsSnapshot = await getDocs(studentsQuery);
+      const students = [];
+      
+      studentsSnapshot.forEach((doc) => {
+        students.push({ id: doc.id, ...doc.data() });
+      });
+
+      if (students.length === 0) {
+        contentDiv.innerHTML = '<p style="margin: 0; color: var(--muted); font-size: 0.9rem;">No students added yet.</p>';
+      } else {
+        contentDiv.innerHTML = `
+          <h4>Students (${students.length})</h4>
+          ${students.map(student => `
+            <div class="student-item">
+              <strong>${student.studentName || 'Unnamed Student'}</strong><br />
+              <span>
+                ${student.birthdate ? `Born: ${student.birthdate}` : ''}
+                ${student.pronouns ? ` • Pronouns: ${student.pronouns}` : ''}
+                ${student.subject ? ` • Subject: ${student.subject}` : ''}
+                ${student.school ? ` • School: ${student.school}` : ''}
+                ${student.relationship ? ` • Relationship: ${student.relationship}` : ''}
+              </span>
+            </div>
+          `).join('')}
+        `;
+      }
+    } catch (err) {
+      console.error("Error loading students:", err);
+      contentDiv.innerHTML = '<p style="margin: 0; color: var(--error);">Error loading students.</p>';
+    }
+  }
+
+  window.openEditModal = async function(userId) {
+    const user = allUsers.find(u => u.id === userId);
+    if (!user) return;
+
+    document.getElementById("edit-user-id").value = userId;
+    document.getElementById("edit-fullName").value = user.fullName || "";
+    document.getElementById("edit-email").value = user.email || "";
+    document.getElementById("edit-phone").value = user.phone || "";
+    document.getElementById("edit-timezone").value = user.timezone || "America/New_York";
+
+    document.getElementById("edit-modal").classList.add("active");
+    clearModalMessages();
+  };
+
+  window.closeEditModal = function() {
+    document.getElementById("edit-modal").classList.remove("active");
+    clearModalMessages();
+  };
+
+  // Handle edit form submission
+  document.getElementById("edit-user-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    clearModalMessages();
+
+    const userId = document.getElementById("edit-user-id").value;
+    const fullName = document.getElementById("edit-fullName").value.trim();
+    const phone = document.getElementById("edit-phone").value.trim();
+    const timezone = document.getElementById("edit-timezone").value;
+
+    if (!fullName || !phone) {
+      showModalError("Please fill in all required fields.");
+      return;
+    }
+
+    try {
+      const userDocRef = doc(db, "users", userId);
+      await updateDoc(userDocRef, {
+        fullName,
+        phone,
+        timezone
+      });
+
+      showModalSuccess("User updated successfully!");
+      
+      // Update local data
+      const user = allUsers.find(u => u.id === userId);
+      if (user) {
+        user.fullName = fullName;
+        user.phone = phone;
+        user.timezone = timezone;
+      }
+
+      // Refresh display
+      displayUsers();
+
+      // Close modal after 1.5 seconds
+      setTimeout(() => {
+        closeEditModal();
+      }, 1500);
+    } catch (err) {
+      console.error("Error updating user:", err);
+      showModalError("Failed to update user. Please try again.");
+    }
+  });
+
+  function showModalError(message) {
+    const errorDiv = document.getElementById("modal-error-message");
+    errorDiv.textContent = message;
+    errorDiv.style.display = "block";
+  }
+
+  function showModalSuccess(message) {
+    const successDiv = document.getElementById("modal-success-message");
+    successDiv.textContent = message;
+    successDiv.style.display = "block";
+  }
+
+  function clearModalMessages() {
+    document.getElementById("modal-error-message").style.display = "none";
+    document.getElementById("modal-success-message").style.display = "none";
+  }
+
+  // Close modal on outside click
+  document.getElementById("edit-modal").addEventListener("click", (e) => {
+    if (e.target.id === "edit-modal") {
+      closeEditModal();
+    }
+  });
+</script>
+</body>
+</html>

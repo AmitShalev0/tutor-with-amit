@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>My Dashboard – Amit Tutoring</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+    .welcome-text {
+      font-size: 1.8rem;
+      font-weight: 600;
+    }
+    .logout-btn {
+      padding: 0.5rem 1rem;
+      background: transparent;
+      border: 1px solid #4b5563;
+      color: #e5e7eb;
+      border-radius: 0.4rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .logout-btn:hover {
+      background: #1f2937;
+    }
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .dashboard-card {
+      background: #1f2937;
+      padding: 1.5rem;
+      border-radius: 0.75rem;
+      border: 1px solid #374151;
+    }
+    .dashboard-card h3 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      font-size: 1.2rem;
+    }
+    .student-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .student-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem;
+      margin-bottom: 0.5rem;
+      background: #111827;
+      border-radius: 0.5rem;
+      border: 1px solid #374151;
+    }
+    .student-info {
+      flex: 1;
+    }
+    .student-name {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    .student-details {
+      font-size: 0.85rem;
+      color: #9ca3af;
+    }
+    .student-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .btn-small {
+      padding: 0.4rem 0.8rem;
+      font-size: 0.85rem;
+      border-radius: 0.4rem;
+      border: none;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn-edit {
+      background: #3b82f6;
+      color: white;
+    }
+    .btn-delete {
+      background: #ef4444;
+      color: white;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 2rem;
+      color: #9ca3af;
+    }
+    .action-buttons {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .quick-actions {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .info-item {
+      margin-bottom: 0.5rem;
+      font-size: 0.95rem;
+    }
+    .info-label {
+      color: #9ca3af;
+      font-size: 0.85rem;
+    }
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+<header class="site-header">
+  <div class="container header-inner">
+    <h1 class="logo"><a href="index.html">Amit Tutoring</a></h1>
+
+    <nav>
+      <a href="dashboard.html">My Dashboard</a>
+      <a href="sessions.html">Sessions</a>
+      <a href="book-session.html">Book Session</a>
+    </nav>
+
+    <div class="header-right">
+      <label class="theme-switch" title="Toggle light/dark mode">
+        <input type="checkbox" id="theme-toggle" aria-label="Toggle theme">
+        <span class="switch-slider"></span>
+      </label>
+      <div id="current-time" class="current-time"></div>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <div class="dashboard-header">
+    <h2 class="welcome-text">Welcome, <span id="user-name">...</span>!</h2>
+    <button id="logout-btn" class="logout-btn">Log Out</button>
+  </div>
+
+  <div id="loading" class="loading">Loading your dashboard...</div>
+
+  <div id="dashboard-content" class="hidden-content">
+    <div class="dashboard-grid">
+      <!-- My Profile Card -->
+      <div class="dashboard-card">
+        <h3>My Profile</h3>
+        <div id="profile-info">
+          <div class="info-item">
+            <div class="info-label">Email</div>
+            <div id="profile-email">-</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Phone</div>
+            <div id="profile-phone">-</div>
+          </div>
+        </div>
+        <div class="action-buttons">
+          <button class="btn secondary" onclick="window.location.href='edit-profile.html'">Edit Profile</button>
+        </div>
+      </div>
+
+      <!-- Quick Actions Card -->
+      <div class="dashboard-card">
+        <h3>Quick Actions</h3>
+        <div class="quick-actions">
+          <button class="btn primary" onclick="window.location.href='add-student.html'">
+            + Add Student
+          </button>
+          <button class="btn primary" onclick="window.location.href='book-session.html'">
+            📅 Book Session
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- My Students Section -->
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="margin: 0;">My Students</h3>
+        <button class="btn primary" onclick="window.location.href='add-student.html'">+ Add Student</button>
+      </div>
+      <div id="students-container">
+        <div class="empty-state">
+          <p>No students added yet.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>
+      © <span id="year"></span> Amit Tutoring ·
+      <a href="contact.html">Contact me</a>
+    </p>
+  </div>
+  <script src="main.js"></script>
+</footer>
+
+<!-- Firebase init -->
+<script type="module" src="firebase.js"></script>
+
+<!-- Dashboard logic -->
+<script type="module">
+  const auth = window.firebaseAuth;
+  const db = window.firebaseDb;
+  const onAuth = window.firebaseOnAuth;
+  const signOut = window.firebaseSignOut;
+  const getDoc = window.firestoreGetDoc;
+  const getDocs = window.firestoreGetDocs;
+  const doc = window.firestoreDoc;
+  const collection = window.firestoreCollection;
+  const query = window.firestoreQuery;
+  const where = window.firestoreWhere;
+  const deleteDoc = window.firestoreDeleteDoc;
+
+  const loadingEl = document.getElementById("loading");
+  const contentEl = document.getElementById("dashboard-content");
+  const userNameEl = document.getElementById("user-name");
+  const profileEmailEl = document.getElementById("profile-email");
+  const profilePhoneEl = document.getElementById("profile-phone");
+  const studentsContainer = document.getElementById("students-container");
+  const logoutBtn = document.getElementById("logout-btn");
+
+  let currentUser = null;
+
+  // Check authentication
+  onAuth(auth, async (user) => {
+    if (!user) {
+      // Not logged in, redirect to login
+      window.location.href = "login.html";
+      return;
+    }
+
+    currentUser = user;
+    await loadDashboard(user);
+  });
+
+  // Logout handler
+  logoutBtn.addEventListener("click", async () => {
+    try {
+      await signOut(auth);
+      window.location.href = "login.html";
+    } catch (err) {
+      console.error("Logout error:", err);
+      alert("Failed to log out. Please try again.");
+    }
+  });
+
+  async function loadDashboard(user) {
+    try {
+      // Load user profile
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      
+      if (!userDoc.exists()) {
+        console.error("User profile not found");
+        loadingEl.textContent = "Error loading profile. Please contact support.";
+        return;
+      }
+
+      const userData = userDoc.data();
+      
+      // Display user info
+      userNameEl.textContent = userData.fullName || user.displayName || "Friend";
+      profileEmailEl.textContent = userData.email || user.email;
+      profilePhoneEl.textContent = userData.phone || "Not provided";
+
+      // Load students
+      await loadStudents(user.uid);
+
+      // Show dashboard
+      loadingEl.style.display = "none";
+      contentEl.style.display = "block";
+
+    } catch (err) {
+      console.error("Error loading dashboard:", err);
+      loadingEl.textContent = "Error loading dashboard. Please refresh the page.";
+    }
+  }
+
+  async function loadStudents(userId) {
+    try {
+      const studentsQuery = query(
+        collection(db, "students"),
+        where("userId", "==", userId)
+      );
+      
+      const querySnapshot = await getDocs(studentsQuery);
+      
+      if (querySnapshot.empty) {
+        studentsContainer.innerHTML = `
+          <div class="empty-state">
+            <p>No students added yet.</p>
+            <button class="btn primary" onclick="window.location.href='add-student.html'">Add Your First Student</button>
+          </div>
+        `;
+        return;
+      }
+
+      // Build student list
+      const studentList = document.createElement("ul");
+      studentList.className = "student-list";
+
+      querySnapshot.forEach((doc) => {
+        const student = doc.data();
+        const studentId = doc.id;
+        
+        const li = document.createElement("li");
+        li.className = "student-item";
+        li.innerHTML = `
+          <div class="student-info">
+            <div class="student-name">${student.studentName}</div>
+            <div class="student-details">
+              ${student.subject} • ${student.school}
+              ${student.yearOfBirth ? ` • Born ${student.yearOfBirth}` : ''}
+            </div>
+          </div>
+          <div class="student-actions">
+            <button class="btn-small btn-edit" onclick="editStudent('${studentId}')">Edit</button>
+            <button class="btn-small btn-delete" onclick="deleteStudent('${studentId}', '${student.studentName}')">Delete</button>
+          </div>
+        `;
+        studentList.appendChild(li);
+      });
+
+      studentsContainer.innerHTML = "";
+      studentsContainer.appendChild(studentList);
+
+    } catch (err) {
+      console.error("Error loading students:", err);
+      studentsContainer.innerHTML = `<p class="error">Error loading students. Please refresh the page.</p>`;
+    }
+  }
+
+  // Make functions globally accessible
+  window.editStudent = function(studentId) {
+    window.location.href = `edit-student.html?id=${studentId}`;
+  };
+
+  window.deleteStudent = async function(studentId, studentName) {
+    if (!confirm(`Are you sure you want to delete ${studentName}'s profile? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, "students", studentId));
+      alert(`${studentName}'s profile has been deleted.`);
+      await loadStudents(currentUser.uid);
+    } catch (err) {
+      console.error("Error deleting student:", err);
+      alert("Failed to delete student. Please try again.");
+    }
+  };
+</script>
+</body>
+</html>

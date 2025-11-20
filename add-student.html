@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Add Student – Amit Tutoring</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="container header-inner">
+    <h1 class="logo"><a href="index.html">Amit Tutoring</a></h1>
+
+    <nav>
+      <a href="dashboard.html">My Dashboard</a>
+      <a href="sessions.html">Sessions</a>
+      <a href="book-session.html">Book Session</a>
+    </nav>
+
+    <div class="header-right">
+      <label class="theme-switch" title="Toggle light/dark mode">
+        <input type="checkbox" id="theme-toggle" aria-label="Toggle theme">
+        <span class="switch-slider"></span>
+      </label>
+      <div id="current-time" class="current-time"></div>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <h2>Add a New Student</h2>
+  <p>Tell me about your student so I can plan the right support.</p>
+
+  <form id="add-student-form" class="card">
+    <div class="field-row">
+      <label>Student's Full Name*</label>
+      <input type="text" name="student_name" id="student-name" placeholder="Alex Johnson" required 
+             pattern="^[a-zA-Z][a-zA-Z'-]* [a-zA-Z][a-zA-Z'-]*$" 
+             title="Student name must be two words (first and last name), each with only letters, apostrophes, or dashes." />
+    </div>
+
+    <div class="field-row">
+      <label>Birthdate*</label>
+      <input type="date" name="birthdate" id="birthdate" min="1990-01-01" max="2030-12-31" title="Student's birthdate" required />
+    </div>
+
+    <div class="field-row">
+      <label>Pronouns</label>
+      <select name="pronouns" id="pronouns" title="Student's pronouns">
+        <option value="">Prefer not to say</option>
+        <option value="he/him">He/Him</option>
+        <option value="she/her">She/Her</option>
+        <option value="they/them">They/Them</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+
+    <div class="field-row">
+      <label>Main Subject</label>
+      <input type="text" name="subject" id="subject" placeholder="e.g. Math 7, Physics 30, Chemistry 30 IB, Biology 30..." />
+    </div>
+
+      <div class="field-row">
+        <label>School</label>
+        <input type="text" name="school" id="school" placeholder="e.g. Woodbine Elementary, Wisewood High School..." />
+    </div>
+
+    <div class="field-row">
+        <label>Relationship to You*</label>
+        <select name="relationship" id="relationship" title="Relationship to you" required>
+            <option value="">Select relationship...</option>
+            <option value="parent">Child</option>
+            <option value="guardian">Legal Guardian</option>
+            <option value="self">Self (I'm the student)</option>
+            <option value="sibling">Sibling</option>
+            <option value="friend">Friend</option>
+            <option value="other">Other</option>
+        </select>
+    </div>
+
+    <div class="field-row">
+        <label>Additional Notes</label>
+        <textarea name="notes" id="notes" rows="4" placeholder="Any additional information about learning style, goals, or challenges..."></textarea>
+    </div>
+
+    <div class="flex-buttons">
+        <button type="submit" class="btn primary">Add Student</button>
+        <button type="button" class="btn tertiary" onclick="window.location.href='dashboard.html'">Cancel</button>
+    </div>
+
+    <p id="form-message" class="form-message"></p>
+  </form>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>
+      © <span id="year"></span> Amit Tutoring ·
+      <a href="contact.html">Contact me</a>
+    </p>
+  </div>
+  <script src="main.js"></script>
+</footer>
+
+<!-- Firebase init -->
+<script type="module" src="firebase.js"></script>
+
+<!-- Add student logic -->
+<script type="module">
+  const auth = window.firebaseAuth;
+  const db = window.firebaseDb;
+  const onAuth = window.firebaseOnAuth;
+  const addDoc = window.firestoreAddDoc;
+  const collection = window.firestoreCollection;
+  const serverTimestamp = window.firestoreServerTimestamp;
+
+  const form = document.getElementById("add-student-form");
+  const msg = document.getElementById("form-message");
+
+  let currentUser = null;
+
+  // Check authentication
+  onAuth(auth, (user) => {
+    if (!user) {
+      window.location.href = "login.html";
+      return;
+    }
+    currentUser = user;
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    msg.textContent = "Adding student...";
+    msg.className = "form-message";
+
+    if (!currentUser) {
+      msg.textContent = "You must be logged in to add a student.";
+      msg.classList.add("error");
+      return;
+    }
+
+    const studentData = {
+      userId: currentUser.uid,
+      studentName: document.getElementById("student-name").value.trim(),
+      birthdate: document.getElementById("birthdate").value,
+      pronouns: document.getElementById("pronouns").value || null,
+      subject: document.getElementById("subject").value.trim() || null,
+      school: document.getElementById("school").value.trim() || null,
+      relationship: document.getElementById("relationship").value,
+      notes: document.getElementById("notes").value.trim(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+
+    try {
+      await addDoc(collection(db, "students"), studentData);
+      
+      msg.textContent = "Student added successfully!";
+      msg.classList.add("ok");
+      
+      // Redirect to dashboard after 1.5 seconds
+      setTimeout(() => {
+        window.location.href = "dashboard.html";
+      }, 1500);
+
+    } catch (err) {
+      console.error("Error adding student:", err);
+      msg.textContent = "Failed to add student. Please try again.";
+      msg.classList.add("error");
+    }
+  });
+</script>
+</body>
+</html>

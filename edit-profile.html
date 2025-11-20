@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Edit Profile – Amit Tutoring</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="container header-inner">
+    <h1 class="logo"><a href="index.html">Amit Tutoring</a></h1>
+
+    <nav>
+      <a href="dashboard.html">My Dashboard</a>
+      <a href="sessions.html">Sessions</a>
+      <a href="book-session.html">Book Session</a>
+    </nav>
+
+    <div class="header-right">
+      <label class="theme-switch" title="Toggle light/dark mode">
+        <input type="checkbox" id="theme-toggle" aria-label="Toggle theme">
+        <span class="switch-slider"></span>
+      </label>
+      <div id="current-time" class="current-time"></div>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <h2>Edit Profile</h2>
+  <p>Update your account information.</p>
+
+  <div id="loading" class="loading">Loading your profile...</div>
+
+  <div id="profile-content" class="hidden-content">
+    <form id="profile-form" class="card">
+      <div class="field-row">
+        <label>Full Name*</label>
+        <input type="text" name="fullName" id="fullName" required />
+      </div>
+
+      <div class="field-row">
+        <label>Email*</label>
+        <input type="email" name="email" id="email" disabled />
+        <p class="help-text">Email cannot be changed. Contact support if you need to update it.</p>
+      </div>
+
+      <div class="field-row">
+        <label>Phone Number*</label>
+        <input type="tel" name="phone" id="phone" placeholder="(123) 456-7890" required />
+      </div>
+
+      <div class="field-row">
+        <label>Time Zone</label>
+        <select name="timezone" id="timezone">
+          <option value="America/New_York">Eastern Time (ET)</option>
+          <option value="America/Chicago">Central Time (CT)</option>
+          <option value="America/Denver">Mountain Time (MT)</option>
+          <option value="America/Phoenix">Arizona (MST)</option>
+          <option value="America/Los_Angeles">Pacific Time (PT)</option>
+          <option value="America/Anchorage">Alaska Time (AKT)</option>
+          <option value="Pacific/Honolulu">Hawaii Time (HST)</option>
+        </select>
+      </div>
+
+      <div id="error-message" class="error-message"></div>
+      <div id="success-message" class="success-message"></div>
+
+      <div class="field-row">
+        <button type="submit" class="btn primary">Save Changes</button>
+        <button type="button" class="btn tertiary" onclick="window.location.href='dashboard.html'" style="margin-top: 0.5rem;">Cancel</button>
+      </div>
+    </form>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>
+      © <span id="year"></span> Amit Tutoring ·
+      <a href="contact.html">Contact me</a>
+    </p>
+  </div>
+  <script src="main.js"></script>
+</footer>
+
+<!-- Firebase init -->
+<script type="module" src="firebase.js"></script>
+
+<!-- Edit Profile logic -->
+<script type="module">
+  const auth = window.firebaseAuth;
+  const db = window.firebaseDb;
+  const onAuth = window.firebaseOnAuth;
+  const getDoc = window.firestoreGetDoc;
+  const doc = window.firestoreDoc;
+  const updateDoc = window.firestoreUpdateDoc;
+
+  let currentUser = null;
+
+  // Check authentication
+  onAuth(auth, async (user) => {
+    if (!user) {
+      window.location.href = "login.html";
+      return;
+    }
+    currentUser = user;
+    await loadProfile();
+  });
+
+  async function loadProfile() {
+    try {
+      const userDocRef = doc(db, "users", currentUser.uid);
+      const userSnap = await getDoc(userDocRef);
+
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        document.getElementById("fullName").value = userData.fullName || "";
+        document.getElementById("email").value = currentUser.email || "";
+        document.getElementById("phone").value = userData.phone || "";
+        document.getElementById("timezone").value = userData.timezone || "America/New_York";
+      }
+
+      // Show profile form
+      document.getElementById("loading").style.display = "none";
+      document.getElementById("profile-content").classList.remove("hidden-content");
+    } catch (err) {
+      console.error("Error loading profile:", err);
+      showError("Failed to load profile. Please try again.");
+      document.getElementById("loading").style.display = "none";
+    }
+  }
+
+  // Handle form submission
+  document.getElementById("profile-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    clearMessages();
+
+    const fullName = document.getElementById("fullName").value.trim();
+    const phone = document.getElementById("phone").value.trim();
+    const timezone = document.getElementById("timezone").value;
+
+    if (!fullName || !phone) {
+      showError("Please fill in all required fields.");
+      return;
+    }
+
+    try {
+      const userDocRef = doc(db, "users", currentUser.uid);
+      await updateDoc(userDocRef, {
+        fullName,
+        phone,
+        timezone
+      });
+
+      showSuccess("Profile updated successfully!");
+      
+      // Redirect back to dashboard after 2 seconds
+      setTimeout(() => {
+        window.location.href = "dashboard.html";
+      }, 2000);
+    } catch (err) {
+      console.error("Error updating profile:", err);
+      showError("Failed to update profile. Please try again.");
+    }
+  });
+
+  function showError(message) {
+    const errorDiv = document.getElementById("error-message");
+    errorDiv.textContent = message;
+    errorDiv.style.display = "block";
+  }
+
+  function showSuccess(message) {
+    const successDiv = document.getElementById("success-message");
+    successDiv.textContent = message;
+    successDiv.style.display = "block";
+  }
+
+  function clearMessages() {
+    document.getElementById("error-message").style.display = "none";
+    document.getElementById("success-message").style.display = "none";
+  }
+</script>
+</body>
+</html>

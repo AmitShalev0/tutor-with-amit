@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Book a Session – Amit Tutoring</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body data-no-auto-init="true">
+<header class="site-header">
+  <div class="container header-inner">
+    <h1 class="logo"><a href="index.html">Amit Tutoring</a></h1>
+
+    <nav>
+      <a href="dashboard.html">My Dashboard</a>
+      <a href="sessions.html">Sessions</a>
+      <a href="book-session.html" class="active">Book Session</a>
+    </nav>
+
+    <div class="header-right">
+      <label class="theme-switch" title="Toggle light/dark mode">
+        <input type="checkbox" id="theme-toggle" aria-label="Toggle theme">
+        <span class="switch-slider"></span>
+      </label>
+      <div id="current-time" class="current-time"></div>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <h2>Book a Tutoring Session</h2>
+  <p>
+    Select your student(s), choose a subject, and pick a time from my available schedule.
+    You'll get a confirmation by email after I approve the request.
+  </p>
+
+  <form id="booking-form" class="card">
+    <div class="students-grid">
+      <div class="field-row">
+        <label>Student 1 (Primary)*</label>
+        <select name="student_1" id="student-1" title="Primary student for this session" required>
+          <option value="">Select student...</option>
+        </select>
+      </div>
+
+      <div class="field-row">
+        <label>Student 2</label>
+        <select name="student_2" id="student-2" title="Optional second student">
+          <option value="">Select student...</option>
+        </select>
+      </div>
+
+      <div class="field-row">
+        <label>Student 3</label>
+        <select name="student_3" id="student-3" title="Optional third student">
+          <option value="">Select student...</option>
+        </select>
+      </div>
+
+      <div class="field-row">
+        <label>Student 4</label>
+        <select name="student_4" id="student-4" title="Optional fourth student">
+          <option value="">Select student...</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <label>Subject for this session*</label>
+      <input type="text" name="subject" id="subject" placeholder="e.g. Math 7, Physics 30, Chemistry 30 IB..." required />
+    </div>
+
+    <div class="field-row">
+      <label>Choose a time from the availability calendar*</label>
+      <p class="help-text">
+        Choose a timeslot (at least 1 hour) by clicking on a block of time on the calendar or using the dropdowns below.
+      </p>
+      <div class="week-nav">
+        <button type="button" id="prev-week" class="btn tertiary week-nav-btn">← Previous Week</button>
+        <span id="week-display" class="week-display">Week of ...</span>
+        <button type="button" id="next-week" class="btn tertiary week-nav-btn">Next Week →</button>
+      </div>
+      <div id="availability-calendar" class="availability-calendar">
+        <!-- Filled by JS -->
+      </div>
+      <input type="hidden" name="selected_date" id="selected-date" />
+      <input type="hidden" name="selected_start" id="selected-start" />
+    </div>
+
+    <div class="field-row time-grid">
+      <div>
+        <label>Day*</label>
+        <select name="day_of_week" id="day-select" title="Day of Week" class="pointer-cursor" required>
+          <option value="">Select day…</option>
+          <option value="0">Monday</option>
+          <option value="1">Tuesday</option>
+          <option value="2">Wednesday</option>
+          <option value="3">Thursday</option>
+          <option value="4">Friday</option>
+        </select>
+      </div>
+      <div>
+        <label>Start Time*</label>
+        <select name="start_time" id="start-time-input" title="Start Time" class="pointer-cursor" required>
+          <option value="">Select start time…</option>
+        </select>
+      </div>
+      <div>
+        <label>End Time*</label>
+        <select name="duration_hours" id="duration-hours" title="End Time" required>
+          <option value="">Select end time…</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field-row checkbox-row">
+      <label>
+        <input type="checkbox" id="recurring" name="recurring" title="Make this a weekly recurring session" />
+        Make this a weekly recurring session
+      </label>
+    </div>
+
+    <div class="field-row hidden" id="recurring-end-row">
+      <label>Last date for recurring sessions (YYYY-MM-DD)*</label>
+      <select name="recurring_end" id="recurring-end" title="Last date for recurring sessions">
+        <option value="">Choose last date…</option>
+      </select>
+    </div>
+
+    <div class="field-row checkbox-row">
+      <label>
+        <input type="checkbox" id="include-summary" name="include_summary" title="Include summary of the session and relevant homework" />
+        Include summary of the session and relevant homework (+$10)
+      </label>
+    </div>
+
+    <div class="field-row">
+      <label>Questions / Comments</label>
+      <textarea name="questions" id="questions" rows="4" title="Questions / Comments"></textarea>
+    </div>
+
+    <div class="field-row checkbox-row">
+      <label>
+        <input type="checkbox" id="sliding-scale-toggle" name="sliding_scale_toggle" title="Enable sliding scale for low-income support" />
+        Apply sliding scale for low-income support
+      </label>
+    </div>
+
+    <div class="field-row hidden sliding-scale-container" id="sliding-scale-row">
+      <label for="income-slider">Adjust Discount</label>
+      <div class="slider-row">
+        <span class="slider-label">Standard Rate</span>
+        <input type="range" id="income-slider" class="slider-input" min="0" max="10" value="0" step="1" />
+        <span class="slider-label">Maximum Discount</span>
+      </div>
+      <div class="discount-display">
+        Discount: $<span id="discount-amount">0</span> off
+      </div>
+    </div>
+
+    <div class="cost-row">
+      <div id="cost-display" class="cost-display">
+        Total Cost: $50.00 per session
+      </div>
+      <button type="submit" class="btn primary">Submit Booking Request</button>
+    </div>
+
+    <p id="booking-form-message" class="form-message"></p>
+  </form>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>
+      © <span id="year"></span> Amit Tutoring ·
+      <a href="contact.html">Contact me</a>
+    </p>
+  </div>
+  <script src="main.js"></script>
+</footer>
+
+<!-- Firebase init -->
+<script type="module" src="firebase.js"></script>
+
+<!-- Booking logic -->
+<script type="module">
+  const auth = window.firebaseAuth;
+  const db = window.firebaseDb;
+  const onAuth = window.firebaseOnAuth;
+  const getDocs = window.firestoreGetDocs;
+  const getDoc = window.firestoreGetDoc;
+  const collection = window.firestoreCollection;
+  const doc = window.firestoreDoc;
+  const query = window.firestoreQuery;
+  const where = window.firestoreWhere;
+
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbKeFr3aAq9tmosxniada0DP2oW0Vv91G0H681BYk34yMy0_iC3PqnRzpqVO_CnRVN/exec";
+
+  let currentUser = null;
+  let userProfile = null;
+  let userStudents = [];
+
+  // Check authentication
+  onAuth(auth, async (user) => {
+    if (!user) {
+      window.location.href = "login.html";
+      return;
+    }
+    currentUser = user;
+    await loadUserData();
+  });
+
+  async function loadUserData() {
+    try {
+      // Load user profile
+      const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+      if (userDoc.exists()) {
+        userProfile = userDoc.data();
+      }
+
+      // Load students
+      const studentsQuery = query(
+        collection(db, "students"),
+        where("userId", "==", currentUser.uid)
+      );
+      const querySnapshot = await getDocs(studentsQuery);
+      
+      userStudents = [];
+      querySnapshot.forEach((doc) => {
+        userStudents.push({ id: doc.id, ...doc.data() });
+      });
+
+      displayStudentDropdowns();
+
+      // Initialize the booking calendar after user data is loaded
+      // Note: We call setupBookingForm() from main.js, but since book-session.html
+      // has a different form structure, some form elements may not exist
+      // The function checks for null before accessing elements, so it's safe
+      if (typeof setupBookingForm === 'function') {
+        setupBookingForm();
+      }
+    } catch (err) {
+      console.error("Error loading user data:", err);
+    }
+  }
+
+  function displayStudentDropdowns() {
+    // Populate all 4 student dropdowns
+    const dropdowns = [
+      document.getElementById("student-1"),
+      document.getElementById("student-2"),
+      document.getElementById("student-3"),
+      document.getElementById("student-4")
+    ];
+    
+    if (userStudents.length === 0) {
+      // Show message and disable first dropdown
+      const firstDropdown = dropdowns[0];
+      firstDropdown.innerHTML = '<option value="">No students added yet</option>';
+      firstDropdown.disabled = true;
+      return;
+    }
+
+    // Populate each dropdown with user's students
+    dropdowns.forEach((dropdown) => {
+      // Keep the placeholder option
+      const placeholder = dropdown.querySelector('option[value=""]');
+      
+      // Clear existing options except placeholder
+      dropdown.innerHTML = '';
+      dropdown.appendChild(placeholder);
+      
+      // Add student options
+      userStudents.forEach((student) => {
+        const option = document.createElement('option');
+        option.value = student.id;
+        option.textContent = student.studentName;
+        dropdown.appendChild(option);
+      });
+    });
+  }
+
+  // Initialize booking form (reuse existing main.js logic)
+  // The form will be populated with user's email, phone, and name automatically
+  document.getElementById("booking-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    
+    const msg = document.getElementById("booking-form-message");
+    msg.textContent = "Submitting booking request…";
+    msg.className = "form-message";
+
+    // Get selected students from dropdowns
+    const selectedStudents = [];
+    const studentIds = [];
+    
+    for (let i = 1; i <= 4; i++) {
+      const dropdown = document.getElementById(`student-${i}`);
+      if (dropdown && dropdown.value) {
+        const student = userStudents.find(s => s.id === dropdown.value);
+        if (student) {
+          selectedStudents.push(student.studentName);
+          studentIds.push(student.id);
+        }
+      }
+    }
+
+    if (selectedStudents.length === 0) {
+      msg.textContent = "Please select at least one student.";
+      msg.classList.add("error");
+      return;
+    }
+
+    const formData = new FormData(e.target);
+    const obj = Object.fromEntries(formData.entries());
+    obj.type = "booking_request";
+    obj.guardian_full_name = userProfile.fullName;
+    obj.email = userProfile.email;
+    obj.phone = userProfile.phone;
+    obj.num_students = selectedStudents.length;
+    obj.student_names = selectedStudents.join(", ");
+    obj.session_title = `${obj.subject} – ${selectedStudents.join(", ")}`;
+
+    // Calculate final cost
+    const duration = parseFloat(obj.duration_hours || "1");
+    const includeSummary = obj.include_summary === "on";
+    const slidingScaleEnabled = obj.sliding_scale_toggle === "on";
+    const discountSlider = document.getElementById("income-slider");
+    
+    const baseRate = 50;
+    const additionalRate = 20;
+    const summaryFee = includeSummary ? 10 : 0;
+    const costPerHour = baseRate + ((selectedStudents.length - 1) * additionalRate);
+    const standardTotal = (costPerHour * duration) + summaryFee;
+    
+    let finalCost = standardTotal;
+    if (slidingScaleEnabled && discountSlider) {
+      const discountSteps = parseInt(discountSlider.value);
+      const discountPerHour = discountSteps * 10;
+      const discountAmount = discountPerHour * duration;
+      finalCost = standardTotal - discountAmount;
+    }
+    
+    obj.final_cost = finalCost.toFixed(2);
+
+    try {
+      await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        body: JSON.stringify(obj),
+      });
+
+      msg.textContent = "Thanks! Your booking request has been submitted. I will review it and email you with confirmation.";
+      msg.classList.add("ok");
+      
+      setTimeout(() => {
+        window.location.href = "dashboard.html";
+      }, 2000);
+
+    } catch (err) {
+      console.error(err);
+      msg.textContent = "Something went wrong. Please try again or contact me directly.";
+      msg.classList.add("error");
+    }
+  });
+</script>
+</body>
+</html>
