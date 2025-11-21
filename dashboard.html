@@ -153,7 +153,7 @@
     <div class="dashboard-grid">
       <!-- My Profile Card -->
       <div class="dashboard-card">
-        <h3>My Profile</h3>
+        <h3 id="profile-heading">My Profile</h3>
         <div id="profile-info">
           <div class="info-item">
             <div class="info-label">Email</div>
@@ -228,6 +228,7 @@
   const loadingEl = document.getElementById("loading");
   const contentEl = document.getElementById("dashboard-content");
   const userNameEl = document.getElementById("user-name");
+  const profileHeadingEl = document.getElementById("profile-heading");
   const profileEmailEl = document.getElementById("profile-email");
   const profilePhoneEl = document.getElementById("profile-phone");
   const studentsContainer = document.getElementById("students-container");
@@ -272,7 +273,9 @@
       const userData = userDoc.data();
       
       // Display user info
-      userNameEl.textContent = userData.fullName || user.displayName || "Friend";
+      const fullName = userData.fullName || user.displayName || "Friend";
+      userNameEl.textContent = fullName;
+      profileHeadingEl.textContent = fullName;
       profileEmailEl.textContent = userData.email || user.email;
       profilePhoneEl.textContent = userData.phone || "Not provided";
 
