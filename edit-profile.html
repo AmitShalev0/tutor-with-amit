@@ -13,8 +13,7 @@
 
     <nav>
       <a href="dashboard.html">My Dashboard</a>
-      <a href="sessions.html">Sessions</a>
-      <a href="book-session.html">Book Session</a>
+      <a href="sessions.html">My Sessions</a>
     </nav>
 
     <div class="header-right">
@@ -56,7 +55,7 @@
 
       <div class="field-row">
         <button type="submit" class="btn primary">Save Changes</button>
-        <button type="button" class="btn tertiary" onclick="window.location.href='dashboard.html'" style="margin-top: 0.5rem;">Cancel</button>
+        <button type="button" class="btn tertiary mt-0-5" onclick="window.location.href='dashboard.html'">Cancel</button>
       </div>
     </form>
   </div>
@@ -125,7 +124,7 @@
 
     const fullName = document.getElementById("fullName").value.trim();
     const phone = document.getElementById("phone").value.trim();
-    
+
     if (!fullName || !phone) {
       showError("Please fill in all required fields.");
       return;

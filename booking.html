@@ -89,10 +89,10 @@
       <p class="help-text">
         Choose a timeslot (at least 1 hour) by clicking on a block of time on the calendar or using the dropdowns below.
       </p>
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-        <button type="button" id="prev-week" class="btn tertiary" style="padding: 6px 12px;">← Previous Week</button>
-        <span id="week-display" style="font-weight: bold; font-size: 0.95rem;">Week of 17/11/2025</span>
-        <button type="button" id="next-week" class="btn tertiary" style="padding: 6px 12px;">Next Week →</button>
+      <div class="week-nav">
+        <button type="button" id="prev-week" class="btn tertiary padding-sm">← Previous Week</button>
+        <span id="week-display" class="week-display">Week of 17/11/2025</span>
+        <button type="button" id="next-week" class="btn tertiary padding-sm">Next Week →</button>
       </div>
       <div id="availability-calendar" class="availability-calendar">
         <!-- Filled by JS using availability from Apps Script -->
@@ -101,10 +101,10 @@
       <input type="hidden" name="selected_start" id="selected-start" />
     </div>
 
-    <div class="field-row" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+    <div class="field-row time-grid">
       <div>
         <label>Day*</label>
-        <select name="day_of_week" id="day-select" title="Day of Week" required style="cursor: pointer;">
+        <select name="day_of_week" id="day-select" title="Day of Week" required class="pointer-cursor">
           <option value="">Select day…</option>
           <option value="0">Monday</option>
           <option value="1">Tuesday</option>
@@ -115,7 +115,7 @@
       </div>
       <div>
         <label>Start Time*</label>
-        <select name="start_time" id="start-time-input" title="Start Time" required style="cursor: pointer;">
+        <select name="start_time" id="start-time-input" title="Start Time" required class="pointer-cursor">
           <option value="">Select start time…</option>
         </select>
       </div>
@@ -160,20 +160,20 @@
       </label>
     </div>
 
-    <div class="field-row hidden" id="sliding-scale-row" style="margin-top: 20px;">
+    <div class="field-row hidden sliding-scale-container" id="sliding-scale-row">
       <label for="income-slider">Adjust Discount</label>
-      <div style="display: flex; align-items: center; gap: 15px;">
-        <span style="font-size: 0.9rem; color: #666;">Standard Rate</span>
-        <input type="range" id="income-slider" min="0" max="10" value="0" step="1" style="flex: 1;" />
-        <span style="font-size: 0.9rem; color: #666;">Maximum Discount</span>
+      <div class="slider-row">
+        <span class="slider-label">Standard Rate</span>
+        <input type="range" id="income-slider" min="0" max="10" value="0" step="1" class="slider-input" />
+        <span class="slider-label">Maximum Discount</span>
       </div>
-      <div style="margin-top: 8px; font-size: 0.9rem; color: #666; text-align: center;">
+      <div class="discount-display">
         Discount: $<span id="discount-amount">0</span> off
       </div>
     </div>
 
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
-      <div id="cost-display" style="font-size: 1.1rem; font-weight: 600; color: #3b82f6;">
+    <div class="cost-row">
+      <div id="cost-display" class="cost-display">
         Total Cost: $50.00 per session
       </div>
       <button type="submit" class="btn primary">Submit Booking Request</button>

@@ -1,6 +1,9 @@
 // main.js
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxxbaRi7gutT8cwueMAD0Tb_OteM9UjRrYUUyAw-UUkM-Gt7AOeTeP3RXpMec1vZT1H/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwr0zGrzVT9Pj0s3f1Jdq05_g9BX4AUJY6aI9nMefAgdLPjtyqdwkfItLAWD9gwjVas/exec";
+
+// Store the originally selected calendar date for recurring sessions
+let originalCalendarDate = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   const yearSpan = document.getElementById("year");
@@ -14,6 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
   
   setupThemeToggle();
   setupCurrentTime();
+  setupUserGreeting();
 });
 
 // Setup validation for input fields with patterns
@@ -101,6 +105,104 @@ function setupCurrentTime() {
   // Update immediately and then every second
   updateTime();
   setInterval(updateTime, 1000);
+}
+
+// Setup user greeting and logout button in header
+async function setupUserGreeting() {
+  const header = document.querySelector('.site-header .container.header-inner');
+  if (!header) return;
+
+  // Check if Firebase auth is available
+  if (!window.firebaseAuth || !window.firebaseOnAuth) {
+    return;
+  }
+
+  const auth = window.firebaseAuth;
+  const onAuth = window.firebaseOnAuth;
+  const signOut = window.firebaseSignOut;
+  const db = window.firestoreDb;
+  const getDoc = window.firestoreGetDoc;
+  const doc = window.firestoreDoc;
+
+  // Create greeting element (goes after logo)
+  const greetingSpan = document.createElement('span');
+  greetingSpan.style.display = 'none';
+  greetingSpan.style.color = 'var(--text-color, #e5e7eb)';
+  greetingSpan.style.fontSize = '1rem';
+  greetingSpan.style.marginLeft = '1.5rem';
+  greetingSpan.style.fontWeight = '500';
+  greetingSpan.id = 'user-greeting-text';
+  
+  // Create logout button (goes after nav in the center)
+  const logoutBtn = document.createElement('button');
+  logoutBtn.textContent = 'Logout';
+  logoutBtn.className = 'btn secondary';
+  logoutBtn.style.padding = '0.4rem 0.8rem';
+  logoutBtn.style.fontSize = '0.85rem';
+  logoutBtn.style.cursor = 'pointer';
+  logoutBtn.style.display = 'none';
+  logoutBtn.id = 'logout-button';
+  
+  logoutBtn.addEventListener('click', async () => {
+    try {
+      await signOut(auth);
+      window.location.href = 'index.html';
+    } catch (error) {
+      console.error('Logout error:', error);
+      alert('Failed to logout. Please try again.');
+    }
+  });
+
+  // Insert greeting after logo
+  const logo = header.querySelector('.logo');
+  if (logo && logo.parentNode === header) {
+    logo.after(greetingSpan);
+  }
+
+  // Insert logout button after nav (in the center section)
+  const nav = header.querySelector('nav');
+  if (nav && nav.parentNode === header) {
+    nav.after(logoutBtn);
+  }
+
+  // Move current time below theme toggle
+  const currentTime = document.getElementById('current-time');
+  const headerRight = header.querySelector('.header-right');
+  if (currentTime && headerRight) {
+    currentTime.style.display = 'block';
+    currentTime.style.marginTop = '0.5rem';
+    currentTime.style.textAlign = 'right';
+    currentTime.style.fontSize = '0.75rem';
+  }
+
+  // Listen for auth state changes
+  onAuth(auth, async (user) => {
+    if (user) {
+      try {
+        // Fetch user profile from Firestore
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        let firstName = 'User';
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          firstName = userData.firstName || userData.fullName?.split(' ')[0] || 'User';
+        }
+        
+        greetingSpan.textContent = `Hello, ${firstName}`;
+        greetingSpan.style.display = 'inline';
+        logoutBtn.style.display = 'inline-block';
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        greetingSpan.textContent = 'Hello!';
+        greetingSpan.style.display = 'inline';
+        logoutBtn.style.display = 'inline-block';
+      }
+    } else {
+      greetingSpan.style.display = 'none';
+      logoutBtn.style.display = 'none';
+    }
+  });
 }
 
 function setupStudentForm() {
@@ -513,6 +615,11 @@ function setupBookingForm() {
           if (durationSel.value) {
             durationSel.dispatchEvent(new Event('change'));
           }
+          
+          // Update recurring options if recurring is checked
+          if (recurringCb && recurringCb.checked && originalCalendarDate) {
+            populateRecurringEndOptions(originalCalendarDate);
+          }
         } else {
           // Selected time is not available on this day
           selectedBlockId = null;
@@ -689,6 +796,11 @@ function setupBookingForm() {
     // Update cost and available start times
     updateCost();
     updateStartTimeAvailability();
+    
+    // Update recurring options if recurring is checked
+    if (recurringCb && recurringCb.checked && originalCalendarDate) {
+      populateRecurringEndOptions(originalCalendarDate);
+    }
 
     function fmt(min) {
       const h = Math.floor(min / 60);
@@ -752,36 +864,190 @@ function setupBookingForm() {
   });
 
   // Populate the recurring-end select with weekly dates starting from the week after baseDate
-  function populateRecurringEndOptions(baseDate) {
+  async function populateRecurringEndOptions(baseDate) {
     if (!recurringEndSel || !baseDate) return;
-    // Clear keep placeholder
-    recurringEndSel.innerHTML = '<option value="">Choose last date…</option>';
-
+    
+    console.log('populateRecurringEndOptions called with baseDate:', baseDate);
+    console.log('Stack trace:', new Error().stack);
+    
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-    const start = new Date(baseDate);
-    // Start from the following week
-    start.setDate(start.getDate() + 7);
+    const startDate = new Date(baseDate);
+    
+    // Get the selected time and duration for conflict checking
+    const startTime = hiddenStart.value;
+    const selectedDuration = durationSel.value ? parseFloat(durationSel.value) : 1;
+    
+    // Calculate start and end minutes for conflict detection
+    let startMin = 0;
+    let endMin = 0;
+    if (startTime) {
+      const [startHour, startMinute] = startTime.split(':').map(Number);
+      startMin = startHour * 60 + (startMinute || 0);
+      endMin = startMin + Math.round(selectedDuration * 60);
+    }
+    
+    // Get day index for conflict checking
+    const dayOfWeek = startDate.getDay();
+    const dayIdx = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Convert to 0=Mon, 1=Tue, etc.
+    
+    console.log('Base date:', startDate, 'Day of week:', dayOfWeek, 'dayIdx:', dayIdx);
+    
+    // Show loading message
+    recurringEndSel.innerHTML = '<option value="">Loading availability...</option>';
+    recurringEndSel.disabled = true;
+    
+    // Load availability data for relevant weeks (batch request)
+    const availabilityCache = {};
+    
+    const today = new Date();
+    const todayMonday = new Date(today);
+    const todayDayOfWeek = todayMonday.getDay();
+    const todayDiff = (todayDayOfWeek === 0 ? -6 : 1) - todayDayOfWeek;
+    todayMonday.setDate(todayMonday.getDate() + todayDiff);
+    todayMonday.setHours(0, 0, 0, 0);
+    
+    // Calculate next occurrence of the same day (1 week from baseDate)
+    const nextWeekDate = new Date(baseDate);
+    nextWeekDate.setDate(nextWeekDate.getDate() + 7);
+    
+    console.log('Next week date:', nextWeekDate, 'Day of week:', nextWeekDate.getDay());
+    
+    // Determine unique weeks we need to check (maximum 20 weeks)
+    const weeksToFetch = new Set();
+    const weekToDateMap = {};
+    
+    for (let i = 1; i <= 20; i++) {
+      const checkDate = new Date(nextWeekDate);
+      checkDate.setDate(nextWeekDate.getDate() + (i - 1) * 7);
+      const checkMonday = new Date(checkDate);
+      const checkDayOfWeek = checkMonday.getDay();
+      const checkDiff = (checkDayOfWeek === 0 ? -6 : 1) - checkDayOfWeek;
+      checkMonday.setDate(checkMonday.getDate() + checkDiff);
+      checkMonday.setHours(0, 0, 0, 0);
+      const weekOffset = Math.floor((checkMonday - todayMonday) / (7 * 24 * 60 * 60 * 1000));
+      weeksToFetch.add(weekOffset);
+      weekToDateMap[weekOffset] = weekToDateMap[weekOffset] || [];
+      weekToDateMap[weekOffset].push(i);
+    }
+    
+    console.log('Fetching', weeksToFetch.size, 'weeks of availability data');
+    
+    // Fetch all needed weeks' availability (with longer timeout and in parallel batches)
+    try {
+      const batchSize = 10;
+      const weekArray = Array.from(weeksToFetch);
+      
+      for (let batchStart = 0; batchStart < weekArray.length; batchStart += batchSize) {
+        const batch = weekArray.slice(batchStart, batchStart + batchSize);
+        
+        await Promise.all(batch.map(weekOffset => {
+          return new Promise(async (resolve) => {
+            try {
+              const callbackName = 'availCallback' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+              const url = `${APPS_SCRIPT_URL}?action=getAvailability&weekOffset=${weekOffset}&callback=${callbackName}`;
+              
+              const data = await new Promise((resolveInner, rejectInner) => {
+                window[callbackName] = (data) => {
+                  delete window[callbackName];
+                  resolveInner(data);
+                };
+                
+                const script = document.createElement('script');
+                script.src = url;
+                script.onerror = () => {
+                  delete window[callbackName];
+                  rejectInner(new Error('Failed to load'));
+                };
+                
+                document.head.appendChild(script);
+                
+                setTimeout(() => {
+                  if (script.parentNode) document.head.removeChild(script);
+                }, 200);
+                
+                setTimeout(() => {
+                  if (window[callbackName]) {
+                    delete window[callbackName];
+                    rejectInner(new Error('Timeout'));
+                  }
+                }, 10000); // 10 second timeout per request
+              });
+              
+              if (data.success) {
+                availabilityCache[weekOffset] = data.booked || {};
+              }
+              resolve();
+            } catch (error) {
+              console.warn('Failed to load week', weekOffset, error);
+              resolve(); // Continue even if one fails
+            }
+          });
+        }));
+      }
+      
+      console.log('Loaded availability for', Object.keys(availabilityCache).length, 'weeks');
+    } catch (error) {
+      console.error('Error loading availability for recurring dates:', error);
+    }
+    
+    // Now populate the options with conflict detection
+    recurringEndSel.innerHTML = '<option value="">Choose last date…</option>';
+    recurringEndSel.disabled = false;
+    
+    let lastOptionIndex = 1;
 
-    for (let i = 1; i <= 52; i++) {
-      const d = new Date(start);
-      d.setDate(start.getDate() + (i - 1) * 7);
+    // Get the day name from the original selection (not from calculated date)
+    // dayIdx is 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri
+    const dayName = days[dayIdx + 1]; // +1 because days array has Sunday at index 0
+    console.log('Day name for display:', dayName, 'from days[' + (dayIdx + 1) + ']');
 
-      const dayName = days[d.getDay()];
+    for (let i = 1; i <= 20; i++) {
+      // Calculate date: add (i-1) weeks to the next week's date
+      const d = new Date(nextWeekDate);
+      d.setDate(nextWeekDate.getDate() + (i - 1) * 7);
       const monthName = months[d.getMonth()];
       const dateNum = d.getDate();
       const year = d.getFullYear();
+
+      // Calculate which week this date falls in
+      const checkMonday = new Date(d);
+      const checkDayOfWeek = checkMonday.getDay();
+      const checkDiff = (checkDayOfWeek === 0 ? -6 : 1) - checkDayOfWeek;
+      checkMonday.setDate(checkMonday.getDate() + checkDiff);
+      checkMonday.setHours(0, 0, 0, 0);
+      const weekOffset = Math.floor((checkMonday - todayMonday) / (7 * 24 * 60 * 60 * 1000));
+      
+      // Check if this date has a conflict with existing bookings
+      let hasConflict = false;
+      if (startTime && availabilityCache[weekOffset]) {
+        const bookedSlots = availabilityCache[weekOffset][dayIdx] || [];
+        hasConflict = bookedSlots.some(([bs, be]) => {
+          // Check if there's any overlap
+          return !(be <= startMin || bs >= endMin);
+        });
+        
+        if (hasConflict) {
+          console.log(`Conflict on ${dayName} ${monthName} ${dateNum}: booked slots overlap with ${startMin}-${endMin}`);
+          // Stop at first conflict - don't show any dates after this
+          break;
+        }
+      }
 
       const label = `${dayName}, ${monthName} ${dateNum}, ${year} (${i})`;
       const opt = document.createElement('option');
       opt.value = d.toISOString().slice(0, 10);
       opt.textContent = label;
+      
       recurringEndSel.appendChild(opt);
+      lastOptionIndex = recurringEndSel.options.length - 1;
     }
 
-    // Select the first real option by default
-    if (recurringEndSel.options.length > 1) recurringEndSel.selectedIndex = 1;
+    // Select the last available option by default
+    if (recurringEndSel.options.length > 1) {
+      recurringEndSel.selectedIndex = lastOptionIndex;
+    }
   }
 
   async function loadAvailability() {
@@ -1013,6 +1279,7 @@ function setupBookingForm() {
             // Calculate the actual date for the selected day
             const date = new Date(monday);
             date.setDate(monday.getDate() + dayIdx);
+            originalCalendarDate = date; // Store for recurring options
             hiddenDate.value = date.toISOString().slice(0, 10);
             const timeStr = `${String(h).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
             hiddenStart.value = timeStr;

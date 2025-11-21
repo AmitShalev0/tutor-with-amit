@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calendar API Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .test-box {
+      background: white;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .status {
+      padding: 10px;
+      border-radius: 4px;
+      margin: 10px 0;
+    }
+    .success {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .info {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    pre {
+      background: #f8fafc;
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 Calendar API Diagnostic Test</h1>
+  
+  <div class="test-box">
+    <h2>Current Status</h2>
+    <div id="current-url" class="status info"></div>
+    <div id="firebase-status" class="status info"></div>
+  </div>
+
+  <div class="test-box">
+    <h2>Step 1: Test Apps Script URL</h2>
+    <p>This will test if your Apps Script deployment is accessible and returning data.</p>
+    <button onclick="testAppsScript()">Test Apps Script</button>
+    <div id="apps-script-result"></div>
+  </div>
+
+  <div class="test-box">
+    <h2>Step 2: Check CORS and Permissions</h2>
+    <p>This will check if there are any CORS or permission issues.</p>
+    <button onclick="testCORS()">Test CORS</button>
+    <div id="cors-result"></div>
+  </div>
+
+  <div class="test-box">
+    <h2>Step 3: Test Calendar Data Loading</h2>
+    <p>This will simulate the actual calendar loading process.</p>
+    <button onclick="testCalendarLoad()">Test Calendar Load</button>
+    <div id="calendar-result"></div>
+  </div>
+
+  <script>
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxxbaRi7gutT8cwueMAD0Tb_OteM9UjRrYUUyAw-UUkM-Gt7AOeTeP3RXpMec1vZT1H/exec";
+    
+    // Display current environment info
+    document.getElementById('current-url').textContent = `Current URL: ${window.location.href}`;
+    document.getElementById('firebase-status').textContent = `Firebase loaded: checking...`;
+
+    // Check if Firebase is available
+    setTimeout(() => {
+      const fbStatus = document.getElementById('firebase-status');
+      if (window.firebaseAuth) {
+        fbStatus.textContent = '✓ Firebase is loaded';
+        fbStatus.className = 'status success';
+      } else {
+        fbStatus.textContent = '✗ Firebase not loaded (this is OK for testing)';
+        fbStatus.className = 'status info';
+      }
+    }, 1000);
+
+    async function testAppsScript() {
+      const resultDiv = document.getElementById('apps-script-result');
+      resultDiv.innerHTML = '<p class="status info">Testing Apps Script...</p>';
+
+      try {
+        // Test with JSONP
+        const callbackName = 'testCallback' + Date.now();
+        const url = `${APPS_SCRIPT_URL}?action=getAvailability&weekOffset=0&callback=${callbackName}`;
+        
+        console.log('Testing URL:', url);
+        
+        const dataPromise = new Promise((resolve, reject) => {
+          window[callbackName] = (data) => {
+            console.log('Received data:', data);
+            delete window[callbackName];
+            resolve(data);
+          };
+          
+          const script = document.createElement('script');
+          script.src = url;
+          script.onerror = (error) => {
+            console.error('Script loading error:', error);
+            delete window[callbackName];
+            reject(new Error('Failed to load script'));
+          };
+          
+          document.head.appendChild(script);
+          
+          setTimeout(() => {
+            if (script.parentNode) {
+              document.head.removeChild(script);
+            }
+          }, 100);
+          
+          setTimeout(() => {
+            if (window[callbackName]) {
+              delete window[callbackName];
+              if (script.parentNode) {
+                document.head.removeChild(script);
+              }
+              reject(new Error('Request timeout after 10 seconds'));
+            }
+          }, 10000);
+        });
+
+        const data = await dataPromise;
+        
+        if (data.success) {
+          resultDiv.innerHTML = `
+            <div class="status success">
+              <strong>✓ Apps Script is working!</strong><br>
+              Week: ${data.monday}<br>
+              Available days: ${Object.keys(data.available).length}
+            </div>
+            <details>
+              <summary>View full response</summary>
+              <pre>${JSON.stringify(data, null, 2)}</pre>
+            </details>
+          `;
+        } else {
+          resultDiv.innerHTML = `
+            <div class="status error">
+              <strong>✗ Apps Script returned error</strong><br>
+              ${data.message}
+            </div>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          `;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `
+          <div class="status error">
+            <strong>✗ Failed to connect to Apps Script</strong><br>
+            Error: ${error.message}
+          </div>
+          <p><strong>Possible causes:</strong></p>
+          <ul>
+            <li>Apps Script is not deployed as a web app</li>
+            <li>Apps Script deployment URL is incorrect</li>
+            <li>Apps Script permissions not granted</li>
+            <li>Calendar ID in Apps Script is incorrect</li>
+          </ul>
+        `;
+      }
+    }
+
+    async function testCORS() {
+      const resultDiv = document.getElementById('cors-result');
+      resultDiv.innerHTML = '<p class="status info">Testing CORS...</p>';
+
+      try {
+        // Try a regular fetch
+        const response = await fetch(`${APPS_SCRIPT_URL}?action=getAvailability&weekOffset=0`);
+        const text = await response.text();
+        
+        resultDiv.innerHTML = `
+          <div class="status success">
+            <strong>✓ Fetch request succeeded</strong><br>
+            Status: ${response.status}
+          </div>
+          <details>
+            <summary>View response</summary>
+            <pre>${text.substring(0, 500)}...</pre>
+          </details>
+        `;
+      } catch (error) {
+        resultDiv.innerHTML = `
+          <div class="status info">
+            <strong>ℹ CORS blocked (this is normal)</strong><br>
+            This is why we use JSONP instead of fetch.<br>
+            Error: ${error.message}
+          </div>
+        `;
+      }
+    }
+
+    function testCalendarLoad() {
+      const resultDiv = document.getElementById('calendar-result');
+      resultDiv.innerHTML = '<p class="status info">Simulating calendar load...</p>';
+
+      // Simulate the exact same process as book-session.html
+      const callbackName = 'calendarTest' + Date.now();
+      const url = `${APPS_SCRIPT_URL}?action=getAvailability&weekOffset=0&callback=${callbackName}`;
+      
+      const startTime = Date.now();
+      
+      const dataPromise = new Promise((resolve, reject) => {
+        window[callbackName] = (data) => {
+          const loadTime = Date.now() - startTime;
+          delete window[callbackName];
+          resolve({ data, loadTime });
+        };
+        
+        const script = document.createElement('script');
+        script.src = url;
+        script.onerror = (error) => {
+          delete window[callbackName];
+          reject(new Error('Script loading failed'));
+        };
+        
+        document.head.appendChild(script);
+        
+        script.onload = () => {
+          setTimeout(() => {
+            if (script.parentNode) {
+              document.head.removeChild(script);
+            }
+          }, 100);
+        };
+        
+        setTimeout(() => {
+          if (window[callbackName]) {
+            delete window[callbackName];
+            if (script.parentNode) {
+              document.head.removeChild(script);
+            }
+            reject(new Error('Timeout after 10 seconds'));
+          }
+        }, 10000);
+      });
+
+      dataPromise
+        .then(({ data, loadTime }) => {
+          if (data.success) {
+            resultDiv.innerHTML = `
+              <div class="status success">
+                <strong>✓ Calendar data loaded successfully!</strong><br>
+                Load time: ${loadTime}ms<br>
+                Your calendar should work now!
+              </div>
+              <details>
+                <summary>View calendar data</summary>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+              </details>
+            `;
+          } else {
+            resultDiv.innerHTML = `
+              <div class="status error">
+                <strong>✗ Calendar returned error</strong><br>
+                ${data.message}
+              </div>
+            `;
+          }
+        })
+        .catch(error => {
+          resultDiv.innerHTML = `
+            <div class="status error">
+              <strong>✗ Calendar load failed</strong><br>
+              ${error.message}
+            </div>
+            <p><strong>Next steps:</strong></p>
+            <ol>
+              <li>Open the Apps Script editor</li>
+              <li>Run the testSetup() function to verify configuration</li>
+              <li>Check that CALENDAR_ID is correct</li>
+              <li>Verify the script has Calendar permissions</li>
+            </ol>
+          `;
+        });
+    }
+  </script>
+</body>
+</html>

@@ -38,15 +38,17 @@ a:hover { text-decoration: underline; }
 }
 
 .header-inner {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 12px 0;
+  gap: 1.5rem;
 }
 
 .logo {
   font-size: 1.2rem;
   letter-spacing: 0.03em;
+  flex-shrink: 0;
 }
 
 .logo a {
@@ -55,9 +57,21 @@ a:hover { text-decoration: underline; }
 }
 .logo a:hover { text-decoration: underline; }
 
+/* Navigation in the center */
+nav {
+  display: flex;
+  gap: 1.5rem;
+  flex: 1;
+  justify-content: center;
+}
+
 /* Center header area for toggle */
 .header-right {
-  justify-self: end;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  flex-shrink: 0;
 }
 
 /* Theme toggle switch */
@@ -132,10 +146,11 @@ a:hover { text-decoration: underline; }
 
 /* Current time display */
 .current-time {
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   color: var(--muted);
-  text-align: center;
+  text-align: right;
   white-space: nowrap;
+  margin-top: 0.25rem;
 }
 
 /* Time display wrapper */
@@ -212,15 +227,11 @@ body.light-theme {
 }
 
 nav a {
-  margin-left: 16px;
+  margin-left: 0;
   font-size: 0.95rem;
-  color: var(--muted);
+  color: #d4d4d8;
 }
 nav a:hover { color: var(--text); }
-
-/* Align nav to the right column of header grid */
-.header-inner nav { justify-self: center; }
-.header-inner .logo { justify-self: start; }
 
 /* Login link styling */
 nav .login-link {
@@ -836,4 +847,67 @@ nav .login-link:hover {
   font-size: 1.1rem;
   font-weight: 600;
   color: #3b82f6;
+}
+
+/* Utility classes for layout and spacing */
+.flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.flex-between-start {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.flex-row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.mb-1 {
+  margin-bottom: 1rem;
+}
+
+.mb-0-5 {
+  margin-bottom: 0.5rem;
+}
+
+.mt-0-5 {
+  margin-top: 0.5rem;
+}
+
+.mt-10 {
+  margin-top: 10px;
+}
+
+.m-0 {
+  margin: 0;
+}
+
+.mt-0-5rem {
+  margin: 0.5rem 0 0 0;
+}
+
+.padding-sm {
+  padding: 6px 12px;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.week-display {
+  font-weight: bold;
+  font-size: 0.95rem;
 }
