@@ -27,6 +27,22 @@
   </div>
 </header>
 
+<!-- Firebase init -->
+<script type="module" src="firebase.js"></script>
+
+<!-- Auth check -->
+<script type="module">
+  const auth = window.firebaseAuth;
+  const onAuth = window.firebaseOnAuth;
+
+  // Check authentication - redirect to login if not authenticated
+  onAuth(auth, (user) => {
+    if (!user) {
+      window.location.href = "login.html";
+    }
+  });
+</script>
+
 <main class="container">
   <h2>Book a Tutoring Session</h2>
   <p>

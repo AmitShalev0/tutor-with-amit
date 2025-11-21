@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete Student API - Tutor with Amit</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        .info {
+            background: #f0f4ff;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #667eea;
+        }
+        .result {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        .success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #10b981;
+        }
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #ef4444;
+        }
+        code {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗑️ Delete Student API</h1>
+        <p>This endpoint deletes a student from Firebase Firestore.</p>
+        
+        <div class="info">
+            <h3>Usage from Desktop App:</h3>
+            <p>Send a POST request to this URL with student document ID:</p>
+            <code>
+                https://amitshalev0.github.io/tutor-with-amit/delete-student-api.html?id={STUDENT_DOC_ID}
+            </code>
+            <p style="margin-top: 10px;"><strong>Or call the JavaScript function directly:</strong></p>
+            <code>deleteStudentFromFirestore(studentDocId)</code>
+        </div>
+
+        <div id="result" class="result"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, doc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBPJdHNa9UaXqDKtfmXCZBWnBLp3J4YST4",
+            authDomain: "tutor-with-amit.firebaseapp.com",
+            projectId: "tutor-with-amit",
+            storageBucket: "tutor-with-amit.firebasestorage.app",
+            messagingSenderId: "626605829738",
+            appId: "1:626605829738:web:5b8fdd951f85129c3ea95d",
+            measurementId: "G-9TF5TK7S61"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Main delete function
+        window.deleteStudentFromFirestore = async function(studentId) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            
+            try {
+                if (!studentId) {
+                    throw new Error("Student ID is required");
+                }
+
+                // Delete the student document
+                const studentRef = doc(db, 'students', studentId);
+                await deleteDoc(studentRef);
+
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <strong>✓ Success!</strong><br>
+                    Student document <code>${studentId}</code> has been deleted from Firebase Firestore.
+                `;
+
+                return { success: true, message: "Student deleted successfully" };
+
+            } catch (error) {
+                console.error("Error deleting student:", error);
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <strong>✗ Error</strong><br>
+                    ${error.message}
+                `;
+
+                return { success: false, message: error.message };
+            }
+        };
+
+        // Check URL parameters on load
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const studentId = urlParams.get('id');
+
+            if (studentId) {
+                deleteStudentFromFirestore(studentId);
+            }
+        });
+
+        // Expose function for external calls
+        window.addEventListener('message', async (event) => {
+            // Security: Check origin if needed
+            if (event.data.action === 'delete_student') {
+                const result = await deleteStudentFromFirestore(event.data.studentId);
+                event.source.postMessage({ 
+                    action: 'delete_student_result', 
+                    result: result 
+                }, event.origin);
+            }
+        });
+    </script>
+</body>
+</html>

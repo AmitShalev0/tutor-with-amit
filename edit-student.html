@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Add Student – Amit Tutoring</title>
+  <title>Edit Student – Amit Tutoring</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -28,10 +28,10 @@
 </header>
 
 <main class="container">
-  <h2>Add a New Student</h2>
-  <p>Tell me about your student so I can plan the right support.</p>
+  <h2>Edit Student Profile</h2>
+  <p>Update student information.</p>
 
-  <form id="add-student-form" class="card">
+  <form id="edit-student-form" class="card">
     <div class="field-row">
       <label>Student's Full Name*</label>
       <input type="text" name="student_name" id="student-name" placeholder="Alex Johnson" required 
@@ -40,8 +40,8 @@
     </div>
 
     <div class="field-row">
-      <label>Birthdate*</label>
-      <input type="date" name="birthdate" id="birthdate" min="1990-01-01" max="2030-12-31" title="Student's birthdate" required />
+      <label>Birthdate</label>
+      <input type="date" name="birthdate" id="birthdate" min="1990-01-01" max="2030-12-31" title="Student's birthdate" />
     </div>
 
     <div class="field-row">
@@ -61,31 +61,31 @@
       <input type="text" name="subject" id="subject" placeholder="e.g. Math 7, Physics 30, Chemistry 30 IB, Biology 30..." />
     </div>
 
-      <div class="field-row">
-        <label>School</label>
-        <input type="text" name="school" id="school" placeholder="e.g. Woodbine Elementary, Wisewood High School..." />
+    <div class="field-row">
+      <label>School</label>
+      <input type="text" name="school" id="school" placeholder="e.g. Woodbine Elementary, Wisewood High School..." />
     </div>
 
     <div class="field-row">
-        <label>Relationship to You</label>
-        <select name="relationship" id="relationship" title="Relationship to you">
-            <option value="">Select relationship...</option>
-            <option value="dependent">Dependent</option>
-            <option value="self">Self (I'm the student)</option>
-            <option value="sibling">Sibling</option>
-            <option value="friend">Friend</option>
-            <option value="other">Other</option>
-        </select>
+      <label>Relationship to You</label>
+      <select name="relationship" id="relationship" title="Relationship to you">
+        <option value="">Select relationship...</option>
+        <option value="dependent">Dependent</option>
+        <option value="self">Self (I'm the student)</option>
+        <option value="sibling">Sibling</option>
+        <option value="friend">Friend</option>
+        <option value="other">Other</option>
+      </select>
     </div>
 
     <div class="field-row">
-        <label>Additional Notes</label>
-        <textarea name="notes" id="notes" rows="4" placeholder="Any additional information about learning style, goals, or challenges..."></textarea>
+      <label>Additional Notes</label>
+      <textarea name="notes" id="notes" rows="4" placeholder="Any additional information about learning style, goals, or challenges..."></textarea>
     </div>
 
     <div class="flex-buttons">
-        <button type="submit" class="btn primary">Add Student</button>
-        <button type="button" class="btn tertiary" onclick="window.location.href='dashboard.html'">Cancel</button>
+      <button type="submit" class="btn primary">Save Changes</button>
+      <button type="button" class="btn tertiary" onclick="window.location.href='dashboard.html'">Cancel</button>
     </div>
 
     <p id="form-message" class="form-message"></p>
@@ -105,42 +105,93 @@
 <!-- Firebase init -->
 <script type="module" src="firebase.js"></script>
 
-<!-- Add student logic -->
+<!-- Edit student logic -->
 <script type="module">
   const auth = window.firebaseAuth;
   const db = window.firebaseDb;
   const onAuth = window.firebaseOnAuth;
-  const addDoc = window.firestoreAddDoc;
-  const collection = window.firestoreCollection;
+  const getDoc = window.firestoreGetDoc;
+  const updateDoc = window.firestoreUpdateDoc;
+  const doc = window.firestoreDoc;
   const serverTimestamp = window.firestoreServerTimestamp;
 
-  const form = document.getElementById("add-student-form");
+  const form = document.getElementById("edit-student-form");
   const msg = document.getElementById("form-message");
 
   let currentUser = null;
+  let studentId = null;
+
+  // Get student ID from URL
+  const urlParams = new URLSearchParams(window.location.search);
+  studentId = urlParams.get('id');
+
+  if (!studentId) {
+    alert("No student ID provided");
+    window.location.href = "dashboard.html";
+  }
 
   // Check authentication
-  onAuth(auth, (user) => {
+  onAuth(auth, async (user) => {
     if (!user) {
       window.location.href = "login.html";
       return;
     }
     currentUser = user;
+    
+    // Load student data
+    await loadStudentData();
   });
+
+  async function loadStudentData() {
+    try {
+      msg.textContent = "Loading student data...";
+      
+      const studentDoc = await getDoc(doc(db, "students", studentId));
+      
+      if (!studentDoc.exists()) {
+        alert("Student not found");
+        window.location.href = "dashboard.html";
+        return;
+      }
+
+      const student = studentDoc.data();
+
+      // Verify ownership
+      if (student.userId !== currentUser.uid) {
+        alert("You don't have permission to edit this student");
+        window.location.href = "dashboard.html";
+        return;
+      }
+
+      // Fill form with existing data
+      document.getElementById("student-name").value = student.studentName || "";
+      document.getElementById("birthdate").value = student.birthdate || "";
+      document.getElementById("pronouns").value = student.pronouns || "";
+      document.getElementById("subject").value = student.subject || "";
+      document.getElementById("school").value = student.school || "";
+      document.getElementById("relationship").value = student.relationship || "";
+      document.getElementById("notes").value = student.notes || "";
+
+      msg.textContent = "";
+    } catch (err) {
+      console.error("Error loading student:", err);
+      msg.textContent = "Failed to load student data.";
+      msg.classList.add("error");
+    }
+  }
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    msg.textContent = "Adding student...";
+    msg.textContent = "Saving changes...";
     msg.className = "form-message";
 
     if (!currentUser) {
-      msg.textContent = "You must be logged in to add a student.";
+      msg.textContent = "You must be logged in to edit a student.";
       msg.classList.add("error");
       return;
     }
 
-    const studentData = {
-      userId: currentUser.uid,
+    const updatedData = {
       studentName: document.getElementById("student-name").value.trim(),
       birthdate: document.getElementById("birthdate").value,
       pronouns: document.getElementById("pronouns").value || null,
@@ -148,50 +199,13 @@
       school: document.getElementById("school").value.trim() || null,
       relationship: document.getElementById("relationship").value || null,
       notes: document.getElementById("notes").value.trim(),
-      createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
 
     try {
-      // Add to Firestore
-      const docRef = await addDoc(collection(db, "students"), studentData);
-      const firestoreDocId = docRef.id; // Get the Firestore document ID
+      await updateDoc(doc(db, "students", studentId), updatedData);
       
-      // Also sync to Google Sheets for desktop app
-      try {
-        // Get user profile for guardian email/phone
-        const getDoc = window.firestoreGetDoc;
-        const doc = window.firestoreDoc;
-        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-        const userData = userDoc.exists() ? userDoc.data() : {};
-        
-        await fetch('https://script.google.com/macros/s/AKfycbxHL7YlP7nbZTYMyjKnJCMvyjYPwp3aVb0NGjOvCakktOHJK5lw2cBY45_VA4-m3wCd/exec', {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            type: 'add_student',
-            studentId: firestoreDocId, // Send the Firestore document ID
-            userId: currentUser.uid,
-            studentName: studentData.studentName,
-            yearOfBirth: studentData.birthdate ? new Date(studentData.birthdate).getFullYear().toString() : '',
-            subject: studentData.subject || '',
-            school: studentData.school || '',
-            relationship: studentData.relationship || '',
-            userEmail: userData.email || currentUser.email,
-            userPhone: userData.phone || '',
-            notes: studentData.notes || ''
-          })
-        });
-        console.log('Student synced to Google Sheets');
-      } catch (sheetError) {
-        console.error('Failed to sync to Google Sheets:', sheetError);
-        // Don't fail the operation if sheets sync fails
-      }
-      
-      msg.textContent = "Student added successfully!";
+      msg.textContent = "Student updated successfully!";
       msg.classList.add("ok");
       
       // Redirect to dashboard after 1.5 seconds
@@ -200,8 +214,8 @@
       }, 1500);
 
     } catch (err) {
-      console.error("Error adding student:", err);
-      msg.textContent = "Failed to add student. Please try again.";
+      console.error("Error updating student:", err);
+      msg.textContent = "Failed to update student. Please try again.";
       msg.classList.add("error");
     }
   });

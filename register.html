@@ -211,6 +211,28 @@
                 updatedAt: serverTimestamp()
             });
 
+            // Add user to Google Sheets for desktop app sync
+            try {
+                const sheetResponse = await fetch('https://script.google.com/macros/s/AKfycbxHL7YlP7nbZTYMyjKnJCMvyjYPwp3aVb0NGjOvCakktOHJK5lw2cBY45_VA4-m3wCd/exec', {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        type: 'user_registration',
+                        userId: user.uid,
+                        fullName: fullName,
+                        email: email,
+                        phone: phone
+                    })
+                });
+                console.log('User added to Google Sheets');
+            } catch (sheetError) {
+                console.error('Failed to add user to Google Sheets:', sheetError);
+                // Don't fail the registration if sheets sync fails
+            }
+
             successEl.textContent = "Account created successfully! Redirecting...";
             
             // Redirect to dashboard after 1.5 seconds

@@ -180,56 +180,58 @@
 
   async function loadSessions() {
     try {
-      // In a real implementation, you'd fetch bookings from Firestore
-      // For now, we'll create a structure for when bookings are stored
+      // Fetch user's bookings from Firestore
       const bookingsQuery = query(
         collection(db, "bookings"),
-        where("userId", "==", currentUser.uid),
-        orderBy("sessionDate", "desc")
+        where("userId", "==", currentUser.uid)
       );
       
       const querySnapshot = await getDocs(bookingsQuery);
       allSessions = [];
       
       querySnapshot.forEach((doc) => {
-        allSessions.push({ id: doc.id, ...doc.data() });
+        const data = doc.data();
+        allSessions.push({ 
+          id: doc.id, 
+          ...data,
+          // Convert Firestore Timestamp to Date if needed
+          sessionDate: data.sessionDate?.toDate ? data.sessionDate.toDate() : new Date(data.sessionDate)
+        });
       });
+
+      // Sort by date (newest first)
+      allSessions.sort((a, b) => b.sessionDate - a.sessionDate);
 
       displaySessions();
     } catch (err) {
       console.error("Error loading sessions:", err);
       
-      // If bookings collection doesn't exist yet, show empty state
-      if (err.code === 'permission-denied' || err.message.includes('indexes')) {
-        displaySessions(); // Will show empty state
-      } else {
-        document.getElementById("pending-sessions-content").innerHTML = 
-          '<p class="empty-state">Error loading sessions. Please try again later.</p>';
-        document.getElementById("upcoming-sessions-content").innerHTML = 
-          '<p class="empty-state">Error loading sessions. Please try again later.</p>';
-        document.getElementById("past-sessions-content").innerHTML = 
-          '<p class="empty-state">Error loading sessions. Please try again later.</p>';
-      }
+      // Show empty state (bookings collection might not exist yet)
+      displaySessions();
     }
   }
 
   function displaySessions() {
     const now = new Date();
-    const pending = allSessions.filter(s => s.status === 'pending');
+    now.setHours(0, 0, 0, 0); // Set to start of today for comparison
+    
+    const pending = allSessions.filter(s => (s.status || 'pending').toLowerCase() === 'pending');
     const upcoming = allSessions.filter(s => {
-      const sessionDate = s.sessionDate?.toDate ? s.sessionDate.toDate() : new Date(s.sessionDate);
-      return sessionDate >= now && s.status === 'approved';
+      const sessionDate = new Date(s.sessionDate);
+      sessionDate.setHours(0, 0, 0, 0);
+      return sessionDate >= now && (s.status || '').toLowerCase() === 'approved';
     });
     
     const past = allSessions.filter(s => {
-      const sessionDate = s.sessionDate?.toDate ? s.sessionDate.toDate() : new Date(s.sessionDate);
-      return sessionDate < now;
+      const sessionDate = new Date(s.sessionDate);
+      sessionDate.setHours(0, 0, 0, 0);
+      return sessionDate < now && (s.status || '').toLowerCase() !== 'pending';
     });
 
     // Display pending sessions
     const pendingContent = document.getElementById("pending-sessions-content");
     if (pending.length === 0) {
-      pendingContent.innerHTML = '<div class="empty-state">No pending sessions.</div>';
+      pendingContent.innerHTML = '<div class="empty-state">No pending sessions. <a href="book-session.html">Book a session</a> to get started!</div>';
     } else {
       pendingContent.innerHTML = `
         <table class="sessions-table">
@@ -240,7 +242,6 @@
               <th>Students</th>
               <th>Subject</th>
               <th>Status</th>
-              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -248,19 +249,6 @@
           </tbody>
         </table>
       `;
-
-      // Add event listeners for approve/decline buttons
-      pending.forEach(session => {
-        const approveBtn = document.getElementById(`approve-${session.id}`);
-        const declineBtn = document.getElementById(`decline-${session.id}`);
-        
-        if (approveBtn) {
-          approveBtn.addEventListener('click', () => approveSession(session));
-        }
-        if (declineBtn) {
-          declineBtn.addEventListener('click', () => declineSession(session));
-        }
-      });
     }
 
     // Display upcoming sessions
@@ -276,7 +264,7 @@
               <th>Time</th>
               <th>Students</th>
               <th>Subject</th>
-              <th>Status</th>
+              <th>Duration</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -313,7 +301,7 @@
               <th>Time</th>
               <th>Students</th>
               <th>Subject</th>
-              <th>Notes</th>
+              <th>Duration</th>
             </tr>
           </thead>
           <tbody>
@@ -325,16 +313,16 @@
   }
 
   function renderPendingSessionRow(session) {
-    const sessionDate = session.sessionDate?.toDate ? session.sessionDate.toDate() : new Date(session.sessionDate);
+    const sessionDate = new Date(session.sessionDate);
     const dateStr = sessionDate.toLocaleDateString('en-US', { 
       weekday: 'short', 
       year: 'numeric', 
       month: 'short', 
       day: 'numeric' 
     });
-    const timeStr = `${session.startTime} - ${session.endTime || 'TBD'}`;
-    const students = session.studentNames || 'N/A';
-    const subject = session.subject || 'N/A';
+    const timeStr = session.startTime ? `${session.startTime}${session.endTime ? ' - ' + session.endTime : ''}` : 'TBD';
+    const students = session.studentNames || session.students || 'N/A';
+    const subject = session.subject || 'General';
 
     return `
       <tr>
@@ -342,28 +330,23 @@
         <td>${timeStr}</td>
         <td>${students}</td>
         <td>${subject}</td>
-        <td><span class="session-status status-pending">Pending</span></td>
-        <td class="session-actions">
-          <button id="approve-${session.id}" class="btn primary">Approve</button>
-          <button id="decline-${session.id}" class="btn tertiary">Decline</button>
-        </td>
+        <td><span class="session-status status-pending">⏳ Pending Approval</span></td>
       </tr>
     `;
   }
 
   function renderSessionRow(session, isUpcoming) {
-    const sessionDate = session.sessionDate?.toDate ? session.sessionDate.toDate() : new Date(session.sessionDate);
+    const sessionDate = new Date(session.sessionDate);
     const dateStr = sessionDate.toLocaleDateString('en-US', { 
       weekday: 'short', 
       year: 'numeric', 
       month: 'short', 
       day: 'numeric' 
     });
-    const timeStr = `${session.startTime} - ${session.endTime || 'TBD'}`;
-    const students = session.studentNames || 'N/A';
-    const subject = session.subject || 'N/A';
-    const status = session.status || 'pending';
-    const notes = session.tutorNotes || '';
+    const timeStr = session.startTime ? `${session.startTime}${session.endTime ? ' - ' + session.endTime : ''}` : 'TBD';
+    const students = session.studentNames || session.students || 'N/A';
+    const subject = session.subject || 'General';
+    const duration = session.duration || session.durationHours || 'N/A';
 
     if (isUpcoming) {
       return `
@@ -372,10 +355,10 @@
           <td>${timeStr}</td>
           <td>${students}</td>
           <td>${subject}</td>
-          <td><span class="session-status status-${status}">${status}</span></td>
+          <td>${duration}h</td>
           <td class="session-actions">
-            <button id="edit-${session.id}" class="btn tertiary">Edit</button>
-            <button id="remove-${session.id}" class="btn tertiary">Remove</button>
+            <button id="edit-${session.id}" class="btn tertiary" style="font-size: 0.85rem;">✏️ Edit</button>
+            <button id="remove-${session.id}" class="btn tertiary" style="font-size: 0.85rem;">🗑️ Cancel</button>
           </td>
         </tr>
       `;
@@ -386,66 +369,46 @@
           <td>${timeStr}</td>
           <td>${students}</td>
           <td>${subject}</td>
-          <td class="notes-preview" title="${notes}">${notes || 'No notes'}</td>
+          <td>${duration}h</td>
         </tr>
       `;
     }
   }
 
   function editSession(session) {
-    // Redirect to an edit page with session ID
-    window.location.href = `edit-session.html?id=${session.id}`;
+    // Redirect to edit booking page
+    window.location.href = `edit-booking.html?id=${session.id}`;
   }
 
   async function removeSession(session) {
-    if (!confirm(`Are you sure you want to remove the session on ${new Date(session.sessionDate).toLocaleDateString()}?`)) {
+    const sessionDate = new Date(session.sessionDate);
+    const dateStr = sessionDate.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    
+    if (!confirm(`Are you sure you want to cancel the session on ${dateStr} at ${session.startTime}?\n\nThis action cannot be undone.`)) {
       return;
     }
 
     try {
-      // In a real implementation, you'd delete from Firestore
-      // For now, just show a message
-      alert('Session removal will be implemented when integrated with your backend.');
-      // await deleteDoc(doc(db, "bookings", session.id));
-      // await loadSessions(); // Reload after deletion
+      const deleteDoc = window.firestoreDeleteDoc;
+      const doc = window.firestoreDoc;
+      
+      await deleteDoc(doc(db, "bookings", session.id));
+      
+      // Remove from local array
+      allSessions = allSessions.filter(s => s.id !== session.id);
+      
+      // Refresh display
+      displaySessions();
+      
+      alert('Session cancelled successfully!');
     } catch (err) {
       console.error("Error removing session:", err);
-      alert('Failed to remove session. Please try again.');
-    }
-  }
-
-  async function approveSession(session) {
-    if (!confirm(`Approve session on ${new Date(session.sessionDate).toLocaleDateString()}?`)) {
-      return;
-    }
-
-    try {
-      // In a real implementation, you'd update the status in Firestore
-      // For now, just show a message
-      alert('Session approval will be implemented when integrated with your backend.');
-      // await updateDoc(doc(db, "bookings", session.id), { status: 'approved' });
-      // await loadSessions(); // Reload after update
-    } catch (err) {
-      console.error("Error approving session:", err);
-      alert('Failed to approve session. Please try again.');
-    }
-  }
-
-  async function declineSession(session) {
-    if (!confirm(`Decline session on ${new Date(session.sessionDate).toLocaleDateString()}?`)) {
-      return;
-    }
-
-    try {
-      // In a real implementation, you'd either delete or update status to 'declined'
-      // For now, just show a message
-      alert('Session decline will be implemented when integrated with your backend.');
-      // await deleteDoc(doc(db, "bookings", session.id));
-      // OR: await updateDoc(doc(db, "bookings", session.id), { status: 'declined' });
-      // await loadSessions(); // Reload after update
-    } catch (err) {
-      console.error("Error declining session:", err);
-      alert('Failed to decline session. Please try again.');
+      alert('Failed to cancel session. Please try again or contact support.');
     }
   }
 

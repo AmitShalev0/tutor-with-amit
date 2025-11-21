@@ -141,8 +141,8 @@
 
     <div class="field-row checkbox-row">
       <label>
-        <input type="checkbox" id="sliding-scale-toggle" name="sliding_scale_toggle" title="Enable sliding scale for low-income support" />
-        Apply sliding scale for low-income support
+        <input type="checkbox" id="sliding-scale-toggle" name="sliding_scale_toggle" title="Apply sliding scale discount" />
+        Apply sliding scale
       </label>
     </div>
 
@@ -194,7 +194,7 @@
   const query = window.firestoreQuery;
   const where = window.firestoreWhere;
 
-  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbKeFr3aAq9tmosxniada0DP2oW0Vv91G0H681BYk34yMy0_iC3PqnRzpqVO_CnRVN/exec";
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxHL7YlP7nbZTYMyjKnJCMvyjYPwp3aVb0NGjOvCakktOHJK5lw2cBY45_VA4-m3wCd/exec";
 
   let currentUser = null;
   let userProfile = null;
@@ -216,6 +216,9 @@
       const userDoc = await getDoc(doc(db, "users", currentUser.uid));
       if (userDoc.exists()) {
         userProfile = userDoc.data();
+        
+        // Check sliding scale eligibility
+        checkSlidingScaleEligibility();
       }
 
       // Load students
@@ -241,6 +244,43 @@
       }
     } catch (err) {
       console.error("Error loading user data:", err);
+    }
+  }
+  
+  function checkSlidingScaleEligibility() {
+    // Check if user has sliding scale eligibility enabled
+    const slidingScaleCheckbox = document.getElementById("sliding-scale-toggle");
+    const slidingScaleLabel = slidingScaleCheckbox?.parentElement;
+    
+    if (!slidingScaleCheckbox) return;
+    
+    // Check if user has sliding_scale_eligible field (stored in Firestore users collection)
+    const isEligible = userProfile?.slidingScaleEligible === true;
+    
+    if (!isEligible) {
+      // Disable the checkbox and show why
+      slidingScaleCheckbox.disabled = true;
+      slidingScaleCheckbox.checked = false;
+      
+      if (slidingScaleLabel) {
+        slidingScaleLabel.style.opacity = "0.5";
+        slidingScaleLabel.style.cursor = "not-allowed";
+        slidingScaleLabel.title = "Sliding scale discount is not available for your account. Please contact the tutor if you need assistance.";
+      }
+      
+      // Hide the slider if it was visible
+      const slidingScaleRow = document.getElementById("sliding-scale-row");
+      if (slidingScaleRow) {
+        slidingScaleRow.classList.add("hidden");
+      }
+    } else {
+      // Enable the checkbox
+      slidingScaleCheckbox.disabled = false;
+      if (slidingScaleLabel) {
+        slidingScaleLabel.style.opacity = "1";
+        slidingScaleLabel.style.cursor = "pointer";
+        slidingScaleLabel.title = "Apply sliding scale discount";
+      }
     }
   }
 
@@ -278,12 +318,42 @@
         dropdown.appendChild(option);
       });
     });
+    
+    // Add change event listener to Student 1 (Primary) to auto-populate subject
+    const primaryStudentDropdown = document.getElementById("student-1");
+    const subjectInput = document.getElementById("subject");
+    
+    if (primaryStudentDropdown && subjectInput) {
+      primaryStudentDropdown.addEventListener('change', (e) => {
+        const selectedStudentId = e.target.value;
+        if (selectedStudentId) {
+          const student = userStudents.find(s => s.id === selectedStudentId);
+          if (student && student.subject) {
+            subjectInput.value = student.subject;
+          }
+        }
+      });
+    }
   }
 
   // Initialize booking form (reuse existing main.js logic)
   // The form will be populated with user's email, phone, and name automatically
+  let isSubmitting = false; // Prevent double submissions
+  
   document.getElementById("booking-form").addEventListener("submit", async (e) => {
     e.preventDefault();
+    
+    // Prevent double submission
+    if (isSubmitting) {
+      console.log("Form already submitting, ignoring duplicate submission");
+      return;
+    }
+    
+    isSubmitting = true;
+    const submitButton = e.target.querySelector('button[type="submit"]');
+    const originalButtonText = submitButton.textContent;
+    submitButton.disabled = true;
+    submitButton.textContent = "Submitting...";
     
     const msg = document.getElementById("booking-form-message");
     msg.textContent = "Submitting booking request…";
@@ -307,18 +377,51 @@
     if (selectedStudents.length === 0) {
       msg.textContent = "Please select at least one student.";
       msg.classList.add("error");
+      submitButton.disabled = false;
+      submitButton.textContent = originalButtonText;
+      isSubmitting = false;
       return;
     }
 
     const formData = new FormData(e.target);
     const obj = Object.fromEntries(formData.entries());
     obj.type = "booking_request";
-    obj.guardian_full_name = userProfile.fullName;
-    obj.email = userProfile.email;
-    obj.phone = userProfile.phone;
+    
+    // Add user profile data with fallbacks
+    obj.guardian_full_name = (userProfile && userProfile.fullName) || "Guest User";
+    obj.email = (userProfile && userProfile.email) || currentUser.email || "";
+    obj.phone = (userProfile && userProfile.phone) || "";
+    
     obj.num_students = selectedStudents.length;
     obj.student_names = selectedStudents.join(", ");
     obj.session_title = `${obj.subject} – ${selectedStudents.join(", ")}`;
+    
+    // Frontend validation: Check required fields before submitting
+    const requiredFields = {
+      'Subject': obj.subject,
+      'Email': obj.email,
+      'Name': obj.guardian_full_name,
+      'Date': obj.selected_date,
+      'Start Time': obj.selected_start,
+      'Students': obj.student_names
+    };
+    
+    const missingFields = [];
+    for (const [fieldName, value] of Object.entries(requiredFields)) {
+      if (!value || value === "" || value === "Guest User" || value === "0") {
+        missingFields.push(fieldName);
+      }
+    }
+    
+    if (missingFields.length > 0) {
+      msg.textContent = `Please fill in all required fields: ${missingFields.join(", ")}`;
+      msg.classList.add("error");
+      msg.classList.remove("ok");
+      submitButton.disabled = false;
+      submitButton.textContent = originalButtonText;
+      isSubmitting = false;
+      return;
+    }
 
     // Calculate final cost
     const duration = parseFloat(obj.duration_hours || "1");
@@ -342,24 +445,44 @@
     
     obj.final_cost = finalCost.toFixed(2);
 
+    // Debug: Log what we're sending
+    console.log("Booking data being sent:", obj);
+    console.log("User profile:", userProfile);
+    console.log("Selected students:", selectedStudents);
+
     try {
-      await fetch(APPS_SCRIPT_URL, {
+      const response = await fetch(APPS_SCRIPT_URL, {
         method: "POST",
-        mode: "no-cors",
+        mode: "no-cors", // Temporary for local testing - prevents CORS errors
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(obj),
       });
 
+      // Add a small delay to ensure the server processes before any potential retry
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // With proper CORS, we can read the response
+      // If no-cors mode is needed, we assume success after a delay
+      console.log("Booking submitted successfully");
+      
       msg.textContent = "Thanks! Your booking request has been submitted. I will review it and email you with confirmation.";
       msg.classList.add("ok");
+      msg.classList.remove("error");
       
+      // Wait 2 seconds before redirecting
       setTimeout(() => {
         window.location.href = "dashboard.html";
       }, 2000);
 
     } catch (err) {
-      console.error(err);
+      console.error("Booking submission error:", err);
       msg.textContent = "Something went wrong. Please try again or contact me directly.";
       msg.classList.add("error");
+      submitButton.disabled = false;
+      submitButton.textContent = originalButtonText;
+      isSubmitting = false;
     }
   });
 </script>

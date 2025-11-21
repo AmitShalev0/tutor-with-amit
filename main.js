@@ -1,6 +1,6 @@
 // main.js
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbKeFr3aAq9tmosxniada0DP2oW0Vv91G0H681BYk34yMy0_iC3PqnRzpqVO_CnRVN/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxxbaRi7gutT8cwueMAD0Tb_OteM9UjRrYUUyAw-UUkM-Gt7AOeTeP3RXpMec1vZT1H/exec";
 
 document.addEventListener("DOMContentLoaded", () => {
   const yearSpan = document.getElementById("year");
@@ -590,9 +590,10 @@ function setupBookingForm() {
   // Mock existing bookings. Replace with server data later.
   // Each booking is [startMin, endMin] relative to day (0=Mon) and minute-of-day.
   // Example: Tuesday (1) has a booking 14:00-15:00
-  const demoBooked = {
+  // This will be populated by loadAvailability() from Apps Script
+  let demoBooked = {
     0: [],
-    1: [[14 * 60, 15 * 60]],
+    1: [],
     2: [],
     3: [],
     4: [],
@@ -784,37 +785,125 @@ function setupBookingForm() {
   }
 
   async function loadAvailability() {
-    // For now: fake availability (Mon–Fri, 8–20). Later: fetch from Apps Script.
+    try {
+      // Use JSONP to avoid CORS issues with Apps Script
+      const callbackName = 'handleAvailabilityResponse' + Date.now();
+      const url = `${APPS_SCRIPT_URL}?action=getAvailability&weekOffset=${currentWeekOffset}&callback=${callbackName}`;
+      
+      console.log('Loading availability from:', url);
+      
+      // Create promise that will be resolved by the JSONP callback
+      const dataPromise = new Promise((resolve, reject) => {
+        // Set up callback function
+        window[callbackName] = (data) => {
+          console.log('Received availability data:', data);
+          delete window[callbackName];
+          resolve(data);
+        };
+        
+        // Create script tag
+        const script = document.createElement('script');
+        script.src = url;
+        script.onerror = (error) => {
+          console.error('Script loading error:', error);
+          delete window[callbackName];
+          reject(new Error('Failed to load availability data - check Apps Script deployment'));
+        };
+        
+        // Add to document
+        document.head.appendChild(script);
+        
+        // Clean up after load
+        script.onload = () => {
+          setTimeout(() => {
+            if (script.parentNode) {
+              document.head.removeChild(script);
+            }
+          }, 100);
+        };
+        
+        // Timeout after 10 seconds
+        setTimeout(() => {
+          if (window[callbackName]) {
+            console.error('Request timeout after 10 seconds');
+            delete window[callbackName];
+            if (script.parentNode) {
+              document.head.removeChild(script);
+            }
+            reject(new Error('Request timeout'));
+          }
+        }, 10000);
+      });
+      
+      const data = await dataPromise;
+      
+      if (!data.success) {
+        throw new Error(data.message || "Failed to load availability");
+      }
+      
+      // Populate demoAvailable and demoBooked from server response
+      demoAvailable = data.available || {};
+      demoBooked = data.booked || {};
+      
+      console.log('Available slots:', demoAvailable);
+      console.log('Booked slots:', demoBooked);
+      
+      // Calculate the Monday of the current week offset
+      const today = new Date();
+      const monday = new Date(today);
+      const day = monday.getDay();
+      const diff = (day === 0 ? -6 : 1) - day; // Monday of current week
+      monday.setDate(today.getDate() + diff + (currentWeekOffset * 7));
+      
+      // Format date as DD/MM/YYYY for display
+      const displayDate = `${String(monday.getDate()).padStart(2, '0')}/${String(monday.getMonth() + 1).padStart(2, '0')}/${monday.getFullYear()}`;
+      if (weekDisplay) weekDisplay.textContent = `Week of ${displayDate}`;
+      
+      // Disable "Previous Week" button if viewing current week
+      if (prevWeekBtn) {
+        prevWeekBtn.disabled = (currentWeekOffset === 0);
+        prevWeekBtn.style.opacity = (currentWeekOffset === 0) ? '0.5' : '1';
+        prevWeekBtn.style.cursor = (currentWeekOffset === 0) ? 'not-allowed' : 'pointer';
+      }
+
+      // Render the calendar
+      renderCalendar(monday);
+      
+    } catch (error) {
+      console.error("Error loading availability:", error);
+      alert('Failed to load calendar availability. Please check:\n1. Apps Script is deployed\n2. Deployment URL is correct\n3. Calendar permissions are granted\n\nError: ' + error.message);
+      
+      // Fallback to empty availability on error
+      demoAvailable = {
+        0: [], 1: [], 2: [], 3: [], 4: []
+      };
+      demoBooked = {
+        0: [], 1: [], 2: [], 3: [], 4: []
+      };
+      
+      // Still render the calendar structure
+      const today = new Date();
+      const monday = new Date(today);
+      const day = monday.getDay();
+      const diff = (day === 0 ? -6 : 1) - day;
+      monday.setDate(today.getDate() + diff + (currentWeekOffset * 7));
+      
+      const displayDate = `${String(monday.getDate()).padStart(2, '0')}/${String(monday.getMonth() + 1).padStart(2, '0')}/${monday.getFullYear()}`;
+      if (weekDisplay) weekDisplay.textContent = `Week of ${displayDate}`;
+      
+      if (prevWeekBtn) {
+        prevWeekBtn.disabled = (currentWeekOffset === 0);
+        prevWeekBtn.style.opacity = (currentWeekOffset === 0) ? '0.5' : '1';
+        prevWeekBtn.style.cursor = (currentWeekOffset === 0) ? 'not-allowed' : 'pointer';
+      }
+      
+      renderCalendar(monday);
+    }
+  }
+  
+  function renderCalendar(monday) {
     const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
     const startHour = 8, endHour = 20;
-
-    // Calculate the Monday of the current week offset
-    const today = new Date();
-    const monday = new Date(today);
-    const day = monday.getDay();
-    const diff = (day === 0 ? -6 : 1) - day; // Monday of current week
-    monday.setDate(today.getDate() + diff + (currentWeekOffset * 7));
-    
-    // Format date as DD/MM/YYYY for display
-    const displayDate = `${String(monday.getDate()).padStart(2, '0')}/${String(monday.getMonth() + 1).padStart(2, '0')}/${monday.getFullYear()}`;
-    if (weekDisplay) weekDisplay.textContent = `Week of ${displayDate}`;
-    
-    // Disable "Previous Week" button if viewing current week
-    if (prevWeekBtn) {
-      prevWeekBtn.disabled = (currentWeekOffset === 0);
-      prevWeekBtn.style.opacity = (currentWeekOffset === 0) ? '0.5' : '1';
-      prevWeekBtn.style.cursor = (currentWeekOffset === 0) ? 'not-allowed' : 'pointer';
-    }
-
-    // Example data structure: available blocks per day as [startMin, endMin]
-    // You will replace this with data from Apps Script.
-    demoAvailable = {
-      0: [[8 * 60, 17 * 60], [19 * 60, 20 * 60]],
-      1: [[8 * 60, 14 * 60], [15 * 60, 16 * 60], [17 * 60 + 15, 20 * 60]],
-      2: [[8 * 60, 20 * 60]],
-      3: [[8 * 60, 16 * 60], [18 * 60 + 15, 20 * 60]],
-      4: [[8 * 60, 13 * 60]],
-    };
 
     // Clear and build header row
     calElem.innerHTML = "";

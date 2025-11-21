@@ -37,31 +37,18 @@
     <form id="profile-form" class="card">
       <div class="field-row">
         <label>Full Name*</label>
-        <input type="text" name="fullName" id="fullName" required />
+        <input type="text" name="fullName" id="fullName" placeholder="Lily Ebert" required />
       </div>
 
       <div class="field-row">
         <label>Email*</label>
-        <input type="email" name="email" id="email" disabled />
+        <input type="email" name="email" id="email" placeholder="CharlieChaplin88@gmail.com" disabled />
         <p class="help-text">Email cannot be changed. Contact support if you need to update it.</p>
       </div>
 
       <div class="field-row">
         <label>Phone Number*</label>
         <input type="tel" name="phone" id="phone" placeholder="(123) 456-7890" required />
-      </div>
-
-      <div class="field-row">
-        <label>Time Zone</label>
-        <select name="timezone" id="timezone">
-          <option value="America/New_York">Eastern Time (ET)</option>
-          <option value="America/Chicago">Central Time (CT)</option>
-          <option value="America/Denver">Mountain Time (MT)</option>
-          <option value="America/Phoenix">Arizona (MST)</option>
-          <option value="America/Los_Angeles">Pacific Time (PT)</option>
-          <option value="America/Anchorage">Alaska Time (AKT)</option>
-          <option value="Pacific/Honolulu">Hawaii Time (HST)</option>
-        </select>
       </div>
 
       <div id="error-message" class="error-message"></div>
@@ -119,7 +106,6 @@
         document.getElementById("fullName").value = userData.fullName || "";
         document.getElementById("email").value = currentUser.email || "";
         document.getElementById("phone").value = userData.phone || "";
-        document.getElementById("timezone").value = userData.timezone || "America/New_York";
       }
 
       // Show profile form
@@ -139,8 +125,7 @@
 
     const fullName = document.getElementById("fullName").value.trim();
     const phone = document.getElementById("phone").value.trim();
-    const timezone = document.getElementById("timezone").value;
-
+    
     if (!fullName || !phone) {
       showError("Please fill in all required fields.");
       return;
@@ -151,7 +136,6 @@
       await updateDoc(userDocRef, {
         fullName,
         phone,
-        timezone
       });
 
       showSuccess("Profile updated successfully!");
