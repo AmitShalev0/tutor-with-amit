@@ -2,34 +2,34 @@
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
-  createUserWithEmailAndPassword,
-  getAuth,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-  updateProfile
+    createUserWithEmailAndPassword,
+    getAuth,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    signOut,
+    updateProfile
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  getFirestore,
-  orderBy,
-  query,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  where
+    addDoc,
+    collection,
+    deleteDoc,
+    doc,
+    getDoc,
+    getDocs,
+    getFirestore,
+    orderBy,
+    query,
+    serverTimestamp,
+    setDoc,
+    updateDoc,
+    where
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import {
-  deleteObject,
-  getDownloadURL,
-  getStorage,
-  ref,
-  uploadBytes
+    deleteObject,
+    getDownloadURL,
+    getStorage,
+    ref,
+    uploadBytes
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
 // Your web app's Firebase configuration
@@ -82,3 +82,11 @@ window.storageRef = ref;
 window.storageUploadBytes = uploadBytes;
 window.storageGetDownloadURL = getDownloadURL;
 window.storageDeleteObject = deleteObject;
+
+// Export for ES6 modules
+export {
+    addDoc, app, auth, collection, createUserWithEmailAndPassword, db, deleteDoc, deleteObject, doc,
+    getDoc,
+    getDocs, getDownloadURL, onAuthStateChanged, orderBy, query, ref, serverTimestamp, setDoc, signInWithEmailAndPassword, signOut, storage, updateDoc, updateProfile, uploadBytes, where
+};
+

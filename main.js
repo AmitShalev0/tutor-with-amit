@@ -1,6 +1,6 @@
 // main.js
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwr0zGrzVT9Pj0s3f1Jdq05_g9BX4AUJY6aI9nMefAgdLPjtyqdwkfItLAWD9gwjVas/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyuEGmx-bCkhs44KHL90Rivtw0h9825Wuys8KLtGb9LNE6dyy9JXvmnY0b10C19U4de/exec";
 
 // Store the originally selected calendar date for recurring sessions
 let originalCalendarDate = null;
@@ -175,34 +175,63 @@ async function setupUserGreeting() {
     currentTime.style.fontSize = '0.75rem';
   }
 
-  // Listen for auth state changes
-  onAuth(auth, async (user) => {
-    if (user) {
-      try {
-        // Fetch user profile from Firestore
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-        
+  // Wait for Firebase to be ready before setting up auth listener
+  function waitForFirebase() {
+    return new Promise((resolve) => {
+      const checkFirebase = () => {
+        if (window.firebaseAuth && window.firebaseDb) {
+          resolve();
+        } else {
+          setTimeout(checkFirebase, 50);
+        }
+      };
+      checkFirebase();
+    });
+  }
+
+  // Wait for Firebase, then set up auth listener
+  waitForFirebase().then(() => {
+    // Listen for auth state changes
+    onAuth(auth, async (user) => {
+      if (user) {
         let firstName = 'User';
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          firstName = userData.firstName || userData.fullName?.split(' ')[0] || 'User';
+        
+        try {
+          // Fetch user profile from Firestore
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDoc = await getDoc(userDocRef);
+          
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            firstName = userData.firstName || userData.fullName?.split(' ')[0] || firstName;
+          }
+        } catch (error) {
+          console.error('Error fetching user data from Firestore:', error);
         }
         
-        greetingSpan.textContent = `Hello, ${firstName}`;
-        greetingSpan.style.display = 'inline';
-        logoutBtn.style.display = 'inline-block';
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-        greetingSpan.textContent = 'Hello!';
-        greetingSpan.style.display = 'inline';
-        logoutBtn.style.display = 'inline-block';
-      }
+        // Fallback to Firebase Auth data if Firestore didn't provide a name
+        if (firstName === 'User') {
+          // Try displayName from Firebase Auth
+          if (user.displayName) {
+            firstName = user.displayName.split(' ')[0];
+          } 
+          // Try extracting from email as last resort
+          else if (user.email) {
+            firstName = user.email.split('@')[0].replace(/[._]/g, ' ').split(' ')[0];
+            // Capitalize first letter
+            firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+          }
+        }
+        
+        greetingSpan.textContent = `Hello ${firstName}`;
+      greetingSpan.style.display = 'inline';
+      logoutBtn.style.display = 'inline-block';
     } else {
       greetingSpan.style.display = 'none';
       logoutBtn.style.display = 'none';
     }
   });
+  }); // End waitForFirebase promise
 }
 
 function setupStudentForm() {
@@ -1037,7 +1066,11 @@ function setupBookingForm() {
 
       const label = `${dayName}, ${monthName} ${dateNum}, ${year} (${i})`;
       const opt = document.createElement('option');
-      opt.value = d.toISOString().slice(0, 10);
+      // Use local date formatting to avoid timezone conversion
+      const optYear = d.getFullYear();
+      const optMonth = String(d.getMonth() + 1).padStart(2, '0');
+      const optDay = String(d.getDate()).padStart(2, '0');
+      opt.value = `${optYear}-${optMonth}-${optDay}`;
       opt.textContent = label;
       
       recurringEndSel.appendChild(opt);
@@ -1280,7 +1313,11 @@ function setupBookingForm() {
             const date = new Date(monday);
             date.setDate(monday.getDate() + dayIdx);
             originalCalendarDate = date; // Store for recurring options
-            hiddenDate.value = date.toISOString().slice(0, 10);
+            // Use local date formatting to avoid timezone conversion issues
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            hiddenDate.value = `${year}-${month}-${day}`;
             const timeStr = `${String(h).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
             hiddenStart.value = timeStr;
             
@@ -1404,7 +1441,11 @@ function setupBookingForm() {
       // Check each week for conflicts
       let currentDate = new Date(startDate);
       while (currentDate <= endDate) {
-        const dateStr = currentDate.toISOString().slice(0, 10);
+        // Use local date formatting to avoid timezone conversion
+        const year = currentDate.getFullYear();
+        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+        const day = String(currentDate.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
         
         // Check if this date conflicts with existing bookings
         const bookedSlots = demoBooked[dayIdx] || [];

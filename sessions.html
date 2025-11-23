@@ -114,19 +114,19 @@
   </div>
 
   <div class="sessions-container">
-    <!-- Pending Sessions -->
-    <div class="session-section">
-      <h3>Pending Sessions</h3>
-      <div id="pending-sessions-content">
-        <p class="loading-text">Loading pending sessions...</p>
-      </div>
-    </div>
-
     <!-- Upcoming Sessions -->
     <div class="session-section">
       <h3>Upcoming Sessions</h3>
       <div id="upcoming-sessions-content">
         <p class="loading-text">Loading upcoming sessions...</p>
+      </div>
+    </div>
+
+    <!-- Pending Sessions -->
+    <div class="session-section">
+      <h3>Pending Sessions</h3>
+      <div id="pending-sessions-content">
+        <p class="loading-text">Loading pending sessions...</p>
       </div>
     </div>
 
@@ -155,41 +155,59 @@
 
 <!-- Sessions logic -->
 <script type="module">
-  const auth = window.firebaseAuth;
-  const db = window.firebaseDb;
-  const onAuth = window.firebaseOnAuth;
-  const getDocs = window.firestoreGetDocs;
-  const collection = window.firestoreCollection;
-  const query = window.firestoreQuery;
-  const where = window.firestoreWhere;
-  const orderBy = window.firestoreOrderBy;
+  // Wait for firebase.js to fully load
+  function waitForFirebase() {
+    return new Promise((resolve) => {
+      if (window.firebaseAuth && window.firebaseDb) {
+        resolve();
+      } else {
+        setTimeout(() => waitForFirebase().then(resolve), 100);
+      }
+    });
+  }
 
-  let currentUser = null;
-  let allSessions = [];
+  waitForFirebase().then(() => {
+    // Use window globals that are already set up
+    const auth = window.firebaseAuth;
+    const db = window.firebaseDb;
+    const onAuthStateChanged = window.firebaseOnAuth;
+    const collection = window.firestoreCollection;
+    const query = window.firestoreQuery;
+    const where = window.firestoreWhere;
+    const getDocs = window.firestoreGetDocs;
 
-  // Check authentication
-  onAuth(auth, async (user) => {
-    if (!user) {
-      window.location.href = "login.html";
-      return;
-    }
-    currentUser = user;
-    await loadSessions();
-  });
+    let currentUser = null;
+    let allSessions = [];
+
+    // Check authentication
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.href = "login.html";
+        return;
+      }
+      currentUser = user;
+      await loadSessions();
+    });
 
   async function loadSessions() {
     try {
-      // Fetch user's bookings from Firestore
-      const bookingsQuery = query(
-        collection(db, "bookings"),
+      console.log("Loading sessions for user:", currentUser.uid);
+      
+      // Fetch user's sessions from Firestore (synced from TutorDesk after approval)
+      // Changed from "bookings" to "sessions" collection
+      const sessionsQuery = query(
+        collection(db, "sessions"),
         where("userId", "==", currentUser.uid)
       );
       
-      const querySnapshot = await getDocs(bookingsQuery);
+      const querySnapshot = await getDocs(sessionsQuery);
       allSessions = [];
+      
+      console.log("Query snapshot size:", querySnapshot.size);
       
       querySnapshot.forEach((doc) => {
         const data = doc.data();
+        console.log("Session data:", doc.id, data);
         allSessions.push({ 
           id: doc.id, 
           ...data,
@@ -198,6 +216,8 @@
         });
       });
 
+      console.log("Total sessions loaded:", allSessions.length);
+
       // Sort by date (newest first)
       allSessions.sort((a, b) => b.sessionDate - a.sessionDate);
 
@@ -205,8 +225,13 @@
     } catch (err) {
       console.error("Error loading sessions:", err);
       
-      // Show empty state (bookings collection might not exist yet)
-      displaySessions();
+      // Show error message to user
+      document.getElementById("upcoming-sessions-content").innerHTML = 
+        `<div class="empty-state" style="color: #dc3545;">Error loading sessions: ${err.message}</div>`;
+      document.getElementById("pending-sessions-content").innerHTML = 
+        `<div class="empty-state">Unable to load data</div>`;
+      document.getElementById("past-sessions-content").innerHTML = 
+        `<div class="empty-state">Unable to load data</div>`;
     }
   }
 
@@ -214,77 +239,67 @@
     const now = new Date();
     now.setHours(0, 0, 0, 0); // Set to start of today for comparison
     
+    console.log("Displaying sessions. Total:", allSessions.length);
+    
     const pending = allSessions.filter(s => (s.status || 'pending').toLowerCase() === 'pending');
     const upcoming = allSessions.filter(s => {
       const sessionDate = new Date(s.sessionDate);
       sessionDate.setHours(0, 0, 0, 0);
-      return sessionDate >= now && (s.status || '').toLowerCase() === 'approved';
+      const status = (s.status || '').toLowerCase();
+      // Include approved sessions OR sessions synced from TutorDesk (which have status "approved")
+      return sessionDate >= now && status !== 'pending';
     });
     
     const past = allSessions.filter(s => {
       const sessionDate = new Date(s.sessionDate);
       sessionDate.setHours(0, 0, 0, 0);
-      return sessionDate < now && (s.status || '').toLowerCase() !== 'pending';
+      return sessionDate < now;
     });
 
-    // Display pending sessions
-    const pendingContent = document.getElementById("pending-sessions-content");
-    if (pending.length === 0) {
-      pendingContent.innerHTML = '<div class="empty-state">No pending sessions. <a href="book-session.html">Book a session</a> to get started!</div>';
-    } else {
-      pendingContent.innerHTML = `
-        <table class="sessions-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Time</th>
-              <th>Students</th>
-              <th>Subject</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${pending.map(session => renderPendingSessionRow(session)).join('')}
-          </tbody>
-        </table>
-      `;
-    }
+    console.log("Categorized - Upcoming:", upcoming.length, "Pending:", pending.length, "Past:", past.length);
 
     // Display upcoming sessions
     const upcomingContent = document.getElementById("upcoming-sessions-content");
     if (upcoming.length === 0) {
-      upcomingContent.innerHTML = '<div class="empty-state">No upcoming sessions scheduled.</div>';
+      upcomingContent.innerHTML = '<div class="empty-state">No upcoming sessions scheduled. <a href="book-session.html">Book a session</a> to get started!</div>';
     } else {
       upcomingContent.innerHTML = `
         <table class="sessions-table">
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Time</th>
-              <th>Students</th>
-              <th>Subject</th>
-              <th>Duration</th>
-              <th>Actions</th>
+              <th>Session Date</th>
+              <th>Start & End Time</th>
+              <th>Student Name</th>
+              <th>Comments / Questions</th>
             </tr>
           </thead>
           <tbody>
-            ${upcoming.map(session => renderSessionRow(session, true)).join('')}
+            ${upcoming.map(session => renderUnifiedSessionRow(session)).join('')}
           </tbody>
         </table>
       `;
+    }
 
-      // Add event listeners for edit/remove buttons
-      upcoming.forEach(session => {
-        const editBtn = document.getElementById(`edit-${session.id}`);
-        const removeBtn = document.getElementById(`remove-${session.id}`);
-        
-        if (editBtn) {
-          editBtn.addEventListener('click', () => editSession(session));
-        }
-        if (removeBtn) {
-          removeBtn.addEventListener('click', () => removeSession(session));
-        }
-      });
+    // Display pending sessions
+    const pendingContent = document.getElementById("pending-sessions-content");
+    if (pending.length === 0) {
+      pendingContent.innerHTML = '<div class="empty-state">No pending sessions.</div>';
+    } else {
+      pendingContent.innerHTML = `
+        <table class="sessions-table">
+          <thead>
+            <tr>
+              <th>Session Date</th>
+              <th>Start & End Time</th>
+              <th>Student Name</th>
+              <th>Comments / Questions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${pending.map(session => renderUnifiedSessionRow(session)).join('')}
+          </tbody>
+        </table>
+      `;
     }
 
     // Display past sessions
@@ -296,22 +311,21 @@
         <table class="sessions-table">
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Time</th>
-              <th>Students</th>
-              <th>Subject</th>
-              <th>Duration</th>
+              <th>Session Date</th>
+              <th>Start & End Time</th>
+              <th>Student Name</th>
+              <th>Comments / Questions</th>
             </tr>
           </thead>
           <tbody>
-            ${past.map(session => renderSessionRow(session, false)).join('')}
+            ${past.map(session => renderUnifiedSessionRow(session)).join('')}
           </tbody>
         </table>
       `;
     }
   }
 
-  function renderPendingSessionRow(session) {
+  function renderUnifiedSessionRow(session) {
     const sessionDate = new Date(session.sessionDate);
     const dateStr = sessionDate.toLocaleDateString('en-US', { 
       weekday: 'short', 
@@ -319,59 +333,20 @@
       month: 'short', 
       day: 'numeric' 
     });
-    const timeStr = session.startTime ? `${session.startTime}${session.endTime ? ' - ' + session.endTime : ''}` : 'TBD';
+    const timeStr = session.startTime && session.endTime 
+      ? `${session.startTime} - ${session.endTime}` 
+      : session.startTime || 'TBD';
     const students = session.studentNames || session.students || 'N/A';
-    const subject = session.subject || 'General';
+    const comments = session.comments || session.notes || session.additionalComments || '';
 
     return `
       <tr>
         <td>${dateStr}</td>
         <td>${timeStr}</td>
         <td>${students}</td>
-        <td>${subject}</td>
-        <td><span class="session-status status-pending">⏳ Pending Approval</span></td>
+        <td><div class="notes-preview" title="${comments}">${comments || '—'}</div></td>
       </tr>
     `;
-  }
-
-  function renderSessionRow(session, isUpcoming) {
-    const sessionDate = new Date(session.sessionDate);
-    const dateStr = sessionDate.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
-    const timeStr = session.startTime ? `${session.startTime}${session.endTime ? ' - ' + session.endTime : ''}` : 'TBD';
-    const students = session.studentNames || session.students || 'N/A';
-    const subject = session.subject || 'General';
-    const duration = session.duration || session.durationHours || 'N/A';
-
-    if (isUpcoming) {
-      return `
-        <tr>
-          <td>${dateStr}</td>
-          <td>${timeStr}</td>
-          <td>${students}</td>
-          <td>${subject}</td>
-          <td>${duration}h</td>
-          <td class="session-actions">
-            <button id="edit-${session.id}" class="btn tertiary" style="font-size: 0.85rem;">✏️ Edit</button>
-            <button id="remove-${session.id}" class="btn tertiary" style="font-size: 0.85rem;">🗑️ Cancel</button>
-          </td>
-        </tr>
-      `;
-    } else {
-      return `
-        <tr>
-          <td>${dateStr}</td>
-          <td>${timeStr}</td>
-          <td>${students}</td>
-          <td>${subject}</td>
-          <td>${duration}h</td>
-        </tr>
-      `;
-    }
   }
 
   function editSession(session) {
@@ -396,7 +371,8 @@
       const deleteDoc = window.firestoreDeleteDoc;
       const doc = window.firestoreDoc;
       
-      await deleteDoc(doc(db, "bookings", session.id));
+      // Delete from Firestore sessions collection
+      await deleteDoc(doc(db, "sessions", session.id));
       
       // Remove from local array
       allSessions = allSessions.filter(s => s.id !== session.id);
@@ -410,6 +386,8 @@
       alert('Failed to cancel session. Please try again or contact support.');
     }
   }
+
+  }); // End waitForFirebase promise
 
 </script>
 </body>
