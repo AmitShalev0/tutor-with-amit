@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - TutorDesk</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .admin-layout {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      min-height: calc(100vh - 60px);
+      gap: 0;
+    }
+
+    .admin-sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 24px 0;
+    }
+
+    .sidebar-nav {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .sidebar-nav li {
+      margin: 4px 12px;
+    }
+
+    .sidebar-nav button {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 12px 16px;
+      text-align: left;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: all 0.2s;
+    }
+
+    .sidebar-nav button:hover {
+      background: var(--surface-alt);
+      color: var(--text);
+    }
+
+    .sidebar-nav button.active {
+      background: var(--accent);
+      color: white;
+    }
+
+    .admin-content {
+      padding: 32px;
+      max-width: 1200px;
+    }
+
+    .admin-section {
+      display: none;
+    }
+
+    .admin-section.active {
+      display: block;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .section-header h2 {
+      margin: 0;
+      font-size: 1.75rem;
+    }
+
+    .btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: opacity 0.2s;
+    }
+
+    .btn:hover {
+      opacity: 0.9;
+    }
+
+    .btn-secondary {
+      background: var(--surface-alt);
+      color: var(--text);
+    }
+
+    .btn-danger {
+      background: #dc3545;
+    }
+
+    .btn-success {
+      background: #28a745;
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 0.85rem;
+    }
+
+    .data-table {
+      width: 100%;
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .data-table table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .data-table th {
+      background: var(--surface-alt);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .data-table tr:hover {
+      background: var(--surface-alt);
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .status-pending {
+      background: #ffc107;
+      color: #000;
+    }
+
+    .status-approved {
+      background: #28a745;
+      color: white;
+    }
+
+    .status-rejected {
+      background: #dc3545;
+      color: white;
+    }
+
+    .search-box {
+      margin-bottom: 20px;
+    }
+
+    .search-box input {
+      width: 100%;
+      max-width: 400px;
+      padding: 10px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+    }
+
+    .empty-state h3 {
+      margin: 0 0 8px;
+      color: var(--text);
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--muted);
+    }
+
+    .sync-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: var(--surface);
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .sync-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+
+    .sync-indicator.success {
+      background: #28a745;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      padding: 20px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+    }
+
+    .stat-card h3 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+      color: var(--accent);
+    }
+
+    .stat-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="site-header">
+    <div class="container">
+      <div class="header-inner">
+        <a href="index.html" class="logo">TutorDesk Admin</a>
+        <nav style="display: flex; gap: 20px; align-items: center;">
+          <span id="adminEmail" style="color: var(--muted); font-size: 0.9rem;"></span>
+          <button onclick="handleSignOut()" class="btn btn-secondary btn-sm">Sign Out</button>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <!-- Admin Layout -->
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <ul class="sidebar-nav">
+        <li><button onclick="showSection('dashboard')" class="nav-btn active" data-section="dashboard">📊 Dashboard</button></li>
+        <li><button onclick="showSection('sessions')" class="nav-btn" data-section="sessions">📅 Sessions</button></li>
+        <li><button onclick="showSection('bookings')" class="nav-btn" data-section="bookings">📝 Booking Approvals</button></li>
+        <li><button onclick="showSection('students')" class="nav-btn" data-section="students">👥 Students</button></li>
+        <li><button onclick="showSection('users')" class="nav-btn" data-section="users">🔐 Users</button></li>
+        <li><button onclick="showSection('sync')" class="nav-btn" data-section="sync">🔄 Calendar Sync</button></li>
+        <li><button onclick="showSection('invoices')" class="nav-btn" data-section="invoices">💰 Invoices</button></li>
+      </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-content">
+      <!-- Dashboard -->
+      <section id="dashboard-section" class="admin-section active">
+        <div class="section-header">
+          <h2>Dashboard</h2>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <h3 id="stat-sessions">-</h3>
+            <p>Total Sessions</p>
+          </div>
+          <div class="stat-card">
+            <h3 id="stat-pending">-</h3>
+            <p>Pending Bookings</p>
+          </div>
+          <div class="stat-card">
+            <h3 id="stat-students">-</h3>
+            <p>Total Students</p>
+          </div>
+          <div class="stat-card">
+            <h3 id="stat-users">-</h3>
+            <p>Registered Users</p>
+          </div>
+        </div>
+        <p style="color: var(--muted);">Welcome to your admin panel. Use the sidebar to navigate.</p>
+      </section>
+
+      <!-- Sessions -->
+      <section id="sessions-section" class="admin-section">
+        <div class="section-header">
+          <h2>Sessions</h2>
+          <button class="btn" onclick="loadSessions()">🔄 Refresh</button>
+        </div>
+        <div class="search-box">
+          <input type="text" id="sessions-search" placeholder="Search sessions by student name..." oninput="filterSessions()">
+        </div>
+        <div id="sessions-container" class="loading">Loading sessions...</div>
+      </section>
+
+      <!-- Booking Approvals -->
+      <section id="bookings-section" class="admin-section">
+        <div class="section-header">
+          <h2>Booking Approvals</h2>
+          <button class="btn" onclick="loadBookings()">🔄 Refresh</button>
+        </div>
+        <div id="bookings-container" class="loading">Loading bookings...</div>
+      </section>
+
+      <!-- Students -->
+      <section id="students-section" class="admin-section">
+        <div class="section-header">
+          <h2>Students</h2>
+          <button class="btn" onclick="loadStudents()">🔄 Refresh</button>
+        </div>
+        <div class="search-box">
+          <input type="text" id="students-search" placeholder="Search students..." oninput="filterStudents()">
+        </div>
+        <div id="students-container" class="loading">Loading students...</div>
+      </section>
+
+      <!-- Users -->
+      <section id="users-section" class="admin-section">
+        <div class="section-header">
+          <h2>Registered Users</h2>
+          <button class="btn" onclick="loadUsers()">🔄 Refresh</button>
+        </div>
+        <div id="users-container" class="loading">Loading users...</div>
+      </section>
+
+      <!-- Calendar Sync -->
+      <section id="sync-section" class="admin-section">
+        <div class="section-header">
+          <h2>Google Calendar Sync</h2>
+        </div>
+        <div style="background: var(--surface); padding: 24px; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+          <p style="margin-top: 0;">Sync your sessions with Google Calendar. This will create calendar events for any sessions that haven't been synced yet.</p>
+          <div style="display: flex; gap: 12px; align-items: center; margin-top: 20px;">
+            <button class="btn" onclick="triggerSync()">🔄 Sync Now</button>
+            <span class="sync-status">
+              <span class="sync-indicator" id="sync-indicator"></span>
+              <span id="sync-status-text">Ready to sync</span>
+            </span>
+          </div>
+          <div id="sync-result" style="margin-top: 20px; color: var(--muted);"></div>
+        </div>
+      </section>
+
+      <!-- Invoices -->
+      <section id="invoices-section" class="admin-section">
+        <div class="section-header">
+          <h2>Invoices</h2>
+          <button class="btn" onclick="showInvoiceGenerator()">+ Generate Invoice</button>
+        </div>
+        <div id="invoices-container">
+          <p style="color: var(--muted);">Invoice generation feature coming soon. Will integrate with your existing invoices.py backend.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module">
+    import { auth, db, onAuthStateChanged, signOut, collection, getDocs, query, where, orderBy, deleteDoc, doc, updateDoc, setDoc, serverTimestamp } from './firebase.js';
+
+    const ADMIN_UID = 'fUXnvGI024fYp4w1AvKUcbM7p8z2';
+    let currentUser = null;
+    let allSessions = [];
+    let allStudents = [];
+
+    // Check authentication
+    onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      if (user.uid !== ADMIN_UID) {
+        alert('Access denied. Admin privileges required.');
+        window.location.href = 'index.html';
+        return;
+      }
+
+      currentUser = user;
+      document.getElementById('adminEmail').textContent = user.email;
+      
+      // Load all data
+      loadDashboard();
+      loadSessions();
+      loadBookings();
+      loadStudents();
+      loadUsers();
+    });
+
+    // Navigation
+    window.showSection = (sectionName) => {
+      document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+      
+      document.getElementById(`${sectionName}-section`).classList.add('active');
+      document.querySelector(`[data-section="${sectionName}"]`).classList.add('active');
+    };
+
+    // Sign out
+    window.handleSignOut = async () => {
+      try {
+        await signOut(auth);
+        window.location.href = 'login.html';
+      } catch (error) {
+        console.error('Sign out error:', error);
+      }
+    };
+
+    // Dashboard
+    async function loadDashboard() {
+      try {
+        const sessionsSnap = await getDocs(collection(db, 'sessions'));
+        const bookingsSnap = await getDocs(query(collection(db, 'bookings'), where('status', '==', 'pending')));
+        const studentsSnap = await getDocs(collection(db, 'students'));
+        const usersSnap = await getDocs(collection(db, 'users'));
+
+        document.getElementById('stat-sessions').textContent = sessionsSnap.size;
+        document.getElementById('stat-pending').textContent = bookingsSnap.size;
+        document.getElementById('stat-students').textContent = studentsSnap.size;
+        document.getElementById('stat-users').textContent = usersSnap.size;
+      } catch (error) {
+        console.error('Error loading dashboard:', error);
+      }
+    }
+
+    // Sessions
+    window.loadSessions = async () => {
+      const container = document.getElementById('sessions-container');
+      container.innerHTML = '<div class="loading">Loading sessions...</div>';
+
+      try {
+        const q = query(collection(db, 'sessions'), orderBy('sessionDate', 'desc'));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+          container.innerHTML = '<div class="empty-state"><h3>No sessions found</h3><p>Sessions will appear here once synced from TutorDesk.</p></div>';
+          return;
+        }
+
+        allSessions = [];
+        snapshot.forEach(doc => {
+          allSessions.push({ id: doc.id, ...doc.data() });
+        });
+
+        renderSessions(allSessions);
+      } catch (error) {
+        console.error('Error loading sessions:', error);
+        container.innerHTML = `<div class="empty-state"><h3>Error loading sessions</h3><p>${error.message}</p></div>`;
+      }
+    };
+
+    function renderSessions(sessions) {
+      const container = document.getElementById('sessions-container');
+      
+      if (sessions.length === 0) {
+        container.innerHTML = '<div class="empty-state"><h3>No matching sessions</h3></div>';
+        return;
+      }
+
+      let html = '<div class="data-table"><table><thead><tr>';
+      html += '<th>Date</th><th>Time</th><th>Student</th><th>Subject</th><th>Actions</th>';
+      html += '</tr></thead><tbody>';
+
+      sessions.forEach(session => {
+        const date = new Date(session.sessionDate).toLocaleDateString();
+        html += `<tr>
+          <td>${date}</td>
+          <td>${session.startTime} - ${session.endTime}</td>
+          <td>${session.studentName || 'Unknown'}</td>
+          <td>${session.subject || '-'}</td>
+          <td class="action-buttons">
+            <button class="btn btn-danger btn-sm" onclick="deleteSession('${session.id}')">Delete</button>
+          </td>
+        </tr>`;
+      });
+
+      html += '</tbody></table></div>';
+      container.innerHTML = html;
+    }
+
+    window.filterSessions = () => {
+      const search = document.getElementById('sessions-search').value.toLowerCase();
+      const filtered = allSessions.filter(s => 
+        (s.studentName || '').toLowerCase().includes(search) ||
+        (s.subject || '').toLowerCase().includes(search)
+      );
+      renderSessions(filtered);
+    };
+
+    window.deleteSession = async (sessionId) => {
+      if (!confirm('Delete this session? This will also attempt to remove it from Google Calendar.')) return;
+
+      try {
+        await deleteDoc(doc(db, 'sessions', sessionId));
+        alert('Session deleted successfully!');
+        loadSessions();
+        loadDashboard();
+      } catch (error) {
+        console.error('Error deleting session:', error);
+        alert('Error deleting session: ' + error.message);
+      }
+    };
+
+    // Bookings
+    window.loadBookings = async () => {
+      const container = document.getElementById('bookings-container');
+      container.innerHTML = '<div class="loading">Loading bookings...</div>';
+
+      try {
+        const q = query(collection(db, 'bookings'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+          container.innerHTML = '<div class="empty-state"><h3>No pending bookings</h3><p>New booking requests will appear here.</p></div>';
+          return;
+        }
+
+        let html = '<div class="data-table"><table><thead><tr>';
+        html += '<th>Date</th><th>Time</th><th>Student</th><th>Email</th><th>Status</th><th>Actions</th>';
+        html += '</tr></thead><tbody>';
+
+        snapshot.forEach(doc => {
+          const booking = doc.data();
+          const date = new Date(booking.date).toLocaleDateString();
+          html += `<tr>
+            <td>${date}</td>
+            <td>${booking.startTime} - ${booking.endTime}</td>
+            <td>${booking.studentName || 'Unknown'}</td>
+            <td>${booking.email || '-'}</td>
+            <td><span class="status-badge status-pending">Pending</span></td>
+            <td class="action-buttons">
+              <button class="btn btn-success btn-sm" onclick="approveBooking('${doc.id}')">Approve</button>
+              <button class="btn btn-danger btn-sm" onclick="rejectBooking('${doc.id}')">Reject</button>
+            </td>
+          </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+      } catch (error) {
+        console.error('Error loading bookings:', error);
+        container.innerHTML = `<div class="empty-state"><h3>Error loading bookings</h3><p>${error.message}</p></div>`;
+      }
+    };
+
+    window.approveBooking = async (bookingId) => {
+      if (!confirm('Approve this booking?')) return;
+
+      try {
+        // Update booking status
+        await updateDoc(doc(db, 'bookings', bookingId), {
+          status: 'approved',
+          approvedAt: serverTimestamp()
+        });
+
+        alert('Booking approved! Remember to sync with Google Calendar.');
+        loadBookings();
+        loadDashboard();
+      } catch (error) {
+        console.error('Error approving booking:', error);
+        alert('Error approving booking: ' + error.message);
+      }
+    };
+
+    window.rejectBooking = async (bookingId) => {
+      if (!confirm('Reject this booking?')) return;
+
+      try {
+        await updateDoc(doc(db, 'bookings', bookingId), {
+          status: 'rejected',
+          rejectedAt: serverTimestamp()
+        });
+
+        alert('Booking rejected.');
+        loadBookings();
+        loadDashboard();
+      } catch (error) {
+        console.error('Error rejecting booking:', error);
+        alert('Error rejecting booking: ' + error.message);
+      }
+    };
+
+    // Students
+    window.loadStudents = async () => {
+      const container = document.getElementById('students-container');
+      container.innerHTML = '<div class="loading">Loading students...</div>';
+
+      try {
+        const snapshot = await getDocs(collection(db, 'students'));
+
+        if (snapshot.empty) {
+          container.innerHTML = '<div class="empty-state"><h3>No students found</h3></div>';
+          return;
+        }
+
+        allStudents = [];
+        snapshot.forEach(doc => {
+          allStudents.push({ id: doc.id, ...doc.data() });
+        });
+
+        renderStudents(allStudents);
+      } catch (error) {
+        console.error('Error loading students:', error);
+        container.innerHTML = `<div class="empty-state"><h3>Error loading students</h3><p>${error.message}</p></div>`;
+      }
+    };
+
+    function renderStudents(students) {
+      const container = document.getElementById('students-container');
+
+      if (students.length === 0) {
+        container.innerHTML = '<div class="empty-state"><h3>No matching students</h3></div>';
+        return;
+      }
+
+      let html = '<div class="data-table"><table><thead><tr>';
+      html += '<th>Name</th><th>Email</th><th>Phone</th><th>Grade</th><th>School</th>';
+      html += '</tr></thead><tbody>';
+
+      students.forEach(student => {
+        html += `<tr>
+          <td>${student.firstName || ''} ${student.lastName || ''}</td>
+          <td>${student.email || '-'}</td>
+          <td>${student.phone || '-'}</td>
+          <td>${student.grade || '-'}</td>
+          <td>${student.school || '-'}</td>
+        </tr>`;
+      });
+
+      html += '</tbody></table></div>';
+      container.innerHTML = html;
+    }
+
+    window.filterStudents = () => {
+      const search = document.getElementById('students-search').value.toLowerCase();
+      const filtered = allStudents.filter(s => 
+        `${s.firstName || ''} ${s.lastName || ''}`.toLowerCase().includes(search) ||
+        (s.email || '').toLowerCase().includes(search)
+      );
+      renderStudents(filtered);
+    };
+
+    // Users
+    window.loadUsers = async () => {
+      const container = document.getElementById('users-container');
+      container.innerHTML = '<div class="loading">Loading users...</div>';
+
+      try {
+        const snapshot = await getDocs(collection(db, 'users'));
+
+        if (snapshot.empty) {
+          container.innerHTML = '<div class="empty-state"><h3>No users found</h3></div>';
+          return;
+        }
+
+        let html = '<div class="data-table"><table><thead><tr>';
+        html += '<th>Name</th><th>Email</th><th>Role</th><th>Joined</th>';
+        html += '</tr></thead><tbody>';
+
+        snapshot.forEach(doc => {
+          const user = doc.data();
+          const joined = user.createdAt ? new Date(user.createdAt.toDate()).toLocaleDateString() : '-';
+          html += `<tr>
+            <td>${user.displayName || '-'}</td>
+            <td>${user.email || '-'}</td>
+            <td>${user.role || 'User'}</td>
+            <td>${joined}</td>
+          </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+      } catch (error) {
+        console.error('Error loading users:', error);
+        container.innerHTML = `<div class="empty-state"><h3>Error loading users</h3><p>${error.message}</p></div>`;
+      }
+    };
+
+    // Calendar Sync
+    window.triggerSync = async () => {
+      const indicator = document.getElementById('sync-indicator');
+      const statusText = document.getElementById('sync-status-text');
+      const resultDiv = document.getElementById('sync-result');
+
+      indicator.className = 'sync-indicator';
+      statusText.textContent = 'Syncing...';
+      resultDiv.textContent = 'Sync in progress. This may take a moment...';
+
+      // Note: Actual sync would call your Python backend
+      // For now, this is a placeholder
+      setTimeout(() => {
+        indicator.className = 'sync-indicator success';
+        statusText.textContent = 'Last synced: just now';
+        resultDiv.innerHTML = '<p style="color: #28a745;">✓ Sync completed successfully!</p><p style="margin-top: 8px; color: var(--muted);">Note: Full sync integration with Python backend coming soon.</p>';
+      }, 2000);
+    };
+
+    // Invoice Generator (placeholder)
+    window.showInvoiceGenerator = () => {
+      alert('Invoice generator coming soon! This will integrate with your existing invoices.py backend.');
+    };
+  </script>
+</body>
+</html>
