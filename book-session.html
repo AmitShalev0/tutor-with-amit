@@ -217,16 +217,28 @@
 
   async function loadUserData() {
     try {
+      // Verify db is initialized
+      if (!db) {
+        console.error("Firestore database not initialized!");
+        throw new Error("Database connection not available. Please refresh the page.");
+      }
+      
+      console.log("Loading user data for:", currentUser.uid);
+      
       // Load user profile
       const userDoc = await getDoc(doc(db, "users", currentUser.uid));
       if (userDoc.exists()) {
         userProfile = userDoc.data();
+        console.log("User profile loaded:", userProfile);
         
         // Check sliding scale eligibility
         checkSlidingScaleEligibility();
+      } else {
+        console.warn("User profile not found in Firestore");
       }
 
       // Load students
+      console.log("Loading students...");
       const studentsQuery = query(
         collection(db, "students"),
         where("userId", "==", currentUser.uid)
@@ -237,6 +249,8 @@
       querySnapshot.forEach((doc) => {
         userStudents.push({ id: doc.id, ...doc.data() });
       });
+      
+      console.log("Students loaded:", userStudents.length);
 
       displayStudentDropdowns();
 
@@ -249,6 +263,7 @@
       }
     } catch (err) {
       console.error("Error loading user data:", err);
+      alert("Error loading your data: " + err.message + ". Please refresh the page.");
     }
   }
   
