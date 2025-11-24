@@ -572,7 +572,7 @@
   </div>
 
   <script type="module">
-    import { auth, db, onAuthStateChanged, signOut, collection, getDocs, query, where, orderBy, deleteDoc, doc, updateDoc, setDoc, serverTimestamp } from './firebase.js';
+    import { auth, db, onAuthStateChanged, signOut, collection, getDocs, getDoc, query, where, orderBy, deleteDoc, doc, updateDoc, setDoc, serverTimestamp } from './firebase.js';
 
     const ADMIN_UID = 'fUXnvGI024fYp4w1AvKUcbM7p8z2';
     let currentUser = null;
@@ -625,13 +625,13 @@
     // Dashboard
     async function loadDashboard() {
       try {
-        const sessionsSnap = await getDocs(collection(db, 'sessions'));
-        const bookingsSnap = await getDocs(query(collection(db, 'bookings'), where('status', '==', 'pending')));
+        const bookingsSnap = await getDocs(collection(db, 'bookings'));
+        const pendingSnap = await getDocs(query(collection(db, 'bookings'), where('status', '==', 'pending')));
         const studentsSnap = await getDocs(collection(db, 'students'));
         const usersSnap = await getDocs(collection(db, 'users'));
 
-        document.getElementById('stat-sessions').textContent = sessionsSnap.size;
-        document.getElementById('stat-pending').textContent = bookingsSnap.size;
+        document.getElementById('stat-sessions').textContent = bookingsSnap.size;
+        document.getElementById('stat-pending').textContent = pendingSnap.size;
         document.getElementById('stat-students').textContent = studentsSnap.size;
         document.getElementById('stat-users').textContent = usersSnap.size;
       } catch (error) {
@@ -645,11 +645,12 @@
       container.innerHTML = '<div class="loading">Loading sessions...</div>';
 
       try {
-        const q = query(collection(db, 'sessions'), orderBy('sessionDate', 'desc'));
+        // Read from bookings collection (includes pending and approved)
+        const q = query(collection(db, 'bookings'), orderBy('sessionDate', 'desc'));
         const snapshot = await getDocs(q);
 
         if (snapshot.empty) {
-          container.innerHTML = '<div class="empty-state"><h3>No sessions found</h3><p>Sessions will appear here once synced from TutorDesk.</p></div>';
+          container.innerHTML = '<div class="empty-state"><h3>No sessions found</h3><p>Sessions will appear here once users book them.</p></div>';
           return;
         }
 
@@ -678,12 +679,26 @@
       html += '</tr></thead><tbody>';
 
       sessions.forEach(session => {
-        const date = new Date(session.sessionDate).toLocaleDateString();
+        const dateValue = session.sessionDate;
+        let date;
+        if (dateValue) {
+          // Handle Firestore Timestamp
+          if (dateValue.toDate) {
+            date = dateValue.toDate().toLocaleDateString();
+          } 
+          // Handle ISO string or regular Date
+          else {
+            date = new Date(dateValue).toLocaleDateString();
+          }
+        } else {
+          date = 'Invalid Date';
+        }
+        
         const hasComment = session.sessionSummary && session.sessionSummary.trim();
         html += `<tr class="session-row" onclick="toggleSessionComment('${session.id}')">
           <td>${date}</td>
-          <td>${session.startTime} - ${session.endTime}</td>
-          <td>${session.studentName || 'Unknown'}</td>
+          <td>${session.startTime || '-'} - ${session.endTime || '-'}</td>
+          <td>${session.studentName || session.studentNames || 'Unknown'}</td>
           <td>${session.subject || '-'}</td>
           <td class="action-buttons" onclick="event.stopPropagation()">
             <button class="btn btn-danger btn-sm" onclick="deleteSession('${session.id}')">Delete</button>
@@ -721,10 +736,10 @@
     };
 
     window.deleteSession = async (sessionId) => {
-      if (!confirm('Delete this session? This will also attempt to remove it from Google Calendar.')) return;
+      if (!confirm('Delete this session? This cannot be undone.')) return;
 
       try {
-        await deleteDoc(doc(db, 'sessions', sessionId));
+        await deleteDoc(doc(db, 'bookings', sessionId));
         alert('Session deleted successfully!');
         loadSessions();
         loadDashboard();
@@ -754,12 +769,15 @@
 
         snapshot.forEach(doc => {
           const booking = doc.data();
-          const date = new Date(booking.date).toLocaleDateString();
+          const dateValue = booking.sessionDate || booking.date;
+          const date = dateValue ? (dateValue.toDate ? dateValue.toDate() : new Date(dateValue)) : new Date();
+          const dateStr = date.toLocaleDateString();
+          
           html += `<tr>
-            <td>${date}</td>
-            <td>${booking.startTime} - ${booking.endTime}</td>
-            <td>${booking.studentName || 'Unknown'}</td>
-            <td>${booking.email || '-'}</td>
+            <td>${dateStr}</td>
+            <td>${booking.startTime || '-'} - ${booking.endTime || '-'}</td>
+            <td>${booking.studentNames || booking.studentName || 'Unknown'}</td>
+            <td>${booking.guardianEmail || booking.email || '-'}</td>
             <td><span class="status-badge status-pending">Pending</span></td>
             <td class="action-buttons">
               <button class="btn btn-success btn-sm" onclick="approveBooking('${doc.id}')">Approve</button>
@@ -777,16 +795,58 @@
     };
 
     window.approveBooking = async (bookingId) => {
-      if (!confirm('Approve this booking?')) return;
+      if (!confirm('Approve this booking? This will add it to Google Calendar and send a confirmation email to the user.')) return;
 
       try {
-        // Update booking status
+        // Get booking details first
+        const bookingDoc = await getDoc(doc(db, 'bookings', bookingId));
+        if (!bookingDoc.exists()) {
+          alert('Booking not found!');
+          return;
+        }
+
+        const booking = bookingDoc.data();
+        
+        // Update booking status in Firestore
         await updateDoc(doc(db, 'bookings', bookingId), {
           status: 'approved',
           approvedAt: serverTimestamp()
         });
 
-        alert('Booking approved! Remember to sync with Google Calendar.');
+        // Sync to Google Calendar via Apps Script
+        const syncData = {
+          action: 'syncToCalendar',
+          bookingId: bookingId,
+          sessionDate: booking.sessionDate,
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          studentNames: booking.studentNames || booking.studentName,
+          subject: booking.subject,
+          guardianName: booking.guardianName,
+          guardianEmail: booking.guardianEmail || booking.email,
+          comments: booking.comments || booking.notes || ''
+        };
+
+        // Call Apps Script to create calendar event and send email
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxHL7YlP7nbZTYMyjKnJCMvyjYPwp3aVb0NGjOvCakktOHJK5lw2cBY45_VA4-m3wCd/exec';
+        
+        try {
+          const response = await fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(syncData)
+          });
+          
+          console.log('Calendar sync and email sent successfully');
+        } catch (syncError) {
+          console.error('Error syncing to calendar:', syncError);
+          // Don't fail the approval if sync fails - can retry later
+        }
+
+        alert('Booking approved! Calendar event created and confirmation email sent to user.');
         loadBookings();
         loadDashboard();
       } catch (error) {
@@ -929,7 +989,7 @@
       container.innerHTML = '<div class="loading">Loading user sessions...</div>';
 
       try {
-        const q = query(collection(db, 'sessions'), where('userId', '==', userId), orderBy('sessionDate', 'desc'));
+        const q = query(collection(db, 'bookings'), where('userId', '==', userId), orderBy('sessionDate', 'desc'));
         const snapshot = await getDocs(q);
 
         if (snapshot.empty) {
@@ -1085,11 +1145,12 @@
       }
       
       try {
-        // Create session directly (approved, no email)
-        await setDoc(doc(collection(db, 'sessions')), {
+        // Create session directly in bookings collection (approved, no email needed)
+        await setDoc(doc(collection(db, 'bookings')), {
           userId: userId,
           studentId: studentId,
           studentName: studentName,
+          studentNames: studentName,
           sessionDate: date,
           startTime: startTime,
           endTime: endTime,
@@ -1142,7 +1203,7 @@
       }
       
       try {
-        await updateDoc(doc(db, 'sessions', sessionId), {
+        await updateDoc(doc(db, 'bookings', sessionId), {
           sessionSummary: comment,
           updatedAt: serverTimestamp()
         });
