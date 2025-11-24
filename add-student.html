@@ -164,7 +164,7 @@
         const userDoc = await getDoc(doc(db, "users", currentUser.uid));
         const userData = userDoc.exists() ? userDoc.data() : {};
         
-        await fetch('https://script.google.com/macros/s/AKfycbxHL7YlP7nbZTYMyjKnJCMvyjYPwp3aVb0NGjOvCakktOHJK5lw2cBY45_VA4-m3wCd/exec', {
+        await fetch('https://script.google.com/macros/s/AKfycbyuEGmx-bCkhs44KHL90Rivtw0h9825Wuys8KLtGb9LNE6dyy9JXvmnY0b10C19U4de/exec', {
           method: 'POST',
           mode: 'no-cors',
           headers: {

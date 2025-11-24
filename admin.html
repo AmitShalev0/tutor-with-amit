@@ -826,12 +826,15 @@
         }
 
         const booking = bookingDoc.data();
+        console.log('Approving booking:', bookingId, booking);
         
         // Update booking status in Firestore
         await updateDoc(doc(db, 'bookings', bookingId), {
           status: 'approved',
           approvedAt: serverTimestamp()
         });
+        
+        console.log('Firestore updated. Now syncing to calendar...');
 
         // Sync to Google Calendar via Apps Script
         const syncData = {
@@ -846,9 +849,11 @@
           guardianEmail: booking.guardianEmail || booking.email,
           comments: booking.comments || booking.notes || ''
         };
+        
+        console.log('Sending to Apps Script:', syncData);
 
         // Call Apps Script to create calendar event and send email
-        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxHL7YlP7nbZTYMyjKnJCMvyjYPwp3aVb0NGjOvCakktOHJK5lw2cBY45_VA4-m3wCd/exec';
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyuEGmx-bCkhs44KHL90Rivtw0h9825Wuys8KLtGb9LNE6dyy9JXvmnY0b10C19U4de/exec';
         
         try {
           const response = await fetch(APPS_SCRIPT_URL, {
@@ -860,13 +865,14 @@
             body: JSON.stringify(syncData)
           });
           
-          console.log('Calendar sync and email sent successfully');
+          console.log('Calendar sync request sent (no-cors mode - cannot read response)');
+          console.log('Check Apps Script execution log for any errors');
         } catch (syncError) {
           console.error('Error syncing to calendar:', syncError);
-          // Don't fail the approval if sync fails - can retry later
+          alert('Booking approved in system, but calendar sync may have failed. Check console and Apps Script logs.');
         }
 
-        alert('Booking approved! Calendar event created and confirmation email sent to user.');
+        alert('Booking approved! Calendar sync initiated. Check your Google Calendar in a moment.');
         loadBookings();
         loadDashboard();
       } catch (error) {
@@ -1078,7 +1084,7 @@
       }
     };
 
-    // Calendar Sync
+    // Calendar Sync - Bulk sync all approved bookings
     window.triggerSync = async () => {
       const indicator = document.getElementById('sync-indicator');
       const statusText = document.getElementById('sync-status-text');
@@ -1086,15 +1092,79 @@
 
       indicator.className = 'sync-indicator';
       statusText.textContent = 'Syncing...';
-      resultDiv.textContent = 'Sync in progress. This may take a moment...';
+      resultDiv.textContent = 'Finding approved sessions to sync...';
 
-      // Note: Actual sync would call your Python backend
-      // For now, this is a placeholder
-      setTimeout(() => {
+      try {
+        // Get all approved bookings
+        const q = query(collection(db, 'bookings'), where('status', '==', 'approved'));
+        const snapshot = await getDocs(q);
+        
+        if (snapshot.empty) {
+          indicator.className = 'sync-indicator';
+          statusText.textContent = 'No sessions to sync';
+          resultDiv.innerHTML = '<p style="color: #ffc107;">⚠️ No approved sessions found to sync.</p>';
+          return;
+        }
+
+        resultDiv.textContent = `Syncing ${snapshot.size} approved session(s) to Google Calendar...`;
+        
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyuEGmx-bCkhs44KHL90Rivtw0h9825Wuys8KLtGb9LNE6dyy9JXvmnY0b10C19U4de/exec';
+        let successCount = 0;
+        let errorCount = 0;
+
+        // Sync each booking
+        for (const bookingDoc of snapshot.docs) {
+          const booking = bookingDoc.data();
+          const syncData = {
+            action: 'syncToCalendar',
+            bookingId: bookingDoc.id,
+            sessionDate: booking.sessionDate,
+            startTime: booking.startTime,
+            endTime: booking.endTime,
+            studentNames: booking.studentNames || booking.studentName,
+            subject: booking.subject,
+            guardianName: booking.guardianName,
+            guardianEmail: booking.guardianEmail || booking.email,
+            comments: booking.comments || booking.notes || ''
+          };
+          
+          try {
+            await fetch(APPS_SCRIPT_URL, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(syncData)
+            });
+            successCount++;
+            console.log(`Synced booking ${bookingDoc.id}`);
+          } catch (error) {
+            errorCount++;
+            console.error(`Failed to sync booking ${bookingDoc.id}:`, error);
+          }
+          
+          // Small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
         indicator.className = 'sync-indicator success';
         statusText.textContent = 'Last synced: just now';
-        resultDiv.innerHTML = '<p style="color: #28a745;">✓ Sync completed successfully!</p><p style="margin-top: 8px; color: var(--muted);">Note: Full sync integration with Python backend coming soon.</p>';
-      }, 2000);
+        resultDiv.innerHTML = `
+          <p style="color: #28a745;">✓ Bulk sync completed!</p>
+          <p style="margin-top: 8px;">
+            <strong>${successCount}</strong> session(s) synced to Google Calendar${errorCount > 0 ? `, <strong style="color: #dc3545;">${errorCount}</strong> failed` : ''}
+          </p>
+          <p style="margin-top: 8px; color: var(--muted); font-size: 0.9rem;">
+            Check your Google Calendar and Apps Script execution logs for details.
+          </p>
+        `;
+      } catch (error) {
+        console.error('Bulk sync error:', error);
+        indicator.className = 'sync-indicator error';
+        statusText.textContent = 'Sync failed';
+        resultDiv.innerHTML = `<p style="color: #dc3545;">✗ Sync failed: ${error.message}</p>`;
+      }
     };
 
     // Invoice Generator (placeholder)

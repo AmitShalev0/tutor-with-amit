@@ -218,8 +218,8 @@
 
       console.log("Total sessions loaded:", allSessions.length);
 
-      // Sort by date (newest first)
-      allSessions.sort((a, b) => b.sessionDate - a.sessionDate);
+      // Sort by date (earliest first for better upcoming view)
+      allSessions.sort((a, b) => a.sessionDate - b.sessionDate);
 
       displaySessions();
     } catch (err) {

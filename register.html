@@ -119,13 +119,13 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
         user-select: none;
     }
     .password-toggle:hover {
         opacity: 0.8;
-    }
-    .password-toggle {
-        -webkit-user-select: none;
     }
     </style>
 </head>
@@ -264,7 +264,7 @@
 
             // Add user to Google Sheets for desktop app sync
             try {
-                const sheetResponse = await fetch('https://script.google.com/macros/s/AKfycbxHL7YlP7nbZTYMyjKnJCMvyjYPwp3aVb0NGjOvCakktOHJK5lw2cBY45_VA4-m3wCd/exec', {
+                const sheetResponse = await fetch('https://script.google.com/macros/s/AKfycbyuEGmx-bCkhs44KHL90Rivtw0h9825Wuys8KLtGb9LNE6dyy9JXvmnY0b10C19U4de/exec', {
                     method: 'POST',
                     mode: 'no-cors',
                     headers: {
