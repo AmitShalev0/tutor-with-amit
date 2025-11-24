@@ -675,7 +675,7 @@
       }
 
       let html = '<div class="data-table"><table><thead><tr>';
-      html += '<th>Date</th><th>Time</th><th>Student</th><th>Subject</th><th>Actions</th>';
+      html += '<th>Date</th><th>Time</th><th>Student</th><th>Subject</th><th>Recurring End Date</th><th>Actions</th>';
       html += '</tr></thead><tbody>';
 
       sessions.forEach(session => {
@@ -695,17 +695,29 @@
         }
         
         const hasComment = session.sessionSummary && session.sessionSummary.trim();
+        
+        // Format recurring end date if exists
+        let recurringEndDate = '-';
+        if (session.recurringEndDate) {
+          if (session.recurringEndDate.toDate) {
+            recurringEndDate = session.recurringEndDate.toDate().toLocaleDateString();
+          } else {
+            recurringEndDate = new Date(session.recurringEndDate).toLocaleDateString();
+          }
+        }
+        
         html += `<tr class="session-row" onclick="toggleSessionComment('${session.id}')">
           <td>${date}</td>
           <td>${session.startTime || '-'} - ${session.endTime || '-'}</td>
           <td>${session.studentName || session.studentNames || 'Unknown'}</td>
           <td>${session.subject || '-'}</td>
+          <td>${recurringEndDate}</td>
           <td class="action-buttons" onclick="event.stopPropagation()">
             <button class="btn btn-danger btn-sm" onclick="deleteSession('${session.id}')">Delete</button>
           </td>
         </tr>
         <tr id="comment-row-${session.id}" style="display: none;">
-          <td colspan="5">
+          <td colspan="6">
             ${hasComment ? `<div class="session-comment">
               <div class="session-comment-header">
                 <span class="session-comment-author">Session Notes</span>
@@ -764,7 +776,7 @@
         }
 
         let html = '<div class="data-table"><table><thead><tr>';
-        html += '<th>Date</th><th>Time</th><th>Student</th><th>Email</th><th>Status</th><th>Actions</th>';
+        html += '<th>Date</th><th>Time</th><th>Student</th><th>Email</th><th>Recurring End Date</th><th>Status</th><th>Actions</th>';
         html += '</tr></thead><tbody>';
 
         snapshot.forEach(doc => {
@@ -773,11 +785,19 @@
           const date = dateValue ? (dateValue.toDate ? dateValue.toDate() : new Date(dateValue)) : new Date();
           const dateStr = date.toLocaleDateString();
           
+          // Format recurring end date if exists
+          let recurringEndDate = '-';
+          if (booking.recurringEndDate) {
+            const recurringDate = booking.recurringEndDate.toDate ? booking.recurringEndDate.toDate() : new Date(booking.recurringEndDate);
+            recurringEndDate = recurringDate.toLocaleDateString();
+          }
+          
           html += `<tr>
             <td>${dateStr}</td>
             <td>${booking.startTime || '-'} - ${booking.endTime || '-'}</td>
             <td>${booking.studentNames || booking.studentName || 'Unknown'}</td>
             <td>${booking.guardianEmail || booking.email || '-'}</td>
+            <td>${recurringEndDate}</td>
             <td><span class="status-badge status-pending">Pending</span></td>
             <td class="action-buttons">
               <button class="btn btn-success btn-sm" onclick="approveBooking('${doc.id}')">Approve</button>
