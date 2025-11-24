@@ -420,9 +420,8 @@ function setupBookingForm() {
       recurringRow.style.display = recurringCb.checked ? "flex" : "none";
       if (recurringEndSel) recurringEndSel.required = recurringCb.checked;
       // If the user turns on recurring and a date is already selected, populate options
-      if (recurringCb.checked && hiddenDate.value && recurringEndSel) {
-        const d = new Date(hiddenDate.value);
-        populateRecurringEndOptions(d);
+      if (recurringCb.checked && originalCalendarDate && recurringEndSel) {
+        populateRecurringEndOptions(originalCalendarDate);
       }
     });
   }
@@ -1027,10 +1026,9 @@ function setupBookingForm() {
     
     let lastOptionIndex = 1;
 
-    // Get the day name from the original selection (not from calculated date)
-    // dayIdx is 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri
-    const dayName = days[dayIdx + 1]; // +1 because days array has Sunday at index 0
-    console.log('Day name for display:', dayName, 'from days[' + (dayIdx + 1) + ']');
+    // Get the day name directly from the baseDate (which is already a proper Date object)
+    const dayName = days[startDate.getDay()];
+    console.log('Day name for display:', dayName, 'from baseDate.getDay():', startDate.getDay());
 
     for (let i = 1; i <= 20; i++) {
       // Calculate date: add (i-1) weeks to the next week's date
@@ -1210,14 +1208,25 @@ function setupBookingForm() {
     const headerRow = document.createElement("div");
     headerRow.className = "av-row";
     
+    // Get today's date for highlighting current date
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
     // Build header with actual dates
     let headerHTML = `<div></div>`;
     for (let dayIdx = 0; dayIdx < 5; dayIdx++) {
       const date = new Date(monday);
       date.setDate(monday.getDate() + dayIdx);
+      date.setHours(0, 0, 0, 0);
       const dayName = days[dayIdx];
-      const dateStr = `${date.getDate()}/${date.getMonth() + 1}`;
-      headerHTML += `<div class="av-row-header">${dayName}<br/><small>${dateStr}</small></div>`;
+      const dateNum = date.getDate();
+      const isToday = date.getTime() === today.getTime();
+      
+      // Apply styles for current date
+      const dayStyle = isToday ? 'color: #4f9dff; font-weight: 600;' : '';
+      const dateStyle = isToday ? 'background: #4f9dff; color: white; font-weight: 700; padding: 4px 8px; border-radius: 50%; display: inline-block; min-width: 32px;' : 'font-weight: 600;';
+      
+      headerHTML += `<div class="av-row-header"><span style="font-size: 0.7rem; ${dayStyle}">${dayName}</span><br/><span style="font-size: 1.2rem; ${dateStyle}">${dateNum}</span></div>`;
     }
     headerRow.innerHTML = headerHTML;
     calElem.appendChild(headerRow);

@@ -253,6 +253,143 @@
       color: var(--muted);
       font-size: 0.9rem;
     }
+
+    /* Modal styles */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--surface);
+      padding: 32px;
+      border-radius: var(--radius-lg);
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .modal-header h3 {
+      margin: 0;
+      font-size: 1.5rem;
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    .form-group textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    /* Comment section styles */
+    .session-comment {
+      margin-top: 8px;
+      padding: 12px;
+      background: var(--surface-alt);
+      border-radius: var(--radius-sm);
+      border-left: 3px solid var(--accent);
+    }
+
+    .session-comment-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .session-comment-author {
+      font-size: 0.85rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .session-comment-text {
+      color: var(--text);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    .comment-form {
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--surface-alt);
+      border-radius: var(--radius-sm);
+    }
+
+    .comment-form textarea {
+      width: 100%;
+      padding: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 0.9rem;
+      resize: vertical;
+      min-height: 80px;
+      margin-bottom: 8px;
+    }
+
+    .session-row {
+      cursor: pointer;
+    }
+
+    .session-row.expanded {
+      background: var(--surface-alt);
+    }
   </style>
 </head>
 <body>
@@ -385,6 +522,55 @@
     </main>
   </div>
 
+  <!-- Add Session Modal -->
+  <div id="add-session-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Add Session</h3>
+        <button class="modal-close" onclick="closeAddSessionModal()">×</button>
+      </div>
+      <form id="add-session-form" onsubmit="submitAddSession(event)">
+        <input type="hidden" id="session-user-id">
+        
+        <div class="form-group">
+          <label>User: <span id="session-user-name"></span></label>
+        </div>
+
+        <div class="form-group">
+          <label for="session-student">Student*</label>
+          <select id="session-student" required>
+            <option value="">Select a student...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="session-date">Date*</label>
+          <input type="date" id="session-date" required>
+        </div>
+
+        <div class="form-group">
+          <label for="session-start-time">Start Time*</label>
+          <input type="time" id="session-start-time" required>
+        </div>
+
+        <div class="form-group">
+          <label for="session-end-time">End Time*</label>
+          <input type="time" id="session-end-time" required>
+        </div>
+
+        <div class="form-group">
+          <label for="session-subject">Subject</label>
+          <input type="text" id="session-subject" placeholder="e.g. Math 7, Physics 30">
+        </div>
+
+        <div style="display: flex; gap: 12px; margin-top: 24px;">
+          <button type="submit" class="btn">Create Session</button>
+          <button type="button" class="btn btn-secondary" onclick="closeAddSessionModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script type="module">
     import { auth, db, onAuthStateChanged, signOut, collection, getDocs, query, where, orderBy, deleteDoc, doc, updateDoc, setDoc, serverTimestamp } from './firebase.js';
 
@@ -493,13 +679,30 @@
 
       sessions.forEach(session => {
         const date = new Date(session.sessionDate).toLocaleDateString();
-        html += `<tr>
+        const hasComment = session.sessionSummary && session.sessionSummary.trim();
+        html += `<tr class="session-row" onclick="toggleSessionComment('${session.id}')">
           <td>${date}</td>
           <td>${session.startTime} - ${session.endTime}</td>
           <td>${session.studentName || 'Unknown'}</td>
           <td>${session.subject || '-'}</td>
-          <td class="action-buttons">
+          <td class="action-buttons" onclick="event.stopPropagation()">
             <button class="btn btn-danger btn-sm" onclick="deleteSession('${session.id}')">Delete</button>
+          </td>
+        </tr>
+        <tr id="comment-row-${session.id}" style="display: none;">
+          <td colspan="5">
+            ${hasComment ? `<div class="session-comment">
+              <div class="session-comment-header">
+                <span class="session-comment-author">Session Notes</span>
+                <button class="btn btn-secondary btn-sm" onclick="editComment('${session.id}')">Edit</button>
+              </div>
+              <div class="session-comment-text">${session.sessionSummary}</div>
+            </div>` : ''}
+            <div class="comment-form" id="comment-form-${session.id}" style="${hasComment ? 'display: none;' : ''}">
+              <textarea id="comment-input-${session.id}" placeholder="Add session notes (summary, student info, homework)...">${session.sessionSummary || ''}</textarea>
+              <button class="btn btn-sm" onclick="saveComment('${session.id}')">Save Comment</button>
+              <button class="btn btn-secondary btn-sm" onclick="cancelComment('${session.id}')">Cancel</button>
+            </div>
           </td>
         </tr>`;
       });
@@ -537,7 +740,7 @@
       container.innerHTML = '<div class="loading">Loading bookings...</div>';
 
       try {
-        const q = query(collection(db, 'bookings'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'));
+        const q = query(collection(db, 'bookings'), where('status', '==', 'pending'));
         const snapshot = await getDocs(q);
 
         if (snapshot.empty) {
@@ -644,16 +847,20 @@
       }
 
       let html = '<div class="data-table"><table><thead><tr>';
-      html += '<th>Name</th><th>Email</th><th>Phone</th><th>Grade</th><th>School</th>';
+      html += '<th>Name</th><th>Pronouns</th><th>Subject</th><th>School</th><th>Relationship</th><th>Actions</th>';
       html += '</tr></thead><tbody>';
 
       students.forEach(student => {
         html += `<tr>
-          <td>${student.firstName || ''} ${student.lastName || ''}</td>
-          <td>${student.email || '-'}</td>
-          <td>${student.phone || '-'}</td>
-          <td>${student.grade || '-'}</td>
+          <td>${student.studentName || '-'}</td>
+          <td>${student.pronouns || '-'}</td>
+          <td>${student.subject || '-'}</td>
           <td>${student.school || '-'}</td>
+          <td>${student.relationship || '-'}</td>
+          <td class="action-buttons">
+            <button class="btn btn-secondary btn-sm" onclick="editStudent('${student.id}')">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteStudent('${student.id}')">Delete</button>
+          </td>
         </tr>`;
       });
 
@@ -664,8 +871,9 @@
     window.filterStudents = () => {
       const search = document.getElementById('students-search').value.toLowerCase();
       const filtered = allStudents.filter(s => 
-        `${s.firstName || ''} ${s.lastName || ''}`.toLowerCase().includes(search) ||
-        (s.email || '').toLowerCase().includes(search)
+        (s.studentName || '').toLowerCase().includes(search) ||
+        (s.subject || '').toLowerCase().includes(search) ||
+        (s.school || '').toLowerCase().includes(search)
       );
       renderStudents(filtered);
     };
@@ -684,17 +892,23 @@
         }
 
         let html = '<div class="data-table"><table><thead><tr>';
-        html += '<th>Name</th><th>Email</th><th>Role</th><th>Joined</th>';
+        html += '<th>Name</th><th>Email</th><th>Phone</th><th>Joined</th><th>Actions</th>';
         html += '</tr></thead><tbody>';
 
         snapshot.forEach(doc => {
           const user = doc.data();
+          const userId = doc.id;
           const joined = user.createdAt ? new Date(user.createdAt.toDate()).toLocaleDateString() : '-';
           html += `<tr>
-            <td>${user.displayName || '-'}</td>
+            <td>${user.fullName || '-'}</td>
             <td>${user.email || '-'}</td>
-            <td>${user.role || 'User'}</td>
+            <td>${user.phone || '-'}</td>
             <td>${joined}</td>
+            <td class="action-buttons">
+              <button class="btn btn-secondary btn-sm" onclick="viewUserSessions('${userId}')">View Sessions</button>
+              <button class="btn btn-secondary btn-sm" onclick="viewUserStudents('${userId}')">View Students</button>
+              <button class="btn btn-sm" onclick="showAddSessionModal('${userId}', '${user.fullName || 'User'}')">Add Session</button>
+            </td>
           </tr>`;
         });
 
@@ -703,6 +917,84 @@
       } catch (error) {
         console.error('Error loading users:', error);
         container.innerHTML = `<div class="empty-state"><h3>Error loading users</h3><p>${error.message}</p></div>`;
+      }
+    };
+
+    window.viewUserSessions = async (userId) => {
+      // Switch to sessions tab and filter by user
+      showSection('sessions');
+      
+      // Load and filter sessions for this user
+      const container = document.getElementById('sessions-container');
+      container.innerHTML = '<div class="loading">Loading user sessions...</div>';
+
+      try {
+        const q = query(collection(db, 'sessions'), where('userId', '==', userId), orderBy('sessionDate', 'desc'));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+          container.innerHTML = '<div class="empty-state"><h3>No sessions found</h3><p>This user has no sessions.</p></div>';
+          return;
+        }
+
+        let sessions = [];
+        snapshot.forEach(doc => {
+          sessions.push({ id: doc.id, ...doc.data() });
+        });
+
+        renderSessions(sessions);
+      } catch (error) {
+        console.error('Error loading user sessions:', error);
+        container.innerHTML = `<div class="empty-state"><h3>Error loading sessions</h3><p>${error.message}</p></div>`;
+      }
+    };
+
+    window.viewUserStudents = async (userId) => {
+      // Switch to students tab and filter by user
+      showSection('students');
+      
+      // Load and filter students for this user
+      const container = document.getElementById('students-container');
+      container.innerHTML = '<div class="loading">Loading user students...</div>';
+
+      try {
+        const q = query(collection(db, 'students'), where('userId', '==', userId));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+          container.innerHTML = '<div class="empty-state"><h3>No students found</h3><p>This user has no students added.</p></div>';
+          return;
+        }
+
+        let students = [];
+        snapshot.forEach(doc => {
+          students.push({ id: doc.id, ...doc.data() });
+        });
+
+        allStudents = students;
+        renderStudents(students);
+      } catch (error) {
+        console.error('Error loading user students:', error);
+        container.innerHTML = `<div class="empty-state"><h3>Error loading students</h3><p>${error.message}</p></div>`;
+      }
+    };
+
+    window.editStudent = (studentId) => {
+      // Redirect to edit-student.html with the student ID
+      window.location.href = `edit-student.html?id=${studentId}`;
+    };
+
+    window.deleteStudent = async (studentId) => {
+      if (!confirm('Delete this student? This will also remove all their sessions.')) return;
+
+      try {
+        await deleteDoc(doc(db, 'students', studentId));
+        alert('Student deleted successfully!');
+        loadStudents();
+        loadDashboard();
+      } catch (error) {
+        console.error('Error deleting student:', error);
+        alert('Error deleting student: ' + error.message);
       }
     };
 
@@ -728,6 +1020,139 @@
     // Invoice Generator (placeholder)
     window.showInvoiceGenerator = () => {
       alert('Invoice generator coming soon! This will integrate with your existing invoices.py backend.');
+    };
+
+    // Add Session Modal
+    window.showAddSessionModal = async (userId, userName) => {
+      document.getElementById('session-user-id').value = userId;
+      document.getElementById('session-user-name').textContent = userName;
+      
+      // Load all students for this user
+      const studentSelect = document.getElementById('session-student');
+      studentSelect.innerHTML = '<option value="">Loading students...</option>';
+      
+      try {
+        const q = query(collection(db, 'students'), where('userId', '==', userId));
+        const snapshot = await getDocs(q);
+        
+        if (snapshot.empty) {
+          studentSelect.innerHTML = '<option value="">No students found</option>';
+        } else {
+          studentSelect.innerHTML = '<option value="">Select a student...</option>';
+          snapshot.forEach(doc => {
+            const student = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = student.studentName || 'Unknown';
+            option.dataset.studentName = student.studentName;
+            option.dataset.subject = student.subject || '';
+            studentSelect.appendChild(option);
+          });
+        }
+      } catch (error) {
+        console.error('Error loading students:', error);
+        studentSelect.innerHTML = '<option value="">Error loading students</option>';
+      }
+      
+      // Set default date to today
+      document.getElementById('session-date').valueAsDate = new Date();
+      
+      // Show modal
+      document.getElementById('add-session-modal').classList.add('active');
+    };
+
+    window.closeAddSessionModal = () => {
+      document.getElementById('add-session-modal').classList.remove('active');
+      document.getElementById('add-session-form').reset();
+    };
+
+    window.submitAddSession = async (event) => {
+      event.preventDefault();
+      
+      const userId = document.getElementById('session-user-id').value;
+      const studentSelect = document.getElementById('session-student');
+      const studentId = studentSelect.value;
+      const selectedOption = studentSelect.options[studentSelect.selectedIndex];
+      const studentName = selectedOption.dataset.studentName;
+      const date = document.getElementById('session-date').value;
+      const startTime = document.getElementById('session-start-time').value;
+      const endTime = document.getElementById('session-end-time').value;
+      const subject = document.getElementById('session-subject').value || selectedOption.dataset.subject || '';
+      
+      if (!studentId) {
+        alert('Please select a student');
+        return;
+      }
+      
+      try {
+        // Create session directly (approved, no email)
+        await setDoc(doc(collection(db, 'sessions')), {
+          userId: userId,
+          studentId: studentId,
+          studentName: studentName,
+          sessionDate: date,
+          startTime: startTime,
+          endTime: endTime,
+          subject: subject,
+          status: 'approved',
+          createdAt: serverTimestamp(),
+          createdBy: 'admin'
+        });
+        
+        alert('Session created successfully!');
+        closeAddSessionModal();
+        loadSessions();
+        loadDashboard();
+      } catch (error) {
+        console.error('Error creating session:', error);
+        alert('Error creating session: ' + error.message);
+      }
+    };
+
+    // Comment Functions
+    window.toggleSessionComment = (sessionId) => {
+      const commentRow = document.getElementById(`comment-row-${sessionId}`);
+      if (commentRow.style.display === 'none') {
+        commentRow.style.display = 'table-row';
+      } else {
+        commentRow.style.display = 'none';
+      }
+    };
+
+    window.editComment = (sessionId) => {
+      document.getElementById(`comment-form-${sessionId}`).style.display = 'block';
+    };
+
+    window.cancelComment = (sessionId) => {
+      const session = allSessions.find(s => s.id === sessionId);
+      if (session && session.sessionSummary) {
+        document.getElementById(`comment-form-${sessionId}`).style.display = 'none';
+      } else {
+        document.getElementById(`comment-row-${sessionId}`).style.display = 'none';
+      }
+    };
+
+    window.saveComment = async (sessionId) => {
+      const commentInput = document.getElementById(`comment-input-${sessionId}`);
+      const comment = commentInput.value.trim();
+      
+      if (!comment) {
+        alert('Please enter a comment');
+        return;
+      }
+      
+      try {
+        await updateDoc(doc(db, 'sessions', sessionId), {
+          sessionSummary: comment,
+          updatedAt: serverTimestamp()
+        });
+        
+        alert('Comment saved!');
+        loadSessions(); // Reload to show updated comment
+      } catch (error) {
+        console.error('Error saving comment:', error);
+        alert('Error saving comment: ' + error.message);
+      }
     };
   </script>
 </body>
