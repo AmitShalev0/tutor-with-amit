@@ -1075,19 +1075,20 @@ function setupBookingForm() {
       lastOptionIndex = recurringEndSel.options.length - 1;
     }
 
-    // Select the last available option by default
+    // Select the FIRST available option by default (1 week) instead of last (20 weeks)
+    // This also fixes the auto-reset bug where it kept jumping back to (20)
     if (recurringEndSel.options.length > 1) {
-      recurringEndSel.selectedIndex = lastOptionIndex;
+      recurringEndSel.selectedIndex = 1; // Index 1 is the first date option (0 is placeholder)
     }
   }
 
-  async function loadAvailability() {
+  async function loadAvailability(retryCount = 0) {
     try {
       // Use JSONP to avoid CORS issues with Apps Script
-      const callbackName = 'handleAvailabilityResponse' + Date.now();
+      const callbackName = 'handleAvailabilityResponse' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
       const url = `${APPS_SCRIPT_URL}?action=getAvailability&weekOffset=${currentWeekOffset}&callback=${callbackName}`;
       
-      console.log('Loading availability from:', url);
+      console.log('Loading availability from:', url, 'Attempt:', retryCount + 1);
       
       // Create promise that will be resolved by the JSONP callback
       const dataPromise = new Promise((resolve, reject) => {
@@ -1104,7 +1105,7 @@ function setupBookingForm() {
         script.onerror = (error) => {
           console.error('Script loading error:', error);
           delete window[callbackName];
-          reject(new Error('Failed to load availability data - check Apps Script deployment'));
+          reject(new Error('Failed to load availability data'));
         };
         
         // Add to document
@@ -1119,10 +1120,10 @@ function setupBookingForm() {
           }, 100);
         };
         
-        // Timeout after 10 seconds
+        // Timeout after 15 seconds (increased from 10)
         setTimeout(() => {
           if (window[callbackName]) {
-            console.error('Request timeout after 10 seconds');
+            console.error('Request timeout after 15 seconds');
             delete window[callbackName];
             if (script.parentNode) {
               document.head.removeChild(script);
@@ -1168,7 +1169,28 @@ function setupBookingForm() {
       
     } catch (error) {
       console.error("Error loading availability:", error);
-      alert('Failed to load calendar availability. Please check:\n1. Apps Script is deployed\n2. Deployment URL is correct\n3. Calendar permissions are granted\n\nError: ' + error.message);
+      
+      // Retry up to 2 times with exponential backoff
+      if (retryCount < 2) {
+        console.log(`Retrying in ${(retryCount + 1) * 2} seconds...`);
+        setTimeout(() => {
+          loadAvailability(retryCount + 1);
+        }, (retryCount + 1) * 2000);
+        return;
+      }
+      
+      // After retries exhausted, show user-friendly message
+      const errorMessage = 'The calendar is taking longer than expected to load. Please wait a moment and refresh the page. If the issue persists, you can still book by selecting a date and time from the dropdowns below.';
+      
+      if (calElem) {
+        calElem.innerHTML = `
+          <div style="padding: 2rem; text-align: center; background: rgba(255, 165, 0, 0.1); border-radius: 8px; border: 1px solid rgba(255, 165, 0, 0.3);">
+            <p style="margin: 0; color: #ffaa00; font-weight: 600;">⚠️ Calendar Loading Issue</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">${errorMessage}</p>
+            <button onclick="location.reload()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #4f9dff; color: white; border: none; border-radius: 4px; cursor: pointer;">Refresh Page</button>
+          </div>
+        `;
+      }
       
       // Fallback to empty availability on error
       demoAvailable = {
@@ -1178,7 +1200,7 @@ function setupBookingForm() {
         0: [], 1: [], 2: [], 3: [], 4: []
       };
       
-      // Still render the calendar structure
+      // Still update week display
       const today = new Date();
       const monday = new Date(today);
       const day = monday.getDay();
@@ -1193,8 +1215,6 @@ function setupBookingForm() {
         prevWeekBtn.style.opacity = (currentWeekOffset === 0) ? '0.5' : '1';
         prevWeekBtn.style.cursor = (currentWeekOffset === 0) ? 'not-allowed' : 'pointer';
       }
-      
-      renderCalendar(monday);
     }
   }
   

@@ -477,6 +477,7 @@
         userId: currentUser.uid,
         studentNames: obj.student_names,
         students: obj.student_names,
+        studentName: obj.student_names,  // Add this for consistency
         subject: obj.subject,
         sessionDate: obj.selected_date,
         startTime: startTime,
@@ -484,14 +485,17 @@
         duration: durationHours,
         durationHours: durationHours,
         status: "pending",  // Will change to "approved" when you import it
-        comments: obj.additional_comments || "",
-        notes: obj.additional_comments || "",
+        comments: obj.questions || "",
+        notes: obj.questions || "",
+        additionalComments: obj.questions || "",
         guardianEmail: userProfile?.email || currentUser.email,
         guardianPhone: userProfile?.phone || "",
         guardianName: userProfile?.fullName || currentUser.displayName || "",
         createdAt: new Date().toISOString(),
         source: "WEBSITE_BOOKING_FORM",
-        cost: obj.final_cost
+        cost: obj.final_cost,
+        recurring: obj.recurring === "on",
+        recurringEnd: obj.recurring_end || ""
       };
       
       // Add to Firestore bookings collection

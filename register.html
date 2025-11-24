@@ -98,6 +98,35 @@
         margin-top: -0.3rem;
         margin-bottom: 0.5rem;
     }
+    .password-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+    .password-wrapper input {
+        padding-right: 2.5rem;
+    }
+    .password-toggle {
+        position: absolute;
+        right: 0.5rem;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 1.2rem;
+        padding: 0.25rem;
+        width: auto;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+    }
+    .password-toggle:hover {
+        opacity: 0.8;
+    }
+    .password-toggle {
+        -webkit-user-select: none;
+    }
     </style>
 </head>
 <body>
@@ -123,11 +152,17 @@
                placeholder="5871234567" />
 
         <label for="password">Password*</label>
-        <input id="password" type="password" autocomplete="new-password" required minlength="6" placeholder="At least 6 characters" />
+        <div class="password-wrapper">
+            <input id="password" type="password" autocomplete="new-password" required minlength="6" placeholder="At least 6 characters" />
+            <button type="button" class="password-toggle" aria-label="Toggle password visibility" data-target="password">🙈</button>
+        </div>
         <p class="help-text">Must be at least 6 characters</p>
 
         <label for="confirm-password">Confirm Password*</label>
-        <input id="confirm-password" type="password" autocomplete="new-password" required minlength="6" />
+        <div class="password-wrapper">
+            <input id="confirm-password" type="password" autocomplete="new-password" required minlength="6" />
+            <button type="button" class="password-toggle" aria-label="Toggle password visibility" data-target="confirm-password">🙈</button>
+        </div>
 
         <button type="submit" id="register-btn">Create Account</button>
         <div class="error" id="error"></div>
@@ -158,6 +193,22 @@
     const collection = window.firestoreCollection;
     const doc = window.firestoreDoc;
     const serverTimestamp = window.firestoreServerTimestamp;
+
+    // Password visibility toggle
+    document.querySelectorAll('.password-toggle').forEach(button => {
+        button.addEventListener('click', () => {
+            const targetId = button.getAttribute('data-target');
+            const input = document.getElementById(targetId);
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                button.textContent = '👀';
+            } else {
+                input.type = 'password';
+                button.textContent = '🙈';
+            }
+        });
+    });
 
     form.addEventListener("submit", async (e) => {
         e.preventDefault();

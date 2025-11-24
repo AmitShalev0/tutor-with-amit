@@ -85,6 +85,35 @@
         color: #38bdf8;
         text-decoration: none;
     }
+    .password-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+    .password-wrapper input {
+        padding-right: 2.5rem;
+    }
+    .password-toggle {
+        position: absolute;
+        right: 0.5rem;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 1.2rem;
+        padding: 0.25rem;
+        width: auto;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+    }
+    .password-toggle:hover {
+        opacity: 0.8;
+    }
+    .password-toggle {
+        -webkit-user-select: none;
+    }
     </style>
 </head>
 <body>
@@ -97,7 +126,10 @@
         <input id="email" type="email" autocomplete="email" required />
 
         <label for="password">Password</label>
-        <input id="password" type="password" autocomplete="current-password" required />
+        <div class="password-wrapper">
+            <input id="password" type="password" autocomplete="current-password" required />
+            <button type="button" class="password-toggle" aria-label="Toggle password visibility" data-target="password">🙈</button>
+        </div>
 
         <button type="submit" id="login-btn">Log in</button>
         <div class="error" id="error"></div>
@@ -126,6 +158,22 @@
         if (user) {
             window.location.href = "dashboard.html";
         }
+    });
+
+    // Password visibility toggle
+    document.querySelectorAll('.password-toggle').forEach(button => {
+        button.addEventListener('click', () => {
+            const targetId = button.getAttribute('data-target');
+            const input = document.getElementById(targetId);
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                button.textContent = '👀';
+            } else {
+                input.type = 'password';
+                button.textContent = '🙈';
+            }
+        });
     });
 
     form.addEventListener("submit", async (e) => {

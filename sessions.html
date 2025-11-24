@@ -193,21 +193,21 @@
     try {
       console.log("Loading sessions for user:", currentUser.uid);
       
-      // Fetch user's sessions from Firestore (synced from TutorDesk after approval)
-      // Changed from "bookings" to "sessions" collection
-      const sessionsQuery = query(
-        collection(db, "sessions"),
+      // Fetch user's bookings from Firestore
+      // Use "bookings" collection which contains pending requests
+      const bookingsQuery = query(
+        collection(db, "bookings"),
         where("userId", "==", currentUser.uid)
       );
       
-      const querySnapshot = await getDocs(sessionsQuery);
+      const querySnapshot = await getDocs(bookingsQuery);
       allSessions = [];
       
       console.log("Query snapshot size:", querySnapshot.size);
       
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        console.log("Session data:", doc.id, data);
+        console.log("Booking data:", doc.id, data);
         allSessions.push({ 
           id: doc.id, 
           ...data,
@@ -379,8 +379,8 @@
       const deleteDoc = window.firestoreDeleteDoc;
       const doc = window.firestoreDoc;
       
-      // Delete from Firestore sessions collection
-      await deleteDoc(doc(db, "sessions", session.id));
+      // Delete from Firestore bookings collection
+      await deleteDoc(doc(db, "bookings", session.id));
       
       // Remove from local array
       allSessions = allSessions.filter(s => s.id !== session.id);
