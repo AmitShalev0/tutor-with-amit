@@ -1,6 +1,6 @@
 // main.js
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzP6GCEJ57js__Ry70hUwlGpDjfa7zS6KSn3-L2E7FKsD88Byzg2WgLNTYRSm6NG5Jv/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec";
 
 // Store the originally selected calendar date for recurring sessions
 let originalCalendarDate = null;
