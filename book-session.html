@@ -199,7 +199,7 @@
   const query = window.firestoreQuery;
   const where = window.firestoreWhere;
 
-  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyuEGmx-bCkhs44KHL90Rivtw0h9825Wuys8KLtGb9LNE6dyy9JXvmnY0b10C19U4de/exec";
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzP6GCEJ57js__Ry70hUwlGpDjfa7zS6KSn3-L2E7FKsD88Byzg2WgLNTYRSm6NG5Jv/exec";
 
   let currentUser = null;
   let userProfile = null;
@@ -211,6 +211,10 @@
       window.location.href = "login.html";
       return;
     }
+    
+    // Wait a moment for Firebase to fully initialize
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     currentUser = user;
     await loadUserData();
   });
