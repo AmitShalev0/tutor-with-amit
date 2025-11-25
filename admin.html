@@ -679,19 +679,22 @@
       html += '</tr></thead><tbody>';
 
       sessions.forEach(session => {
+
         const dateValue = session.sessionDate;
-        let date;
+        let date = 'Invalid Date';
+
         if (dateValue) {
-          // Handle Firestore Timestamp
-          if (dateValue.toDate) {
+        if (dateValue.toDate) {
+            // Firestore Timestamp
             date = dateValue.toDate().toLocaleDateString();
-          } 
-          // Handle ISO string or regular Date
-          else {
-            date = new Date(dateValue).toLocaleDateString();
-          }
+        } else if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+            // Plain "YYYY-MM-DD" string -> treat as LOCAL date, not UTC
+            const d = new Date(dateValue + 'T00:00:00');  // local midnight
+            date = d.toLocaleDateString();
         } else {
-          date = 'Invalid Date';
+            // Fallback for other formats
+            date = new Date(dateValue).toLocaleDateString();
+        }
         }
         
         const hasComment = session.sessionSummary && session.sessionSummary.trim();
@@ -793,20 +796,7 @@
         } catch (error) {
             console.error('Error deleting session:', error);
             alert('Error deleting session: ' + error.message);
-        }
-        };
-
-      if (!confirm('Delete this session? This cannot be undone.')) return;
-
-      try {
-        await deleteDoc(doc(db, 'bookings', sessionId));
-        alert('Session deleted successfully!');
-        loadSessions();
-        loadDashboard();
-      } catch (error) {
-        console.error('Error deleting session:', error);
-        alert('Error deleting session: ' + error.message);
-      }
+    }
     };
 
     // Bookings
@@ -828,10 +818,20 @@
         html += '</tr></thead><tbody>';
 
         snapshot.forEach(doc => {
-          const booking = doc.data();
-          const dateValue = booking.sessionDate || booking.date;
-          const date = dateValue ? (dateValue.toDate ? dateValue.toDate() : new Date(dateValue)) : new Date();
-          const dateStr = date.toLocaleDateString();
+            const dateValue = booking.sessionDate || booking.date;
+            let dateStr = '-';
+
+            if (dateValue) {
+            if (dateValue.toDate) {
+                dateStr = dateValue.toDate().toLocaleDateString();
+            } else if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+                const d = new Date(dateValue + 'T00:00:00'); // local date
+                dateStr = d.toLocaleDateString();
+            } else {
+                dateStr = new Date(dateValue).toLocaleDateString();
+            }
+            }
+
           
           // Format recurring end date if exists
           let recurringEndDate = '-';
@@ -924,73 +924,6 @@
             console.error('Error approving booking:', error);
             alert('Error approving booking: ' + error.message);
         }
-        };
-
-      if (!confirm('Approve this booking? This will add it to Google Calendar and send a confirmation email to the user.')) return;
-
-      try {
-        // Get booking details first
-        const bookingDoc = await getDoc(doc(db, 'bookings', bookingId));
-        if (!bookingDoc.exists()) {
-          alert('Booking not found!');
-          return;
-        }
-
-        const booking = bookingDoc.data();
-        console.log('Approving booking:', bookingId, booking);
-        
-        // Update booking status in Firestore
-        await updateDoc(doc(db, 'bookings', bookingId), {
-          status: 'approved',
-          approvedAt: serverTimestamp()
-        });
-        
-        console.log('Firestore updated. Now syncing to calendar...');
-
-        // Sync to Google Calendar via Apps Script
-        const syncData = {
-          action: 'syncToCalendar',
-          bookingId: bookingId,
-          sessionDate: booking.sessionDate,
-          startTime: booking.startTime,
-          endTime: booking.endTime,
-          studentNames: booking.studentNames || booking.studentName,
-          subject: booking.subject,
-          guardianName: booking.guardianName,
-          guardianEmail: booking.guardianEmail || booking.email,
-          comments: booking.comments || booking.notes || ''
-        };
-        
-        console.log('Sending to Apps Script:', syncData);
-
-        // Call Apps Script to create calendar event and send email
-        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec';
-        
-        try {
-          const response = await fetch(APPS_SCRIPT_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            body: JSON.stringify(syncData)
-          });
-          
-          console.log('Calendar sync request sent (no-cors mode - cannot read response)');
-          console.log('Check Apps Script execution log for any errors');
-        } catch (syncError) {
-          console.error('Error syncing to calendar:', syncError);
-          alert('Booking approved in system, but calendar sync may have failed. Check console and Apps Script logs.');
-        }
-
-        alert('Booking approved! Calendar sync initiated. Check your Google Calendar in a moment.');
-        loadBookings();
-        loadDashboard();
-      } catch (error) {
-        console.error('Error approving booking:', error);
-        alert('Error approving booking: ' + error.message);
-      }
     };
 
     window.rejectBooking = async (bookingId) => {

@@ -325,14 +325,29 @@
     }
   }
 
+  function formatSessionDate(value) {
+    if (!value) return '-';
+
+    if (value.toDate) {
+      return value.toDate().toLocaleDateString();
+    }
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const d = new Date(value + 'T00:00:00');
+      return d.toLocaleDateString();
+    }
+    return new Date(value).toLocaleDateString();
+  }
+
+
   function renderUnifiedSessionRow(session) {
     const sessionDate = new Date(session.sessionDate);
-    const dateStr = sessionDate.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
+    const dateStr = formatSessionDate(sessionDate);
+    // const dateStr = sessionDate.toLocaleDateString('en-US', { 
+    //   weekday: 'short', 
+    //   year: 'numeric', 
+    //   month: 'short', 
+    //   day: 'numeric' 
+    // });
     const timeStr = session.startTime && session.endTime 
       ? `${session.startTime} - ${session.endTime}` 
       : session.startTime || 'TBD';
@@ -364,12 +379,13 @@
 
   async function removeSession(session) {
     const sessionDate = new Date(session.sessionDate);
-    const dateStr = sessionDate.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
+    const dateStr = formatSessionDate(sessionDate);
+    // const dateStr = sessionDate.toLocaleDateString('en-US', { 
+    //   weekday: 'long', 
+    //   year: 'numeric', 
+    //   month: 'long', 
+    //   day: 'numeric' 
+    // });
     
     if (!confirm(`Are you sure you want to cancel the session on ${dateStr} at ${session.startTime}?\n\nThis action cannot be undone.`)) {
       return;
