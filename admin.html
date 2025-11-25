@@ -748,6 +748,54 @@
     };
 
     window.deleteSession = async (sessionId) => {
+        if (!confirm('Delete this session? This cannot be undone.')) return;
+
+        try {
+            const bookingRef = doc(db, 'bookings', sessionId);
+            const bookingSnap = await getDoc(bookingRef);
+
+            // Try to delete from calendar first (if we have enough info)
+            if (bookingSnap.exists()) {
+            const booking = bookingSnap.data();
+
+            const deletePayload = {
+                action: 'deleteCalendarEvent',
+                bookingId: booking.bookingId || sessionId,  // use stored bookingId, fall back to doc id
+                sessionDate: booking.sessionDate,
+                startTime: booking.startTime,
+                endTime: booking.endTime
+            };
+
+            const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec';
+
+            try {
+                await fetch(APPS_SCRIPT_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(deletePayload)
+                });
+                console.log('Requested calendar event deletion for', deletePayload.bookingId);
+            } catch (calErr) {
+                console.error('Error calling Apps Script delete:', calErr);
+                // We still continue to delete from Firestore
+            }
+            }
+
+            // Now delete the booking document itself
+            await deleteDoc(bookingRef);
+
+            alert('Session deleted. Check Google Calendar to confirm the event was removed.');
+            loadSessions();
+            loadDashboard();
+        } catch (error) {
+            console.error('Error deleting session:', error);
+            alert('Error deleting session: ' + error.message);
+        }
+        };
+
       if (!confirm('Delete this session? This cannot be undone.')) return;
 
       try {
@@ -815,6 +863,69 @@
     };
 
     window.approveBooking = async (bookingId) => {
+        if (!confirm('Approve this booking? This will add it to Google Calendar and send a confirmation email to the user.')) return;
+
+        try {
+            // Get booking details first
+            const bookingRef = doc(db, 'bookings', bookingId);
+            const bookingDoc = await getDoc(bookingRef);
+            if (!bookingDoc.exists()) {
+            alert('Booking not found!');
+            return;
+            }
+
+            const booking = bookingDoc.data();
+            console.log('Approving booking:', bookingId, booking);
+            
+            // 👇 NOTE: also store bookingId field on the document
+            await updateDoc(bookingRef, {
+            status: 'approved',
+            approvedAt: serverTimestamp(),
+            bookingId: bookingId
+            });
+            
+            console.log('Firestore updated. Now syncing to calendar...');
+
+            const syncData = {
+            action: 'syncToCalendar',
+            bookingId: bookingId,                          // <– we use this in Apps Script
+            sessionDate: booking.sessionDate,
+            startTime: booking.startTime,
+            endTime: booking.endTime,
+            studentNames: booking.studentNames || booking.studentName,
+            subject: booking.subject,
+            guardianName: booking.guardianName,
+            guardianEmail: booking.guardianEmail || booking.email,
+            comments: booking.comments || booking.notes || ''
+            };
+            
+            const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec';
+
+            try {
+            await fetch(APPS_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                },
+                body: JSON.stringify(syncData)
+            });
+            console.log('Calendar sync request sent (no-cors mode)');
+            } catch (syncError) {
+            console.error('Error syncing to calendar:', syncError);
+            alert('Booking approved in system, but calendar sync may have failed. Check console and Apps Script logs.');
+            }
+
+            alert('Booking approved! Calendar sync initiated. Check your Google Calendar in a moment.');
+            loadBookings();
+            loadDashboard();
+        } catch (error) {
+            console.error('Error approving booking:', error);
+            alert('Error approving booking: ' + error.message);
+        }
+        };
+
       if (!confirm('Approve this booking? This will add it to Google Calendar and send a confirmation email to the user.')) return;
 
       try {
@@ -1235,49 +1346,55 @@
       document.getElementById('add-session-form').reset();
     };
 
+
     window.submitAddSession = async (event) => {
-      event.preventDefault();
-      
-      const userId = document.getElementById('session-user-id').value;
-      const studentSelect = document.getElementById('session-student');
-      const studentId = studentSelect.value;
-      const selectedOption = studentSelect.options[studentSelect.selectedIndex];
-      const studentName = selectedOption.dataset.studentName;
-      const date = document.getElementById('session-date').value;
-      const startTime = document.getElementById('session-start-time').value;
-      const endTime = document.getElementById('session-end-time').value;
-      const subject = document.getElementById('session-subject').value || selectedOption.dataset.subject || '';
-      
-      if (!studentId) {
-        alert('Please select a student');
-        return;
-      }
-      
-      try {
-        // Create session directly in bookings collection (approved, no email needed)
-        await setDoc(doc(collection(db, 'bookings')), {
-          userId: userId,
-          studentId: studentId,
-          studentName: studentName,
-          studentNames: studentName,
-          sessionDate: date,
-          startTime: startTime,
-          endTime: endTime,
-          subject: subject,
-          status: 'approved',
-          createdAt: serverTimestamp(),
-          createdBy: 'admin'
-        });
+        event.preventDefault();
         
-        alert('Session created successfully!');
-        closeAddSessionModal();
-        loadSessions();
-        loadDashboard();
-      } catch (error) {
-        console.error('Error creating session:', error);
-        alert('Error creating session: ' + error.message);
-      }
-    };
+        const userId = document.getElementById('session-user-id').value;
+        const studentSelect = document.getElementById('session-student');
+        const studentId = studentSelect.value;
+        const selectedOption = studentSelect.options[studentSelect.selectedIndex];
+        const studentName = selectedOption.dataset.studentName;
+        const date = document.getElementById('session-date').value;
+        const startTime = document.getElementById('session-start-time').value;
+        const endTime = document.getElementById('session-end-time').value;
+        const subject = document.getElementById('session-subject').value || selectedOption.dataset.subject || '';
+        
+        if (!studentId) {
+            alert('Please select a student');
+            return;
+        }
+        
+        try {
+            // 👇 create doc ref first so we know the ID
+            const bookingRef = doc(collection(db, 'bookings'));
+            const bookingId = bookingRef.id;
+
+            await setDoc(bookingRef, {
+            bookingId: bookingId,        // <– session knows its bookingId
+            userId: userId,
+            studentId: studentId,
+            studentName: studentName,
+            studentNames: studentName,
+            sessionDate: date,
+            startTime: startTime,
+            endTime: endTime,
+            subject: subject,
+            status: 'approved',
+            createdAt: serverTimestamp(),
+            createdBy: 'admin'
+            });
+            
+            alert('Session created successfully!');
+            closeAddSessionModal();
+            loadSessions();
+            loadDashboard();
+        } catch (error) {
+            console.error('Error creating session:', error);
+            alert('Error creating session: ' + error.message);
+        }
+        };
+
 
     // Comment Functions
     window.toggleSessionComment = (sessionId) => {
