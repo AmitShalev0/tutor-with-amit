@@ -208,11 +208,13 @@
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         console.log("Booking data:", doc.id, data);
-        allSessions.push({ 
-          id: doc.id, 
+        allSessions.push({
+          id: doc.id,
           ...data,
-          // Convert Firestore Timestamp to Date if needed
-          sessionDate: data.sessionDate?.toDate ? data.sessionDate.toDate() : new Date(data.sessionDate)
+          // Keep the raw value; only convert Firestore Timestamps
+          sessionDate: data.sessionDate && data.sessionDate.toDate
+            ? data.sessionDate.toDate()
+            : data.sessionDate
         });
       });
 
@@ -235,6 +237,37 @@
     }
   }
 
+
+  function getSessionDateForCompare(raw) {
+    if (!raw) return null;
+
+    // Firestore Timestamp
+    if (raw.toDate) {
+      const d = raw.toDate();
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+
+    // Already a Date object
+    if (raw instanceof Date) {
+      const d = new Date(raw);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+
+    // "YYYY-MM-DD" string – treat as local date
+    if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      const [y, m, d] = raw.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+    // Fallback
+    const d = new Date(raw);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+
   function displaySessions() {
     const now = new Date();
     now.setHours(0, 0, 0, 0); // Set to start of today for comparison
@@ -243,17 +276,17 @@
     
     const pending = allSessions.filter(s => (s.status || 'pending').toLowerCase() === 'pending');
     const upcoming = allSessions.filter(s => {
-      const sessionDate = new Date(s.sessionDate);
-      sessionDate.setHours(0, 0, 0, 0);
+      const sessionDate = getSessionDateForCompare(s.sessionDate);
+      if (!sessionDate) return false;
       const status = (s.status || '').toLowerCase();
+      return sessionDate >= now && status !== 'pending';
       // Include approved sessions OR sessions synced from TutorDesk (which have status "approved")
       return sessionDate >= now && status !== 'pending';
     });
-    
     const past = allSessions.filter(s => {
-      const sessionDate = new Date(s.sessionDate);
-      sessionDate.setHours(0, 0, 0, 0);
-      return sessionDate < now;
+    const sessionDate = getSessionDateForCompare(s.sessionDate);
+    if (!sessionDate) return false;
+    return sessionDate < now;
     });
 
     console.log("Categorized - Upcoming:", upcoming.length, "Pending:", pending.length, "Past:", past.length);
@@ -340,8 +373,9 @@
 
 
   function renderUnifiedSessionRow(session) {
-    const sessionDate = new Date(session.sessionDate);
-    const dateStr = formatSessionDate(sessionDate);
+    const dateStr = formatSessionDate(session.sessionDate);
+    // const sessionDate = new Date(session.sessionDate);
+    // const dateStr = formatSessionDate(sessionDate);
     // const dateStr = sessionDate.toLocaleDateString('en-US', { 
     //   weekday: 'short', 
     //   year: 'numeric', 
@@ -378,8 +412,10 @@
   }
 
   async function removeSession(session) {
-    const sessionDate = new Date(session.sessionDate);
-    const dateStr = formatSessionDate(sessionDate);
+    const dateStr = formatSessionDate(session.sessionDate);
+
+    // const sessionDate = new Date(session.sessionDate);
+    // const dateStr = formatSessionDate(sessionDate);
     // const dateStr = sessionDate.toLocaleDateString('en-US', { 
     //   weekday: 'long', 
     //   year: 'numeric', 

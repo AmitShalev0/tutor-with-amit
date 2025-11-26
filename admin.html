@@ -763,24 +763,32 @@
 
             const deletePayload = {
                 action: 'deleteCalendarEvent',
-                bookingId: booking.bookingId || sessionId,  // use stored bookingId, fall back to doc id
-                sessionDate: booking.sessionDate,
-                startTime: booking.startTime,
-                endTime: booking.endTime
+                bookingId: booking.bookingId || sessionId,
+                sessionDate: booking.sessionDate
             };
+
+            console.log('Deleting calendar event for bookingId:', deletePayload.bookingId);
 
             const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec';
 
             try {
-                await fetch(APPS_SCRIPT_URL, {
+                // Use URLSearchParams to avoid CORS preflight
+                const formData = new URLSearchParams();
+                formData.append('payload', JSON.stringify(deletePayload));
+                
+                const res = await fetch(APPS_SCRIPT_URL, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify(deletePayload)
+                body: formData
                 });
-                console.log('Requested calendar event deletion for', deletePayload.bookingId);
+
+                const json = await res.json();
+                console.log('Calendar delete response:', json);
+                
+                if (json.success) {
+                    console.log('Successfully deleted', json.data.deleted, 'calendar event(s)');
+                } else {
+                    console.warn('Calendar delete returned:', json.message);
+                }
             } catch (calErr) {
                 console.error('Error calling Apps Script delete:', calErr);
                 // We still continue to delete from Firestore
@@ -790,7 +798,7 @@
             // Now delete the booking document itself
             await deleteDoc(bookingRef);
 
-            alert('Session deleted. Check Google Calendar to confirm the event was removed.');
+            alert('✅ Session deleted from database. Calendar event should be removed shortly.');
             loadSessions();
             loadDashboard();
         } catch (error) {
@@ -817,7 +825,10 @@
         html += '<th>Date</th><th>Time</th><th>Student</th><th>Email</th><th>Recurring End Date</th><th>Status</th><th>Actions</th>';
         html += '</tr></thead><tbody>';
 
+
         snapshot.forEach(doc => {
+            const booking = doc.data();
+
             const dateValue = booking.sessionDate || booking.date;
             let dateStr = '-';
 
@@ -854,6 +865,8 @@
           </tr>`;
         });
 
+
+
         html += '</tbody></table></div>';
         container.innerHTML = html;
       } catch (error) {
@@ -888,7 +901,7 @@
 
             const syncData = {
             action: 'syncToCalendar',
-            bookingId: bookingId,                          // <– we use this in Apps Script
+            bookingId: bookingId,
             sessionDate: booking.sessionDate,
             startTime: booking.startTime,
             endTime: booking.endTime,
@@ -899,25 +912,41 @@
             comments: booking.comments || booking.notes || ''
             };
             
+            console.log('Sending to Apps Script:', syncData);
+            
             const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec';
 
             try {
-            await fetch(APPS_SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                },
-                body: JSON.stringify(syncData)
-            });
-            console.log('Calendar sync request sent (no-cors mode)');
+                // Use URLSearchParams to avoid CORS preflight (no-cors compatible)
+                const formData = new URLSearchParams();
+                formData.append('payload', JSON.stringify(syncData));
+                
+                const res = await fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const json = await res.json();
+                console.log('Apps Script response:', json);
+
+                if (!json.success) {
+                    throw new Error(json.message || 'Apps Script returned failure');
+                }
+
+                // SAVE eventId into Firestore
+                if (json.data && json.data.eventId) {
+                    await updateDoc(bookingRef, {
+                        eventId: json.data.eventId
+                    });
+                    console.log('Saved eventId to Firestore:', json.data.eventId);
+                }
+
+                alert('✅ Booking approved and added to Google Calendar!');
             } catch (syncError) {
-            console.error('Error syncing to calendar:', syncError);
-            alert('Booking approved in system, but calendar sync may have failed. Check console and Apps Script logs.');
+                console.error('Error syncing to calendar:', syncError);
+                alert('⚠️ Booking approved in system, but calendar sync failed: ' + syncError.message + '\n\nPlease check Apps Script logs.');
             }
 
-            alert('Booking approved! Calendar sync initiated. Check your Google Calendar in a moment.');
             loadBookings();
             loadDashboard();
         } catch (error) {
@@ -1174,32 +1203,31 @@
           };
           
           try {
+            // Use URLSearchParams to avoid CORS preflight
+            const formData = new URLSearchParams();
+            formData.append('payload', JSON.stringify(syncData));
+            
             const response = await fetch(APPS_SCRIPT_URL, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify(syncData)
+                body: formData
                 });
 
-                if (!response.ok) {
-                const text = await response.text().catch(() => '');
-                throw new Error(`Apps Script HTTP ${response.status}: ${text}`);
-                }
-
-                let json;
-                try {
-                json = await response.json();
-                } catch (_) {
-                throw new Error('Apps Script did not return valid JSON.');
-                }
+                const json = await response.json();
 
                 if (!json.success) {
                 throw new Error(json.message || 'Apps Script returned an error.');
                 }
 
                 successCount++;
+                // ALSO update Firestore to match what we synced
+                const updateDoc = window.firestoreUpdateDoc;
+                const docRef = window.firestoreDoc(db, "bookings", bookingId);
+                await updateDoc(docRef, {
+                sessionDate: syncData.sessionDate,
+                startTime: syncData.startTime,
+                endTime: syncData.endTime
+                });
+
                 console.log(`Synced booking ${bookingDoc.id}`);
 
           } catch (error) {
