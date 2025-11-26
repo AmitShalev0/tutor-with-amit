@@ -269,8 +269,9 @@
 
 
   function displaySessions() {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0); // Set to start of today for comparison
+    const now = new Date(); // Current date and time
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today for date-only comparison
     
     console.log("Displaying sessions. Total:", allSessions.length);
     
@@ -279,14 +280,47 @@
       const sessionDate = getSessionDateForCompare(s.sessionDate);
       if (!sessionDate) return false;
       const status = (s.status || '').toLowerCase();
-      return sessionDate >= now && status !== 'pending';
-      // Include approved sessions OR sessions synced from TutorDesk (which have status "approved")
-      return sessionDate >= now && status !== 'pending';
+      if (status !== 'approved') return false;
+      
+      // Session is upcoming if:
+      // 1. It's on a future day, OR
+      // 2. It's today but the end time hasn't passed yet
+      if (sessionDate > today) {
+        return true; // Future day
+      } else if (sessionDate.getTime() === today.getTime()) {
+        // Same day - check if end time has passed
+        if (s.endTime) {
+          const [hours, minutes] = s.endTime.split(':').map(Number);
+          const sessionEnd = new Date();
+          sessionEnd.setHours(hours, minutes, 0, 0);
+          return now < sessionEnd; // Session hasn't ended yet
+        }
+        return true; // No end time, assume still upcoming if today
+      }
+      return false; // Past day
     });
     const past = allSessions.filter(s => {
-    const sessionDate = getSessionDateForCompare(s.sessionDate);
-    if (!sessionDate) return false;
-    return sessionDate < now;
+      const sessionDate = getSessionDateForCompare(s.sessionDate);
+      if (!sessionDate) return false;
+      const status = (s.status || '').toLowerCase();
+      if (status !== 'approved' && status !== 'rejected') return false;
+      
+      // Session is past if:
+      // 1. It's on a past day, OR
+      // 2. It's today and the end time has passed
+      if (sessionDate < today) {
+        return true; // Past day
+      } else if (sessionDate.getTime() === today.getTime()) {
+        // Same day - check if end time has passed
+        if (s.endTime) {
+          const [hours, minutes] = s.endTime.split(':').map(Number);
+          const sessionEnd = new Date();
+          sessionEnd.setHours(hours, minutes, 0, 0);
+          return now >= sessionEnd; // Session has ended
+        }
+        return false; // No end time, assume still upcoming if today
+      }
+      return false; // Future day
     });
 
     console.log("Categorized - Upcoming:", upcoming.length, "Pending:", pending.length, "Past:", past.length);
@@ -374,37 +408,49 @@
 
   function renderUnifiedSessionRow(session) {
     const dateStr = formatSessionDate(session.sessionDate);
-    // const sessionDate = new Date(session.sessionDate);
-    // const dateStr = formatSessionDate(sessionDate);
-    // const dateStr = sessionDate.toLocaleDateString('en-US', { 
-    //   weekday: 'short', 
-    //   year: 'numeric', 
-    //   month: 'short', 
-    //   day: 'numeric' 
-    // });
     const timeStr = session.startTime && session.endTime 
       ? `${session.startTime} - ${session.endTime}` 
       : session.startTime || 'TBD';
     const students = session.studentName || session.studentNames || session.students || 'N/A';
-    const summary = session.sessionSummary || session.comments || session.notes || session.additionalComments || '';
-
-    // Show session summary if it exists
-    const summaryHtml = summary ? `
+    
+    // Student's questions/comments from booking form
+    const studentComments = session.comments || session.notes || session.additionalComments || '';
+    const studentCommentsHtml = studentComments 
+      ? `<div style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.5;">${studentComments}</div>`
+      : '<div style="color: #b0b0b5; font-style: italic;">No comments</div>';
+    
+    // Tutor's session notes (separate from student comments)
+    const tutorNotes = session.sessionSummary || '';
+    const hasTutorNotes = tutorNotes.trim().length > 0;
+    
+    const tutorNotesHtml = hasTutorNotes ? `
       <div style="margin-top: 8px; padding: 12px; background: rgba(79, 157, 255, 0.1); border-left: 3px solid #4f9dff; border-radius: 4px;">
         <div style="font-weight: 600; color: #4f9dff; font-size: 0.85rem; margin-bottom: 6px;">📝 Session Notes from Tutor:</div>
-        <div style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.5; color: #f5f5f7;">${summary}</div>
+        <div style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.5; color: #f5f5f7;">${tutorNotes}</div>
       </div>
-    ` : '<div style="color: #b0b0b5; font-style: italic;">No notes yet</div>';
+    ` : '<div style="color: #b0b0b5; font-style: italic; padding: 12px;">No tutor notes yet</div>';
 
     return `
-      <tr>
+      <tr style="cursor: pointer;" onclick="toggleTutorNotes('${session.id}')" title="Click to ${hasTutorNotes ? 'view' : 'see'} tutor notes">
         <td>${dateStr}</td>
         <td>${timeStr}</td>
         <td>${students}</td>
-        <td>${summaryHtml}</td>
+        <td>${studentCommentsHtml}</td>
+      </tr>
+      <tr id="tutor-notes-row-${session.id}" style="display: none;">
+        <td colspan="4" style="background: rgba(0, 0, 0, 0.2); padding: 0;">
+          ${tutorNotesHtml}
+        </td>
       </tr>
     `;
   }
+
+  window.toggleTutorNotes = function(sessionId) {
+    const row = document.getElementById(`tutor-notes-row-${sessionId}`);
+    if (row) {
+      row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+    }
+  };
 
   function editSession(session) {
     // Redirect to edit booking page

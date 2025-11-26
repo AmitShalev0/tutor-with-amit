@@ -1241,10 +1241,11 @@ function setupBookingForm() {
       const dayName = days[dayIdx];
       const dateNum = date.getDate();
       const isToday = date.getTime() === today.getTime();
+      const isPast = date < today;
       
       // Apply styles for current date
-      const dayStyle = isToday ? 'color: #4f9dff; font-weight: 600;' : '';
-      const dateStyle = isToday ? 'background: #4f9dff; color: white; font-weight: 700; padding: 4px 8px; border-radius: 50%; display: inline-block; min-width: 32px;' : 'font-weight: 600;';
+      const dayStyle = isToday ? 'color: #4f9dff; font-weight: 600;' : (isPast ? 'opacity: 0.4;' : '');
+      const dateStyle = isToday ? 'background: #4f9dff; color: white; font-weight: 700; padding: 4px 8px; border-radius: 50%; display: inline-block; min-width: 32px;' : (isPast ? 'font-weight: 600; opacity: 0.4;' : 'font-weight: 600;');
       
       headerHTML += `<div class="av-row-header"><span style="font-size: 0.7rem; ${dayStyle}">${dayName}</span><br/><span style="font-size: 1.2rem; ${dateStyle}">${dateNum}</span></div>`;
     }
@@ -1264,6 +1265,21 @@ function setupBookingForm() {
       for (let dayIdx = 0; dayIdx < 5; dayIdx++) {
         const cell = document.createElement("div");
         cell.className = "av-slot";
+
+        // Check if this day is in the past
+        const date = new Date(monday);
+        date.setDate(monday.getDate() + dayIdx);
+        date.setHours(0, 0, 0, 0);
+        const isPast = date < today;
+
+        // Gray out past days
+        if (isPast) {
+          cell.style.opacity = '0.3';
+          cell.style.cursor = 'not-allowed';
+          cell.style.background = '#333';
+          row.appendChild(cell);
+          continue; // Skip the rest of the logic for past days
+        }
 
         // Check if this whole hour is within any available block (>= 60 mins)
         const blocks = demoAvailable[dayIdx] || [];

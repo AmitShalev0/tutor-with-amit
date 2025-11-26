@@ -50,6 +50,20 @@
         <input type="tel" name="phone" id="phone" placeholder="(123) 456-7890" required />
       </div>
 
+      <div class="field-row">
+        <label style="font-weight: 600; margin-bottom: 0.75rem; display: block;">Email Notifications</label>
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+          <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal; cursor: pointer;">
+            <input type="checkbox" id="notifyBookingApproved" name="notifyBookingApproved" style="width: auto; cursor: pointer;">
+            <span>Notify me when my booking is approved</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal; cursor: pointer;">
+            <input type="checkbox" id="notifySessionDeleted" name="notifySessionDeleted" style="width: auto; cursor: pointer;">
+            <span>Notify me when a session is deleted</span>
+          </label>
+        </div>
+      </div>
+
       <div id="error-message" class="error-message"></div>
       <div id="success-message" class="success-message"></div>
 
@@ -105,6 +119,10 @@
         document.getElementById("fullName").value = userData.fullName || "";
         document.getElementById("email").value = currentUser.email || "";
         document.getElementById("phone").value = userData.phone || "";
+        
+        // Load notification preferences (default to false if not set)
+        document.getElementById("notifyBookingApproved").checked = userData.notifyBookingApproved === true;
+        document.getElementById("notifySessionDeleted").checked = userData.notifySessionDeleted === true;
       }
 
       // Show profile form
@@ -124,6 +142,8 @@
 
     const fullName = document.getElementById("fullName").value.trim();
     const phone = document.getElementById("phone").value.trim();
+    const notifyBookingApproved = document.getElementById("notifyBookingApproved").checked;
+    const notifySessionDeleted = document.getElementById("notifySessionDeleted").checked;
 
     if (!fullName || !phone) {
       showError("Please fill in all required fields.");
@@ -135,6 +155,8 @@
       await updateDoc(userDocRef, {
         fullName,
         phone,
+        notifyBookingApproved,
+        notifySessionDeleted,
       });
 
       showSuccess("Profile updated successfully!");

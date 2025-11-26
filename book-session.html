@@ -492,13 +492,13 @@
       const endDate = new Date(startDate.getTime() + (durationHours * 60 * 60 * 1000));
       const endTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
       
-      const bookingData = {
+      // Base booking data
+      const baseBookingData = {
         userId: currentUser.uid,
         studentNames: obj.student_names,
         students: obj.student_names,
         studentName: obj.student_names,  // Add this for consistency
         subject: obj.subject,
-        sessionDate: obj.selected_date,
         startTime: startTime,
         endTime: endTime,
         duration: durationHours,
@@ -512,16 +512,64 @@
         guardianName: userProfile?.fullName || currentUser.displayName || "",
         createdAt: new Date().toISOString(),
         source: "WEBSITE_BOOKING_FORM",
-        cost: obj.final_cost,
-        recurring: obj.recurring === "on",
-        recurringEnd: obj.recurring_end || ""
+        cost: obj.final_cost
       };
       
       // Add to Firestore bookings collection
       const addDoc = window.firestoreAddDoc;
       const collection = window.firestoreCollection;
-      const bookingRef = await addDoc(collection(db, "bookings"), bookingData);
-      console.log("Saved to Firestore with ID:", bookingRef.id);
+      
+      // Check if recurring
+      const isRecurring = obj.recurring === "on";
+      let bookingCount = 0; // Declare at outer scope so it's accessible later
+      
+      if (isRecurring && obj.recurring_end) {
+        // Create multiple bookings - one for each week until recurring_end
+        // Parse dates correctly in local time (avoid timezone issues)
+        const [firstYear, firstMonth, firstDay] = obj.selected_date.split('-').map(Number);
+        const firstDate = new Date(firstYear, firstMonth - 1, firstDay);
+        
+        const [lastYear, lastMonth, lastDay] = obj.recurring_end.split('-').map(Number);
+        const lastDate = new Date(lastYear, lastMonth - 1, lastDay);
+        
+        let currentDate = new Date(firstDate);
+        
+        while (currentDate <= lastDate) {
+          // Format date as YYYY-MM-DD
+          const year = currentDate.getFullYear();
+          const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+          const day = String(currentDate.getDate()).padStart(2, '0');
+          const dateStr = `${year}-${month}-${day}`;
+          
+          // Create booking for this date
+          const bookingData = {
+            ...baseBookingData,
+            sessionDate: dateStr,
+            isPartOfRecurringSeries: true,
+            recurringSeriesStart: obj.selected_date,
+            recurringSeriesEnd: obj.recurring_end
+          };
+          
+          const bookingRef = await addDoc(collection(db, "bookings"), bookingData);
+          console.log(`Saved recurring booking ${bookingCount + 1} to Firestore with ID:`, bookingRef.id, "for date:", dateStr);
+          bookingCount++;
+          
+          // Move to next week
+          currentDate.setDate(currentDate.getDate() + 7);
+        }
+        
+        console.log(`Created ${bookingCount} recurring bookings from ${obj.selected_date} to ${obj.recurring_end}`);
+      } else {
+        // Single booking
+        const bookingData = {
+          ...baseBookingData,
+          sessionDate: obj.selected_date
+        };
+        
+        const bookingRef = await addDoc(collection(db, "bookings"), bookingData);
+        console.log("Saved to Firestore with ID:", bookingRef.id);
+        bookingCount = 1; // Single booking
+      }
       
       // SECOND: Also send to Google Sheets via Apps Script (for your records)
       // Note: Using no-cors mode means we can't read the response, but submission still works
@@ -541,14 +589,18 @@
       }
 
       // Success! Show confirmation message
-      msg.textContent = "Thanks! Your booking request has been submitted. I will review it and email you with confirmation.";
+      const bookingCountMsg = isRecurring && obj.recurring_end 
+        ? ` (${bookingCount} session${bookingCount !== 1 ? 's' : ''} from ${obj.selected_date} to ${obj.recurring_end})`
+        : "";
+      msg.textContent = `Thanks! Your booking request has been submitted${bookingCountMsg}. I will review it and email you with confirmation.`;
       msg.classList.add("ok");
       msg.classList.remove("error");
       
-      // Wait 2 seconds before redirecting
+      // Don't call form.reset() or renderStudentFields() after successful submission
+      // Just redirect to sessions page after 2 seconds
       setTimeout(() => {
         window.location.href = "sessions.html";  // Redirect to sessions page so they can see their pending booking
-      }, 2000);
+      }, 2500);
 
     } catch (err) {
       console.error("Booking submission error:", err);
