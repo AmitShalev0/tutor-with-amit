@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   
   setupThemeToggle();
-  setupCurrentTime();
+  // setupCurrentTime();
   setupUserGreeting();
 });
 
@@ -67,11 +67,11 @@ function setupThemeToggle() {
   // initialize from localStorage, or auto-detect based on time of day
   let stored = localStorage.getItem("site-theme");
   if (!stored) {
-    // stored = "dark";  // Default to dark mode
+    stored = "dark";  // Default to dark mode
     // Auto-detect: 7am-6:59:59pm = light, 7pm-6:59:59am = dark
-    const now = new Date();
-    const hour = now.getHours();
-    stored = (hour >= 7 && hour < 19) ? "light" : "dark";
+    // const now = new Date();
+    // const hour = now.getHours();
+    // stored = (hour >= 7 && hour < 19) ? "light" : "dark";
   }
   applyTheme(stored);
 
