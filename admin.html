@@ -6,6 +6,83 @@
   <title>Admin Panel - TutorDesk</title>
   <link rel="stylesheet" href="style.css">
   <style>
+
+/* style for the edit button */
+    .session-detail-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .edit-session-form h4 {
+      margin-bottom: 8px;
+      font-size: 0.95rem;
+      color: #e5e7eb;
+    }
+
+    .edit-session-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 8px 16px;
+    }
+
+    .edit-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .edit-field-inline {
+      flex-direction: row;
+      align-items: center;
+    }
+
+    .edit-field-notes textarea {
+      width: 100%;
+    }
+
+    .edit-session-form input,
+    .edit-session-form textarea {
+      background: #111827;
+      border: 1px solid #374151;
+      color: #e5e7eb;
+      border-radius: 6px;
+      padding: 4px 8px;
+    }
+
+    .edit-session-actions {
+      margin-top: 8px;
+      display: flex;
+      gap: 8px;
+    }
+
+
+/* end of style for edit button */
+
+/* style for comment textbox */
+
+    .session-comment-wrapper {
+      margin-top: 12px;
+      padding: 12px;
+    }
+
+    .session-comment-input {
+      width: 90%;          /* take ~90% of the row width */
+      max-width: 90%;
+      min-width: 90%;
+      min-height: 5rem;    /* ~4–5 lines tall */
+      resize: vertical;    /* you can still drag bigger if you want */
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      padding: 10px;
+      font-size: 0.9rem;
+    }
+
+    /* end of style for textbox */
+
+
     .admin-layout {
       display: grid;
       grid-template-columns: 240px 1fr;
@@ -87,6 +164,16 @@
       font-size: 0.95rem;
       transition: opacity 0.2s;
     }
+
+    .btn-warning {
+      background: #facc15;
+      color: #111827;
+    }
+
+    .btn-warning:hover {
+      background: #eab308;
+    }
+
 
     .btn:hover {
       opacity: 0.9;
@@ -871,7 +958,8 @@
         }
         
         const hasComment = session.sessionSummary && session.sessionSummary.trim();
-        
+
+        // Main row
         html += `<tr class="session-row" onclick="toggleSessionComment('${session.id}')" style="${isSelected ? 'background: rgba(220, 53, 69, 0.1);' : ''}">
           <td onclick="event.stopPropagation()">
             <input type="checkbox" 
@@ -883,26 +971,138 @@
           <td>${session.studentName || session.studentNames || 'Unknown'}</td>
           <td>${session.subject || '-'}</td>
           <td class="action-buttons" onclick="event.stopPropagation()">
-            <button class="btn btn-danger btn-sm" onclick="deleteSession('${session.id}')">Delete</button>
+            <button class="btn btn-warning btn-sm" onclick="event.stopPropagation(); openEditSession('${session.id}')">
+              Edit
+            </button>
           </td>
-        </tr>
-        <tr id="comment-row-${session.id}" style="display: none;">
+        </tr>`;
+
+        // Detail + notes row
+        html += `
+        <tr id="comment-row-${session.id}" class="session-comment-row" style="display: none;">
           <td colspan="6">
-            ${hasComment ? `<div class="session-comment">
-              <div class="session-comment-header">
-                <span class="session-comment-author">Session Notes</span>
-                <button class="btn btn-secondary btn-sm" onclick="editComment('${session.id}')">Edit</button>
+            <div class="session-detail-wrapper">
+              <!-- EDIT SESSION FORM -->
+              <div class="edit-session-form" id="edit-form-${session.id}">
+                <h4>Edit session</h4>
+
+                <div class="edit-session-grid">
+                  <div class="edit-field">
+                    <label for="edit-date-${session.id}">Date</label>
+                    <input
+                      type="date"
+                      id="edit-date-${session.id}"
+                      value="${(session.sessionDate && session.sessionDate.toDate)
+                        ? session.sessionDate.toDate().toISOString().substring(0,10)
+                        : (session.sessionDate || '')}"
+                    />
+                  </div>
+
+                  <div class="edit-field">
+                    <label for="edit-start-${session.id}">Start time</label>
+                    <input
+                      type="time"
+                      id="edit-start-${session.id}"
+                      value="${session.startTime || ''}"
+                    />
+                  </div>
+
+                  <div class="edit-field">
+                    <label for="edit-end-${session.id}">End time</label>
+                    <input
+                      type="time"
+                      id="edit-end-${session.id}"
+                      value="${session.endTime || ''}"
+                    />
+                  </div>
+
+                  <div class="edit-field">
+                    <label for="edit-students-${session.id}">Student(s)</label>
+                    <input
+                      type="text"
+                      id="edit-students-${session.id}"
+                      value="${session.studentNames || session.students || ''}"
+                    />
+                  </div>
+
+                  <div class="edit-field">
+                    <label for="edit-subject-${session.id}">Subject</label>
+                    <input
+                      type="text"
+                      id="edit-subject-${session.id}"
+                      value="${session.subject || ''}"
+                    />
+                  </div>
+
+                  <div class="edit-field edit-field-inline">
+                    <label for="edit-includeSummary-${session.id}">
+                      <input
+                        type="checkbox"
+                        id="edit-includeSummary-${session.id}"
+                        ${session.includeSummary ? 'checked' : ''}
+                      />
+                      Include summary for parent
+                    </label>
+                  </div>
+
+                  <div class="edit-field">
+                    <label for="edit-cost-${session.id}">Cost</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      id="edit-cost-${session.id}"
+                      value="${session.cost || ''}"
+                    />
+                  </div>
+
+                  <div class="edit-field edit-field-notes">
+                    <label for="edit-notes-${session.id}">Questions / notes from guardian</label>
+                    <textarea
+                      id="edit-notes-${session.id}"
+                      rows="2"
+                    >${session.notes || ''}</textarea>
+                  </div>
+                </div>
+
+                <div class="edit-session-actions">
+                  <button class="btn btn-warning btn-sm"
+                          onclick="event.stopPropagation(); saveSessionChanges('${session.id}')">
+                    Save changes
+                  </button>
+                  <button class="btn btn-secondary btn-sm"
+                          onclick="event.stopPropagation(); cancelSessionEdit('${session.id}')">
+                    Cancel
+                  </button>
+                </div>
               </div>
-              <div class="session-comment-text">${session.sessionSummary}</div>
-            </div>` : ''}
-            <div class="comment-form" id="comment-form-${session.id}" style="${hasComment ? 'display: none;' : ''}">
-              <textarea id="comment-input-${session.id}" placeholder="Add session notes (summary, student info, homework)...">${session.sessionSummary || ''}</textarea>
-              <button class="btn btn-sm" onclick="saveComment('${session.id}')">Save Comment</button>
-              <button class="btn btn-secondary btn-sm" onclick="cancelComment('${session.id}')">Cancel</button>
+
+              <!-- TUTOR NOTES SECTION -->
+              <div class="session-comment-wrapper">
+                <textarea
+                  id="comment-input-${session.id}"
+                  class="session-comment-input"
+                  placeholder="Add session notes (summary, student info, homework)..."
+                >${session.sessionSummary || ''}</textarea>
+
+                <div class="session-comment-actions">
+                  <button class="btn btn-primary btn-sm"
+                          onclick="event.stopPropagation(); saveComment('${session.id}')">
+                    Save Comment
+                  </button>
+                  <button class="btn btn-secondary btn-sm"
+                          onclick="event.stopPropagation(); cancelComment('${session.id}')">
+                    Cancel
+                  </button>
+                </div>
+              </div>
             </div>
           </td>
         </tr>`;
       });
+
+
+
+
 
       html += '</tbody></table></div>';
         return html;
@@ -929,11 +1129,141 @@
       renderSessions(filtered);
     };
 
+// Open the edit form for a session (used by the yellow Edit button)
+window.openEditSession = function (sessionId) {
+  const row = document.getElementById(`comment-row-${sessionId}`);
+  const editForm = document.getElementById(`edit-form-${sessionId}`);
+
+  // Always open detail row
+  row.style.display = 'table-row';
+
+  // SHOW edit section
+  editForm.style.display = 'block';
+
+  // HIDE notes section
+  const notesSection = row.querySelector('.session-comment-wrapper');
+  if (notesSection) notesSection.style.display = 'none';
+
+  editForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
+
+
+// Close the edit form (hides the detail row)
+window.cancelSessionEdit = function (sessionId) {
+  const row = document.getElementById(`comment-row-${sessionId}`);
+  const editForm = document.getElementById(`edit-form-${sessionId}`);
+  const notesSection = row.querySelector('.session-comment-wrapper');
+
+  editForm.style.display = 'none';
+  notesSection.style.display = 'none';
+  row.style.display = 'none';
+};
+
+
+// Save changes from the edit form
+window.saveSessionChanges = async function (sessionId) {
+  try {
+    const dateEl     = document.getElementById(`edit-date-${sessionId}`);
+    const startEl    = document.getElementById(`edit-start-${sessionId}`);
+    const endEl      = document.getElementById(`edit-end-${sessionId}`);
+    const studentsEl = document.getElementById(`edit-students-${sessionId}`);
+    const subjectEl  = document.getElementById(`edit-subject-${sessionId}`);
+    const includeEl  = document.getElementById(`edit-includeSummary-${sessionId}`);
+    const costEl     = document.getElementById(`edit-cost-${sessionId}`);
+    const notesEl    = document.getElementById(`edit-notes-${sessionId}`);
+
+    const sessionDate   = dateEl?.value;
+    const startTime     = startEl?.value;
+    const endTime       = endEl?.value;
+    const studentNames  = studentsEl?.value || '';
+    const subject       = subjectEl?.value || '';
+    const includeSummary = !!(includeEl && includeEl.checked);
+    const cost          = costEl?.value || '';
+    const notes         = notesEl?.value || '';
+
+    if (!sessionDate || !startTime || !endTime) {
+      alert('Please set date, start time, and end time.');
+      return;
+    }
+
+    const session = allSessions.find(s => s.id === sessionId);
+    if (!session) {
+      alert('Could not find this session in memory.');
+      return;
+    }
+
+    const bookingId = session.bookingId || sessionId;
+    const eventId   = session.eventId || null;
+
+    // 1) Update Firestore
+    const bookingRef = doc(db, 'bookings', sessionId);
+    await updateDoc(bookingRef, {
+      sessionDate,
+      startTime,
+      endTime,
+      studentNames,
+      subject,
+      includeSummary,
+      notes,
+      cost,
+    });
+
+    // 2) Update Google Calendar via Apps Script
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec';
+
+    const payload = {
+      action: 'updateCalendarEvent',
+      bookingId,
+      eventId,
+      sessionDate,
+      startTime,
+      endTime,
+      studentNames,
+      subject,
+      includeSummary,
+      notes,
+      cost,
+      guardianName: session.guardianName || '',
+      guardianEmail: session.guardianEmail || '',
+    };
+
+    const formData = new URLSearchParams();
+    formData.append('payload', JSON.stringify(payload));
+
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const result = await res.json();
+
+    if (!result.success) {
+      console.error('Calendar update failed:', result);
+      alert('Session saved, but calendar update failed: ' + (result.message || 'Unknown error'));
+    } else {
+      if (result.data && result.data.eventId) {
+        session.eventId = result.data.eventId;
+      }
+      alert('Session updated and calendar synced.');
+    }
+
+    await loadSessions();
+  } catch (err) {
+    console.error('Error saving session changes:', err);
+    alert('Error saving changes: ' + err.message);
+  } finally {
+    cancelSessionEdit(sessionId);
+  }
+};
+
+
+
     window.deleteSelectedSessions = async () => {
       if (selectedSessionIds.size === 0) {
         alert('Please select at least one session to delete.');
         return;
       }
+
 
       if (!confirm(`Delete ${selectedSessionIds.size} selected session(s)? This will also remove them from Google Calendar. This cannot be undone.`)) {
         return;
@@ -1769,15 +2099,13 @@
                 throw new Error(json.message || 'Apps Script returned an error.');
                 }
 
-                successCount++;
-                // ALSO update Firestore to match what we synced
-                const updateDoc = window.firestoreUpdateDoc;
-                const docRef = window.firestoreDoc(db, "bookings", bookingId);
-                await updateDoc(docRef, {
-                sessionDate: syncData.sessionDate,
-                startTime: syncData.startTime,
-                endTime: syncData.endTime
-                });
+            // Update Firestore after syncing to Google Calendar
+            const bookingRef = doc(db, "bookings", bookingDoc.id);
+            await updateDoc(bookingRef, {
+              eventId: json.data?.eventId || null,   // store event ID for future updates
+              syncedAt: serverTimestamp()
+            });
+
 
                 console.log(`Synced booking ${bookingDoc.id}`);
 
@@ -1910,11 +2238,20 @@
 
     // Comment Functions
     window.toggleSessionComment = (sessionId) => {
-      const commentRow = document.getElementById(`comment-row-${sessionId}`);
-      if (commentRow.style.display === 'none') {
-        commentRow.style.display = 'table-row';
-      } else {
-        commentRow.style.display = 'none';
+      const row = document.getElementById(`comment-row-${sessionId}`);
+
+      // Toggle the row
+      const isHidden = row.style.display === 'none';
+      row.style.display = isHidden ? 'table-row' : 'none';
+
+      // NOTES visible only when user clicked the row
+      const notesSection = row.querySelector('.session-comment-wrapper');
+      const editForm = document.getElementById(`edit-form-${sessionId}`);
+
+      if (isHidden) {
+        // User just opened it → show notes ONLY
+        notesSection.style.display = 'block';
+        editForm.style.display = 'none';
       }
     };
 
