@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>My Sessions – Amit Tutoring</title>
+  <title>Sessions – Amit Tutoring</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="style.css" />
   <style>
@@ -90,8 +90,8 @@
     <h1 class="logo"><a href="index.html">Amit Tutoring</a></h1>
 
     <nav>
-      <a href="dashboard.html">My Dashboard</a>
-      <a href="sessions.html" class="active">My Sessions</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="sessions.html" class="active">Sessions</a>
     </nav>
 
     <div class="header-right">
@@ -107,7 +107,7 @@
 <main class="container">
   <div class="flex-between mb-1">
     <div>
-      <h2 class="m-0">My Sessions</h2>
+      <h2 class="m-0">Sessions</h2>
       <p class="mt-0-5rem">View all your past and upcoming tutoring sessions.</p>
     </div>
     <button class="btn primary" onclick="window.location.href='book-session.html'">Book Session</button>
@@ -328,7 +328,7 @@
     // Display upcoming sessions
     const upcomingContent = document.getElementById("upcoming-sessions-content");
     if (upcoming.length === 0) {
-      upcomingContent.innerHTML = '<div class="empty-state">No upcoming sessions scheduled. <a href="book-session.html">Book a session</a> to get started!</div>';
+      upcomingContent.innerHTML = '<div class="empty-state">No upcoming sessions scheduled. <br> <a href="book-session.html">Book a session</a> to get started!</div>';
     } else {
       upcomingContent.innerHTML = `
         <table class="sessions-table">

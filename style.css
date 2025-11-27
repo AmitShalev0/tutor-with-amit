@@ -494,9 +494,17 @@ nav .login-link:hover {
     padding: 0 12px;
   }
 
-  .header-inner {
+  /* .header-inner {
     grid-template-columns: 1fr;
     gap: 8px;
+    padding: 8px 0;
+  } */
+
+    .header-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
     padding: 8px 0;
   }
 
@@ -910,4 +918,35 @@ nav .login-link:hover {
 .week-display {
   font-weight: bold;
   font-size: 0.95rem;
+}
+
+/* --- Mobile: Move switch-slider to right and align with nav --- */
+@media (max-width: 480px) {
+  .header-inner {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    padding: 8px 0;
+  }
+  nav {
+    flex: 1;
+    justify-content: flex-start;
+    gap: 4px;
+  }
+  .header-right {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-left: auto;
+    margin-right: 0;
+    order: 2;
+  }
+  .theme-switch {
+    margin-left: auto;
+    margin-right: 0;
+    order: 3;
+  }
 }
