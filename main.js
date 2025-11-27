@@ -176,6 +176,25 @@ async function setupUserGreeting() {
     currentTime.style.fontSize = '0.75rem';
   }
 
+  function generateRecurringDates(startDate, recurringEnd) {
+    const dates = [];
+    let current = new Date(startDate);
+    const end = new Date(recurringEnd);
+
+    while (current <= end) {
+      const y = current.getFullYear();
+      const m = String(current.getMonth() + 1).padStart(2, "0");
+      const d = String(current.getDate()).padStart(2, "0");
+
+      dates.push(`${y}-${m}-${d}`); // YYYY-MM-DD
+
+      current.setDate(current.getDate() + 7); // weekly recurrence
+    }
+
+    return dates;
+  }
+
+
   // Wait for Firebase to be ready before setting up auth listener
   function waitForFirebase() {
     return new Promise((resolve) => {

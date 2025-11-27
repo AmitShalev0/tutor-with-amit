@@ -401,7 +401,7 @@
     const studentComments = session.comments || session.notes || session.additionalComments || '';
     const studentCommentsHtml = studentComments 
       ? `<div style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.5;">${studentComments}</div>`
-      : '<div style="color: #b0b0b5; font-style: italic;">No comments</div>';
+      : '<div style="color: #b0b0b5; font-style: italic;"></div>';
     
     // Tutor's session notes (separate from student comments)
     const tutorNotes = session.sessionSummary || '';

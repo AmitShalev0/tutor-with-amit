@@ -1260,131 +1260,117 @@
     // Bulk approval function - groups emails by guardian
     window.approveSelectedBookings = async () => {
       if (selectedBookingIds.size === 0) {
-        alert('Please select at least one booking to approve.');
+        alert("Please select at least one booking to approve.");
         return;
       }
 
-      if (!confirm(`Approve ${selectedBookingIds.size} selected booking(s)? This will add them to Google Calendar and send confirmation emails grouped by student.`)) {
+      if (!confirm(`Approve ${selectedBookingIds.size} selected booking(s)? This will send one email per guardian containing all approved sessions.`)) {
         return;
       }
 
-      const results = {
-        success: [],
-        failed: []
-      };
+      const results = { success: [], failed: [] };
 
       try {
-        // Group bookings by guardianEmail
+        // 1️⃣ Group bookings by guardian email
         const bookingsByGuardian = new Map();
 
         for (const bookingId of selectedBookingIds) {
           try {
-            const bookingRef = doc(db, 'bookings', bookingId);
-            const bookingDoc = await getDoc(bookingRef);
-            
-            if (!bookingDoc.exists()) {
-              results.failed.push({ id: bookingId, error: 'Booking not found' });
+            const ref = doc(db, "bookings", bookingId);
+            const snap = await getDoc(ref);
+
+            if (!snap.exists()) {
+              results.failed.push({ id: bookingId, error: "Not found" });
               continue;
             }
 
-            const booking = { id: bookingId, ...bookingDoc.data() };
-            const guardianEmail = booking.guardianEmail || booking.email;
+            const booking = { id: bookingId, ...snap.data() };
+            const email = booking.guardianEmail || booking.email;
 
-            if (!bookingsByGuardian.has(guardianEmail)) {
-              bookingsByGuardian.set(guardianEmail, []);
+            if (!bookingsByGuardian.has(email)) {
+              bookingsByGuardian.set(email, []);
             }
-            bookingsByGuardian.get(guardianEmail).push(booking);
+            bookingsByGuardian.get(email).push(booking);
 
           } catch (error) {
-            console.error(`Error fetching booking ${bookingId}:`, error);
+            console.error("Fetch error:", error);
             results.failed.push({ id: bookingId, error: error.message });
           }
         }
 
-        // Process each booking: approve in Firestore and sync to calendar
+        // 2️⃣ Process each guardian ONCE
         for (const [guardianEmail, bookings] of bookingsByGuardian) {
           console.log(`Processing ${bookings.length} bookings for ${guardianEmail}`);
 
-          for (const booking of bookings) {
-            try {
-              const bookingRef = doc(db, 'bookings', booking.id);
+          // 2A — Mark all bookings approved in Firestore
+          for (const b of bookings) {
+            const ref = doc(db, "bookings", b.id);
+            await updateDoc(ref, {
+              status: "approved",
+              approvedAt: serverTimestamp(),
+              bookingId: b.id
+            });
+          }
 
-              // Update Firestore status
-              await updateDoc(bookingRef, {
-                status: 'approved',
-                approvedAt: serverTimestamp(),
-                bookingId: booking.id
-              });
+          // 2B — Build ONE bulkApprove payload
+          const syncData = {
+            action: "bulkApprove",
+            guardianEmail,
+            guardianName: bookings[0].guardianName,
+            sessions: bookings.map(b => ({
+              bookingId: b.id,
+              sessionDate: b.sessionDate,
+              startTime: b.startTime,
+              endTime: b.endTime,
+              studentNames: b.studentNames || b.studentName,
+              subject: b.subject,
+              comments: b.comments || b.notes || ""
+            }))
+          };
 
-              console.log(`Approved booking ${booking.id}, syncing to calendar...`);
+          // 2C — Send ONE request per guardian
+          try {
+            const APPS_SCRIPT_URL =
+              "https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec";
 
-              // Sync to Google Calendar
-              const syncData = {
-                action: 'syncToCalendar',
-                bookingId: booking.id,
-                sessionDate: booking.sessionDate,
-                startTime: booking.startTime,
-                endTime: booking.endTime,
-                studentNames: booking.studentNames || booking.studentName,
-                subject: booking.subject,
-                guardianName: booking.guardianName,
-                guardianEmail: guardianEmail,
-                comments: booking.comments || booking.notes || ''
-              };
+            const formData = new URLSearchParams();
+            formData.append("payload", JSON.stringify(syncData));
 
-              const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec';
+            const res = await fetch(APPS_SCRIPT_URL, {
+              method: "POST",
+              body: formData
+            });
 
-              const formData = new URLSearchParams();
-              formData.append('payload', JSON.stringify(syncData));
+            const json = await res.json();
 
-              const res = await fetch(APPS_SCRIPT_URL, {
-                method: 'POST',
-                body: formData
-              });
-
-              const json = await res.json();
-
-              if (!json.success) {
-                throw new Error(json.message || 'Calendar sync failed');
-              }
-
-              // Save eventId
-              if (json.data && json.data.eventId) {
-                await updateDoc(bookingRef, {
-                  eventId: json.data.eventId
-                });
-              }
-
-              results.success.push(booking.id);
-
-            } catch (error) {
-              console.error(`Error approving booking ${booking.id}:`, error);
-              results.failed.push({ id: booking.id, error: error.message });
+            if (!json.success) {
+              throw new Error(json.message || "Bulk approve failed");
             }
+
+            bookings.forEach(b => results.success.push(b.id));
+
+          } catch (error) {
+            console.error(`Bulk email error for ${guardianEmail}:`, error);
+            bookings.forEach(b => results.failed.push({ id: b.id, error: error.message }));
           }
         }
 
-        // Clear selection
+        // 3️⃣ Clear selection and refresh UI
         selectedBookingIds.clear();
 
-        // Show results
-        let message = `✅ Successfully approved ${results.success.length} booking(s)`;
-        if (results.failed.length > 0) {
-          message += `\n⚠️ Failed to approve ${results.failed.length} booking(s)`;
-        }
-        message += '\n\nNote: Grouped confirmation emails will be sent by the backend sync process.';
+        let msg = `✅ Approved ${results.success.length} booking(s)`;
+        if (results.failed.length > 0) msg += `\n⚠️ Failed: ${results.failed.length}`;
+        alert(msg);
 
-        alert(message);
-
-        // Reload data
         loadBookings();
         loadDashboard();
 
       } catch (error) {
-        console.error('Error in bulk approval:', error);
-        alert('Error during bulk approval: ' + error.message);
+        console.error("Bulk approval error:", error);
+        alert("Bulk approval failed: " + error.message);
       }
     };
+
 
     // Bulk rejection function
     window.rejectSelectedBookings = async () => {
