@@ -1237,6 +1237,10 @@ window.saveSessionChanges = async function (sessionId) {
 
     const result = await res.json();
 
+    if (result.success && result.data && result.data.eventId) {
+      await updateDoc(bookingRef, { eventId: result.data.eventId });
+    }
+
     if (!result.success) {
       console.error('Calendar update failed:', result);
       alert('Session saved, but calendar update failed: ' + (result.message || 'Unknown error'));

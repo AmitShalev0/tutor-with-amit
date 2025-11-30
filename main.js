@@ -464,7 +464,15 @@ function setupBookingForm() {
 
   let selectedBlockId = null;
   let selectedBlockElem = null;
-  let currentWeekOffset = 0; // 0 = current week, 1 = next week, etc.
+  // Show next week if today is Friday, Saturday, or Sunday
+  let currentWeekOffset = 0;
+  {
+    const today = new Date();
+    const day = today.getDay(); // 0=Sunday, 5=Friday, 6=Saturday
+    if (day === 5 || day === 6 || day === 0) {
+      currentWeekOffset = 1;
+    }
+  }
 
   // Function to populate start time dropdown with 15-minute intervals
   function populateStartTimeOptions() {
