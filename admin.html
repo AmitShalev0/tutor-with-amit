@@ -14,52 +14,74 @@
       gap: 16px;
     }
 
-    .edit-session-form h4 {
-      margin-bottom: 8px;
-      font-size: 0.95rem;
-      color: #e5e7eb;
+    .session-select-cell,
+    .data-table th.session-select-header {
+      position: relative;
+      padding-left: 40px;
     }
 
-    .edit-session-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-      gap: 8px 16px;
+    .session-select-cell.has-toggle {
+      padding-left: 40px;
     }
 
-    .edit-field {
+    .session-select-inner {
       display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .edit-field-inline {
-      flex-direction: row;
       align-items: center;
+      gap: 12px;
     }
 
-    .edit-field-notes textarea {
+    .checkbox-slot {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .checkbox-slot.small {
+      width: 16px;
+    }
+
+    .checkbox-slot.large {
+      width: 18px;
+    }
+
+    .checkbox-placeholder {
+      visibility: hidden;
+    }
+
+    .checkbox-slot input {
       width: 100%;
+      height: 100%;
     }
 
-    .edit-session-form input,
-    .edit-session-form textarea {
-      background: #111827;
-      border: 1px solid #374151;
-      color: #e5e7eb;
-      border-radius: 6px;
-      padding: 4px 8px;
+    .session-checkbox {
+      width: 16px;
+      height: 16px;
     }
 
-    .edit-session-actions {
-      margin-top: 8px;
-      display: flex;
-      gap: 8px;
+    .session-checkbox.session-checkbox-multi {
+      width: 18px;
+      height: 18px;
     }
 
+    .group-select-all {
+      width: 18px;
+      height: 18px;
+    }
 
-/* end of style for edit button */
-
-/* style for comment textbox */
+    .group-toggle-btn {
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 32px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      margin: 0;
+      padding: 0;
+    }
 
     .session-comment-wrapper {
       margin-top: 12px;
@@ -81,6 +103,18 @@
     }
 
     /* end of style for textbox */
+
+    .modal-subtle-text {
+      margin-top: 0;
+      color: var(--muted);
+    }
+
+    .modal-action-row {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      margin-top: 24px;
+    }
 
 
     .admin-layout {
@@ -154,6 +188,12 @@
       font-size: 1.75rem;
     }
 
+    .section-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
     .btn {
       background: var(--accent);
       color: white;
@@ -166,12 +206,12 @@
     }
 
     .btn-warning {
-      background: #facc15;
+      background: rgba(244, 200, 110, 0.82);
       color: #111827;
     }
 
     .btn-warning:hover {
-      background: #eab308;
+      background: rgba(230, 176, 72, 0.88);
     }
 
 
@@ -231,6 +271,40 @@
 
     .data-table tr:hover {
       background: var(--surface-alt);
+    }
+
+    .data-table tr.conflict-row {
+      background: rgba(244, 63, 94, 0.18);
+    }
+
+    .data-table tr.conflict-row:hover {
+      background: rgba(244, 63, 94, 0.25);
+    }
+
+    .data-table tr.selected-row {
+      background: rgba(102, 126, 234, 0.15);
+    }
+
+    .data-table tr.selected-row:hover {
+      background: rgba(102, 126, 234, 0.22);
+    }
+
+    .data-table tr.pending-conflict {
+      background: rgba(250, 204, 21, 0.18);
+    }
+
+    .data-table tr.pending-conflict:hover {
+      background: rgba(250, 204, 21, 0.24);
+    }
+
+    .data-table tr.conflict-row.selected-row,
+    .data-table tr.selected-row.conflict-row {
+      background: rgba(244, 63, 94, 0.28);
+    }
+
+    .data-table tr.pending-conflict.selected-row,
+    .data-table tr.selected-row.pending-conflict {
+      background: rgba(250, 204, 21, 0.26);
     }
 
     .status-badge {
@@ -312,6 +386,8 @@
 
     .action-buttons {
       display: flex;
+      justify-content: flex-end;
+      align-items: center;
       gap: 8px;
     }
 
@@ -477,6 +553,22 @@
     .session-row.expanded {
       background: var(--surface-alt);
     }
+
+    .session-row.session-conflict {
+      background: rgba(244, 63, 94, 0.2) !important;
+    }
+
+    .session-row.session-conflict:hover {
+      background: rgba(244, 63, 94, 0.28) !important;
+    }
+
+    .recurring-child {
+      background: rgba(59, 130, 246, 0.08);
+    }
+
+    .recurring-child:hover {
+      background: rgba(59, 130, 246, 0.12);
+    }
   </style>
 </head>
 <body>
@@ -503,6 +595,7 @@
         <li><button onclick="showSection('bookings')" class="nav-btn" data-section="bookings">📝 Booking Approvals</button></li>
         <li><button onclick="showSection('students')" class="nav-btn" data-section="students">👥 Students</button></li>
         <li><button onclick="showSection('users')" class="nav-btn" data-section="users">🔐 Users</button></li>
+        <li><button onclick="showSection('blocked')" class="nav-btn" data-section="blocked">🚫 Blocked Emails</button></li>
         <li><button onclick="showSection('sync')" class="nav-btn" data-section="sync">🔄 Calendar Sync</button></li>
         <li><button onclick="showSection('invoices')" class="nav-btn" data-section="invoices">💰 Invoices</button></li>
       </ul>
@@ -542,6 +635,7 @@
           <h2>Sessions</h2>
           <div style="display: flex; gap: 0.5rem;">
             <button class="btn btn-danger" id="delete-selected-sessions-btn" onclick="deleteSelectedSessions()" style="display: none;">Delete Selected (<span id="selected-sessions-count">0</span>)</button>
+            <button class="btn btn-warning" id="bulk-edit-times-btn" onclick="openBulkEditModal()" style="display: none;">Edit Selected Times</button>
             <button class="btn" onclick="loadSessions()">🔄 Refresh</button>
           </div>
         </div>
@@ -579,6 +673,18 @@
           <button class="btn" onclick="loadUsers()">🔄 Refresh</button>
         </div>
         <div id="users-container" class="loading">Loading users...</div>
+      </section>
+
+      <!-- Blocked Emails -->
+      <section id="blocked-section" class="admin-section">
+        <div class="section-header">
+          <h2>Blocked Emails</h2>
+          <div class="section-actions">
+            <button class="btn" onclick="loadBlockedEmails()">🔄 Refresh</button>
+            <button class="btn btn-secondary" onclick="addBlockedEmail()">+ Add Blocked Email</button>
+          </div>
+        </div>
+        <div id="blocked-container" class="loading">Loading blocked emails...</div>
       </section>
 
       <!-- Calendar Sync -->
@@ -661,6 +767,34 @@
     </div>
   </div>
 
+  <!-- Bulk Edit Sessions Modal -->
+  <div id="bulk-edit-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Edit Recurring Sessions</h3>
+        <button class="modal-close" onclick="closeBulkEditModal()">×</button>
+      </div>
+      <form id="bulk-edit-form" onsubmit="submitBulkEdit(event)">
+        <p id="bulk-edit-count" class="modal-subtle-text"></p>
+
+        <div class="form-group">
+          <label for="bulk-start-time">Start Time</label>
+          <input type="time" id="bulk-start-time" required>
+        </div>
+
+        <div class="form-group">
+          <label for="bulk-end-time">End Time</label>
+          <input type="time" id="bulk-end-time" required>
+        </div>
+
+        <div class="modal-action-row">
+          <button type="button" class="btn btn-secondary" onclick="closeBulkEditModal()">Cancel</button>
+          <button type="submit" class="btn btn-warning" id="bulk-edit-submit-btn">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script type="module">
     import { auth, db, onAuthStateChanged, signOut, collection, getDocs, getDoc, query, where, orderBy, deleteDoc, doc, updateDoc, setDoc, serverTimestamp } from './firebase.js';
 
@@ -668,6 +802,33 @@
     let currentUser = null;
     let allSessions = [];
     let allStudents = [];
+    let currentRenderedSessions = [];
+    let currentRenderedSessionIds = [];
+    let recurringGroupSessions = new Map();
+    let expandedRecurringGroupIds = new Set();
+    let bulkEditSessionIds = [];
+    let bulkEditRecurringKey = null;
+
+    async function shouldSuppressApprovalEmail(booking) {
+      try {
+        if (!booking || !booking.userId) {
+          return false;
+        }
+
+        const userRef = doc(db, 'users', booking.userId);
+        const userSnap = await getDoc(userRef);
+
+        if (!userSnap.exists()) {
+          return false;
+        }
+
+        const userData = userSnap.data();
+        return userData.notifyBookingApproved === false;
+      } catch (err) {
+        console.warn('Email preference lookup failed:', err);
+        return false;
+      }
+    }
 
     // Check authentication
     onAuthStateChanged(auth, (user) => {
@@ -691,6 +852,7 @@
       loadBookings();
       loadStudents();
       loadUsers();
+      loadBlockedEmails();
     });
 
     // Navigation
@@ -744,6 +906,14 @@
         const snapshot = await getDocs(q);
 
         if (snapshot.empty) {
+          currentRenderedSessions = [];
+          currentRenderedSessionIds = [];
+          selectedSessionIds.clear();
+          expandedRecurringGroupIds.clear();
+          recurringGroupSessions = new Map();
+          bulkEditSessionIds = [];
+          bulkEditRecurringKey = null;
+          updateSessionSelectionUI();
           container.innerHTML = '<div class="empty-state"><h3>No sessions found</h3><p>Sessions will appear here once users book them.</p></div>';
           return;
         }
@@ -755,11 +925,23 @@
 
         // Clear selection when reloading
         selectedSessionIds.clear();
+        expandedRecurringGroupIds.clear();
+        recurringGroupSessions = new Map();
+        bulkEditSessionIds = [];
+        bulkEditRecurringKey = null;
         updateSessionSelectionUI();
         
         renderSessions(allSessions);
       } catch (error) {
         console.error('Error loading sessions:', error);
+        currentRenderedSessions = [];
+        currentRenderedSessionIds = [];
+        selectedSessionIds.clear();
+        expandedRecurringGroupIds.clear();
+        recurringGroupSessions = new Map();
+        bulkEditSessionIds = [];
+        bulkEditRecurringKey = null;
+        updateSessionSelectionUI();
         container.innerHTML = `<div class="empty-state"><h3>Error loading sessions</h3><p>${error.message}</p></div>`;
       }
     };
@@ -771,30 +953,119 @@
         selectedSessionIds.add(sessionId);
       }
       updateSessionSelectionUI();
-      renderSessions(allSessions);
+      renderSessions(currentRenderedSessions);
     };
 
     window.toggleAllSessions = () => {
-      if (selectedSessionIds.size === allSessions.length) {
-        selectedSessionIds.clear();
+      if (!currentRenderedSessionIds.length) {
+        return;
+      }
+
+      const allVisibleSelected = currentRenderedSessionIds.every(id => selectedSessionIds.has(id));
+
+      if (allVisibleSelected) {
+        currentRenderedSessionIds.forEach(id => selectedSessionIds.delete(id));
       } else {
-        selectedSessionIds = new Set(allSessions.map(s => s.id));
+        currentRenderedSessionIds.forEach(id => selectedSessionIds.add(id));
       }
       updateSessionSelectionUI();
-      renderSessions(allSessions);
+      renderSessions(currentRenderedSessions);
+    };
+
+    window.toggleGroupSelection = (groupId) => {
+      const sessionIds = recurringGroupSessions.get(groupId) || [];
+      if (!sessionIds.length) {
+        return;
+      }
+
+      const allSelected = sessionIds.every(id => selectedSessionIds.has(id));
+
+      if (allSelected) {
+        sessionIds.forEach(id => selectedSessionIds.delete(id));
+      } else {
+        sessionIds.forEach(id => selectedSessionIds.add(id));
+      }
+
+      updateSessionSelectionUI();
+      renderSessions(currentRenderedSessions);
+    };
+
+    window.toggleRecurringGroup = (groupId) => {
+      if (expandedRecurringGroupIds.has(groupId)) {
+        expandedRecurringGroupIds.delete(groupId);
+      } else {
+        expandedRecurringGroupIds.add(groupId);
+      }
+
+      renderSessions(currentRenderedSessions);
     };
 
     function updateSessionSelectionUI() {
       const count = selectedSessionIds.size;
-      const btn = document.getElementById('delete-selected-sessions-btn');
+      const deleteBtn = document.getElementById('delete-selected-sessions-btn');
       const countSpan = document.getElementById('selected-sessions-count');
-      
-      if (count > 0) {
-        btn.style.display = 'block';
+      const bulkEditBtn = document.getElementById('bulk-edit-times-btn');
+
+      if (deleteBtn) {
+        if (count > 0) {
+          deleteBtn.style.display = 'block';
+          if (countSpan) {
+            countSpan.textContent = count;
+          }
+        } else {
+          deleteBtn.style.display = 'none';
+          if (countSpan) {
+            countSpan.textContent = '0';
+          }
+        }
+      } else if (countSpan) {
         countSpan.textContent = count;
-      } else {
-        btn.style.display = 'none';
       }
+
+      let canBulkEdit = false;
+      let eligibleIds = [];
+      let recurringKey = null;
+
+      if (count >= 2) {
+        const ids = Array.from(selectedSessionIds);
+        for (const sessionId of ids) {
+          const session = allSessions.find(s => s.id === sessionId);
+          if (!session || !session._recurringKey) {
+            canBulkEdit = false;
+            recurringKey = null;
+            eligibleIds = [];
+            break;
+          }
+
+          if (!recurringKey) {
+            recurringKey = session._recurringKey;
+            canBulkEdit = true;
+            eligibleIds.push(sessionId);
+            continue;
+          }
+
+          if (session._recurringKey !== recurringKey) {
+            canBulkEdit = false;
+            recurringKey = null;
+            eligibleIds = [];
+            break;
+          }
+
+          eligibleIds.push(sessionId);
+        }
+      }
+
+      if (bulkEditBtn) {
+        if (canBulkEdit && recurringKey) {
+          bulkEditBtn.style.display = 'block';
+          bulkEditBtn.textContent = `Edit Times (${eligibleIds.length})`;
+        } else {
+          bulkEditBtn.style.display = 'none';
+        }
+      }
+
+      bulkEditSessionIds = canBulkEdit && recurringKey ? eligibleIds : [];
+      bulkEditRecurringKey = canBulkEdit && recurringKey ? recurringKey : null;
     }
 
     window.sortSessions = (column) => {
@@ -804,10 +1075,14 @@
         sessionsSortColumn = column;
         sessionsSortDirection = 'asc';
       }
-      renderSessions(allSessions);
+      renderSessions(currentRenderedSessions);
     };
 
     function renderSessions(sessions) {
+      currentRenderedSessions = sessions;
+      currentRenderedSessionIds = [];
+      recurringGroupSessions = new Map();
+      const validRecurringGroupIds = new Set();
       const container = document.getElementById('sessions-container');
       
       if (sessions.length === 0) {
@@ -843,13 +1118,44 @@
         return d;
       };
 
+      const normalizeStudentKey = (session) => {
+        const raw = session.studentNames || session.studentName || session.students || '';
+        if (!raw) return '';
+        return raw
+          .split(',')
+          .map(name => name.trim().toLowerCase())
+          .filter(Boolean)
+          .sort()
+          .join('|');
+      };
+
       sessions.forEach(session => {
         const sessionDate = parseSessionDate(session.sessionDate);
         if (!sessionDate) return;
 
+        const dateKey = `${sessionDate.getFullYear()}-${String(sessionDate.getMonth() + 1).padStart(2, '0')}-${String(sessionDate.getDate()).padStart(2, '0')}`;
+        const startMinutes = timeStringToMinutes(session.startTime);
+        const endMinutes = deriveEndMinutes(startMinutes, session);
+
+        session._dateKey = dateKey;
+        session._startMinutes = startMinutes;
+        session._endMinutes = endMinutes;
+        session._hasConflict = false;
+        session._dayOfWeek = sessionDate.getDay();
+        session._studentKey = normalizeStudentKey(session);
+        session._sortDate = sessionDate.getTime();
+        const startKey = (session.startTime || '').trim();
+        const endKey = (session.endTime || '').trim();
+        if (session._dayOfWeek != null) {
+          session._recurringKey = `${session._dayOfWeek}|${startKey}|${endKey}|${session._studentKey}`;
+        } else {
+          session._recurringKey = null;
+        }
+
         // Check if session is past
         if (sessionDate < today) {
           pastSessions.push(session);
+          currentRenderedSessionIds.push(session.id);
         } else if (sessionDate.getTime() === today.getTime()) {
           // Today - check end time
           if (session.endTime) {
@@ -858,40 +1164,159 @@
             sessionEnd.setHours(hours, minutes, 0, 0);
             if (now >= sessionEnd) {
               pastSessions.push(session);
+              currentRenderedSessionIds.push(session.id);
             } else {
               upcomingSessions.push(session);
+              currentRenderedSessionIds.push(session.id);
             }
           } else {
             upcomingSessions.push(session);
+            currentRenderedSessionIds.push(session.id);
           }
         } else {
           upcomingSessions.push(session);
+          currentRenderedSessionIds.push(session.id);
         }
       });
+
+      const markConflicts = (list) => {
+        const byDate = new Map();
+
+        list.forEach(session => {
+          session._hasConflict = false;
+          if (!session._dateKey || session._startMinutes == null || session._endMinutes == null) {
+            return;
+          }
+          if (!byDate.has(session._dateKey)) {
+            byDate.set(session._dateKey, []);
+          }
+          byDate.get(session._dateKey).push(session);
+        });
+
+        byDate.forEach(sameDaySessions => {
+          if (sameDaySessions.length < 2) {
+            return;
+          }
+          sameDaySessions.sort((a, b) => a._startMinutes - b._startMinutes);
+          for (let i = 0; i < sameDaySessions.length; i++) {
+            for (let j = i + 1; j < sameDaySessions.length; j++) {
+              const first = sameDaySessions[i];
+              const second = sameDaySessions[j];
+              if (first._startMinutes < second._endMinutes && first._endMinutes > second._startMinutes) {
+                first._hasConflict = true;
+                second._hasConflict = true;
+              }
+            }
+          }
+        });
+      };
+
+      markConflicts(upcomingSessions);
+      markConflicts(pastSessions);
+
+      const buildRecurringDisplay = (list, tableType) => {
+        const groupsByKey = new Map();
+
+        list.forEach(session => {
+          if (session._dayOfWeek == null) return;
+          const studentKey = session._studentKey || '';
+          const startKey = (session.startTime || '').trim();
+          const endKey = (session.endTime || '').trim();
+          const groupKey = `${session._dayOfWeek}|${startKey}|${endKey}|${studentKey}`;
+
+          if (!groupsByKey.has(groupKey)) {
+            groupsByKey.set(groupKey, []);
+          }
+          session._recurringKey = groupKey;
+          groupsByKey.get(groupKey).push(session);
+        });
+
+        const seenKeys = new Set();
+        const displayItems = [];
+
+        list.forEach(session => {
+          const studentKey = session._studentKey || '';
+          const startKey = session.startTime || '';
+          const endKey = session.endTime || '';
+          const groupKey = `${session._dayOfWeek}|${startKey}|${endKey}|${studentKey}`;
+          const groupedSessions = groupsByKey.get(groupKey);
+
+          if (!groupedSessions || groupedSessions.length <= 1) {
+            displayItems.push(session);
+            return;
+          }
+
+          if (seenKeys.has(groupKey)) {
+            return;
+          }
+          seenKeys.add(groupKey);
+
+          let sortedGroup = [...groupedSessions].sort((a, b) => {
+            if (a._sortDate !== b._sortDate) return a._sortDate - b._sortDate;
+            if (a._startMinutes != null && b._startMinutes != null && a._startMinutes !== b._startMinutes) {
+              return a._startMinutes - b._startMinutes;
+            }
+            return a.id > b.id ? 1 : -1;
+          });
+
+          let primarySession;
+          if (tableType === 'past') {
+            primarySession = sortedGroup[sortedGroup.length - 1];
+            sortedGroup = [primarySession, ...sortedGroup.filter(s => s.id !== primarySession.id)];
+          } else {
+            primarySession = sortedGroup[0];
+          }
+
+          const safeKey = groupKey.replace(/[^a-z0-9]/gi, '_');
+          const groupId = `${tableType}-grp-${safeKey}`;
+
+          recurringGroupSessions.set(groupId, sortedGroup.map(s => s.id));
+          validRecurringGroupIds.add(groupId);
+
+          displayItems.push({
+            type: 'group',
+            groupId,
+            sessions: sortedGroup,
+            primarySession,
+            hasConflict: sortedGroup.some(s => s._hasConflict)
+          });
+        });
+
+        return displayItems;
+      };
+
+      const upcomingDisplayItems = buildRecurringDisplay(upcomingSessions, 'upcoming');
+      const pastDisplayItems = buildRecurringDisplay(pastSessions, 'past');
+
+      expandedRecurringGroupIds = new Set(
+        [...expandedRecurringGroupIds].filter(id => validRecurringGroupIds.has(id))
+      );
 
       // Sort function
       const sortSessionsList = (list) => {
         if (!sessionsSortColumn) return list;
         
         return [...list].sort((a, b) => {
+          const sourceA = a.type === 'group' ? a.primarySession : a;
+          const sourceB = b.type === 'group' ? b.primarySession : b;
           let aVal, bVal;
           
           switch (sessionsSortColumn) {
             case 'date':
-              aVal = a.sessionDate || '';
-              bVal = b.sessionDate || '';
+              aVal = sourceA.sessionDate || '';
+              bVal = sourceB.sessionDate || '';
               break;
             case 'time':
-              aVal = a.startTime || '';
-              bVal = b.startTime || '';
+              aVal = sourceA.startTime || '';
+              bVal = sourceB.startTime || '';
               break;
             case 'student':
-              aVal = (a.studentName || a.studentNames || '').toLowerCase();
-              bVal = (b.studentName || b.studentNames || '').toLowerCase();
+              aVal = (sourceA.studentName || sourceA.studentNames || '').toLowerCase();
+              bVal = (sourceB.studentName || sourceB.studentNames || '').toLowerCase();
               break;
             case 'subject':
-              aVal = (a.subject || '').toLowerCase();
-              bVal = (b.subject || '').toLowerCase();
+              aVal = (sourceA.subject || '').toLowerCase();
+              bVal = (sourceB.subject || '').toLowerCase();
               break;
             default:
               return 0;
@@ -915,12 +1340,20 @@
         
         let html = `<h3 style="margin-top: 1.5rem; margin-bottom: 1rem; color: var(--accent);">${title}</h3>`;
         html += '<div class="data-table"><table><thead><tr>';
+        const allVisibleSelected = currentRenderedSessionIds.length > 0 && currentRenderedSessionIds.every(id => selectedSessionIds.has(id));
+
         html += `
-          <th>
-            <input type="checkbox" 
-              ${selectedSessionIds.size === allSessions.length ? 'checked' : ''} 
-              onchange="toggleAllSessions()"
-              title="Select all">
+          <th class="session-select-header">
+            <div class="session-select-inner">
+              <span class="checkbox-slot small checkbox-placeholder"></span>
+              <span class="checkbox-slot large">
+                <input type="checkbox" 
+                  class="session-checkbox session-checkbox-multi session-select-all-checkbox"
+                  ${allVisibleSelected ? 'checked' : ''} 
+                  onchange="toggleAllSessions()"
+                  title="Select all visible sessions">
+              </span>
+            </div>
           </th>
           <th style="cursor: pointer;" onclick="sortSessions('date')">
             Date ${getSortIcon('date')}
@@ -937,48 +1370,25 @@
           <th>Actions</th>`;
         html += '</tr></thead><tbody>';
 
-        sortedList.forEach(session => {
-        const isSelected = selectedSessionIds.has(session.id);
+        const formatSessionDate = (session) => {
+          const dateValue = session.sessionDate;
+          let date = 'Invalid Date';
 
-        const dateValue = session.sessionDate;
-        let date = 'Invalid Date';
+          if (dateValue) {
+            if (dateValue.toDate) {
+              date = dateValue.toDate().toLocaleDateString();
+            } else if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+              const d = new Date(dateValue + 'T00:00:00');
+              date = d.toLocaleDateString();
+            } else {
+              date = new Date(dateValue).toLocaleDateString();
+            }
+          }
 
-        if (dateValue) {
-        if (dateValue.toDate) {
-            // Firestore Timestamp
-            date = dateValue.toDate().toLocaleDateString();
-        } else if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
-            // Plain "YYYY-MM-DD" string -> treat as LOCAL date, not UTC
-            const d = new Date(dateValue + 'T00:00:00');  // local midnight
-            date = d.toLocaleDateString();
-        } else {
-            // Fallback for other formats
-            date = new Date(dateValue).toLocaleDateString();
-        }
-        }
-        
-        const hasComment = session.sessionSummary && session.sessionSummary.trim();
+          return date;
+        };
 
-        // Main row
-        html += `<tr class="session-row" onclick="toggleSessionComment('${session.id}')" style="${isSelected ? 'background: rgba(220, 53, 69, 0.1);' : ''}">
-          <td onclick="event.stopPropagation()">
-            <input type="checkbox" 
-              ${isSelected ? 'checked' : ''} 
-              onchange="toggleSessionSelection('${session.id}')">
-          </td>
-          <td>${date}</td>
-          <td>${session.startTime || '-'} - ${session.endTime || '-'}</td>
-          <td>${session.studentName || session.studentNames || 'Unknown'}</td>
-          <td>${session.subject || '-'}</td>
-          <td class="action-buttons" onclick="event.stopPropagation()">
-            <button class="btn btn-warning btn-sm" onclick="event.stopPropagation(); openEditSession('${session.id}')">
-              Edit
-            </button>
-          </td>
-        </tr>`;
-
-        // Detail + notes row
-        html += `
+        const buildDetailRow = (session) => `
         <tr id="comment-row-${session.id}" class="session-comment-row" style="display: none;">
           <td colspan="6">
             <div class="session-detail-wrapper">
@@ -1098,7 +1508,111 @@
             </div>
           </td>
         </tr>`;
-      });
+
+        const buildSessionRows = (session, options = {}) => {
+          const {
+            isGroupParent = false,
+            isGroupChild = false,
+            group = null,
+            isExpanded = false,
+            forceConflict = false
+          } = options;
+
+          const isSelected = selectedSessionIds.has(session.id);
+          const rowClasses = ['session-row'];
+          if (forceConflict || session._hasConflict) {
+            rowClasses.push('session-conflict');
+          }
+          if (isSelected) {
+            rowClasses.push('selected-row');
+          }
+          if (isGroupChild) {
+            rowClasses.push('recurring-child');
+          }
+
+          const attrParts = [`class="${rowClasses.join(' ')}"`];
+          if (isGroupChild && !isExpanded) {
+            attrParts.push('style="display: none;"');
+          }
+          if (group) {
+            attrParts.push(`data-recurring-group="${group.groupId}"`);
+          }
+
+          const singleCheckbox = `
+            <span class="checkbox-slot small">
+              <input type="checkbox" class="session-checkbox" ${isSelected ? 'checked' : ''} onchange="toggleSessionSelection('${session.id}')">
+            </span>`;
+
+          let multiCheckbox = '<span class="checkbox-slot large checkbox-placeholder"></span>';
+          if (isGroupParent && group) {
+            const sessionIds = recurringGroupSessions.get(group.groupId) || [];
+            const groupSelected = sessionIds.length > 0 && sessionIds.every(id => selectedSessionIds.has(id));
+            multiCheckbox = `
+              <span class="checkbox-slot large">
+                <input type="checkbox" class="session-checkbox session-checkbox-multi group-select-all" title="Select all recurring sessions" ${groupSelected ? 'checked' : ''} onchange="toggleGroupSelection('${group.groupId}')">
+              </span>`;
+          }
+
+          const actionButtons = [];
+          actionButtons.push(
+            `<button class="btn btn-warning btn-sm" onclick="event.stopPropagation(); openEditSession('${session.id}')">
+              Edit
+            </button>`
+          );
+
+          const selectCellClasses = ['session-select-cell'];
+          if (isGroupParent && group) {
+            selectCellClasses.push('has-toggle');
+          }
+
+          const toggleButton = (isGroupParent && group)
+            ? `<button class="btn btn-secondary btn-sm group-toggle-btn" onclick="event.stopPropagation(); toggleRecurringGroup('${group.groupId}')" title="${isExpanded ? 'Hide sessions' : 'Show sessions'}">${isExpanded ? '&#9650;' : '&#9660;'}</button>`
+            : '';
+
+          const mainRow = `<tr ${attrParts.join(' ')} onclick="toggleSessionComment('${session.id}')">
+          <td class="${selectCellClasses.join(' ')}" onclick="event.stopPropagation()">
+            ${toggleButton}
+            <div class="session-select-inner">
+              ${singleCheckbox}${multiCheckbox}
+            </div>
+          </td>
+          <td>${formatSessionDate(session)}</td>
+          <td>${session.startTime || '-'} - ${session.endTime || '-'}</td>
+          <td>${session.studentName || session.studentNames || 'Unknown'}</td>
+          <td>${session.subject || '-'}</td>
+          <td class="action-buttons" onclick="event.stopPropagation()">
+            ${actionButtons.join(' ')}
+          </td>
+        </tr>`;
+
+          return mainRow + buildDetailRow(session);
+        };
+
+        sortedList.forEach(item => {
+          if (item && item.type === 'group') {
+            const group = item;
+            const isExpanded = expandedRecurringGroupIds.has(group.groupId);
+            const primarySession = group.primarySession;
+
+            html += buildSessionRows(primarySession, {
+              isGroupParent: true,
+              group,
+              isExpanded,
+              forceConflict: group.hasConflict
+            });
+
+            group.sessions.forEach(session => {
+              if (session.id === primarySession.id) return;
+              html += buildSessionRows(session, {
+                isGroupChild: true,
+                group,
+                isExpanded
+              });
+            });
+          } else {
+            html += buildSessionRows(item);
+          }
+        });
 
 
 
@@ -1110,14 +1624,15 @@
 
       // Render both tables
       let finalHtml = '';
-      finalHtml += renderTable(upcomingSessions, '📅 Upcoming Sessions');
-      finalHtml += renderTable(pastSessions, '📚 Past Sessions');
+      finalHtml += renderTable(upcomingDisplayItems, '📅 Upcoming Sessions');
+      finalHtml += renderTable(pastDisplayItems, '📚 Past Sessions');
       
-      if (upcomingSessions.length === 0 && pastSessions.length === 0) {
+      if (upcomingDisplayItems.length === 0 && pastDisplayItems.length === 0) {
         finalHtml = '<div class="empty-state"><h3>No sessions found</h3></div>';
       }
       
       container.innerHTML = finalHtml;
+      updateSessionSelectionUI();
     }
 
     window.filterSessions = () => {
@@ -1225,6 +1740,7 @@ window.saveSessionChanges = async function (sessionId) {
       cost,
       guardianName: session.guardianName || '',
       guardianEmail: session.guardianEmail || '',
+      suppressEmail: true
     };
 
     const formData = new URLSearchParams();
@@ -1259,6 +1775,178 @@ window.saveSessionChanges = async function (sessionId) {
     cancelSessionEdit(sessionId);
   }
 };
+
+
+    window.openBulkEditModal = () => {
+      if (!bulkEditSessionIds.length) {
+        alert('Select at least two recurring sessions to edit.');
+        return;
+      }
+
+      const modal = document.getElementById('bulk-edit-modal');
+      const countEl = document.getElementById('bulk-edit-count');
+      const startInput = document.getElementById('bulk-start-time');
+      const endInput = document.getElementById('bulk-end-time');
+
+      if (!modal || !startInput || !endInput) {
+        console.warn('Bulk edit modal elements missing.');
+        return;
+      }
+
+      const firstSession = allSessions.find(s => s.id === bulkEditSessionIds[0]);
+      if (firstSession) {
+        startInput.value = normalizeTimeForInput(firstSession.startTime || '');
+        endInput.value = normalizeTimeForInput(firstSession.endTime || '');
+      } else {
+        startInput.value = '';
+        endInput.value = '';
+      }
+
+      if (countEl) {
+        countEl.textContent = `Editing ${bulkEditSessionIds.length} session(s)`;
+      }
+
+      modal.classList.add('active');
+    };
+
+    window.closeBulkEditModal = () => {
+      const modal = document.getElementById('bulk-edit-modal');
+      const form = document.getElementById('bulk-edit-form');
+
+      if (modal) {
+        modal.classList.remove('active');
+      }
+
+      if (form) {
+        form.reset();
+      }
+    };
+
+    window.submitBulkEdit = async (event) => {
+      event.preventDefault();
+
+      if (!bulkEditSessionIds.length) {
+        alert('Select at least two recurring sessions to edit.');
+        return;
+      }
+
+      const startInput = document.getElementById('bulk-start-time');
+      const endInput = document.getElementById('bulk-end-time');
+      const submitBtn = document.getElementById('bulk-edit-submit-btn');
+
+      const startTime = normalizeTimeForInput(startInput?.value || '');
+      const endTime = normalizeTimeForInput(endInput?.value || '');
+
+      if (!startTime || !endTime) {
+        alert('Please provide both start and end times.');
+        return;
+      }
+
+      const startMinutes = timeStringToMinutes(startTime);
+      const endMinutes = timeStringToMinutes(endTime);
+
+      if (startMinutes == null || endMinutes == null) {
+        alert('Please enter valid times in HH:MM format.');
+        return;
+      }
+
+      if (endMinutes <= startMinutes) {
+        alert('End time must be later than start time.');
+        return;
+      }
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+      }
+
+      const results = { success: [], failed: [] };
+      const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec';
+
+      try {
+        for (const sessionId of bulkEditSessionIds) {
+          try {
+            const session = allSessions.find(s => s.id === sessionId);
+            if (!session) {
+              throw new Error('Session not found in memory.');
+            }
+
+            const bookingRef = doc(db, 'bookings', sessionId);
+            await updateDoc(bookingRef, {
+              startTime,
+              endTime
+            });
+
+            session.startTime = startTime;
+            session.endTime = endTime;
+
+            const payload = {
+              action: 'updateCalendarEvent',
+              bookingId: session.bookingId || sessionId,
+              eventId: session.eventId || null,
+              sessionDate: getISODateString(session.sessionDate),
+              startTime,
+              endTime,
+              studentNames: session.studentNames || session.studentName || '',
+              subject: session.subject || '',
+              includeSummary: session.includeSummary || false,
+              notes: session.notes || session.sessionSummary || '',
+              cost: session.cost || '',
+              guardianName: session.guardianName || '',
+              guardianEmail: session.guardianEmail || '',
+              suppressEmail: true
+            };
+
+            const formData = new URLSearchParams();
+            formData.append('payload', JSON.stringify(payload));
+
+            const res = await fetch(APPS_SCRIPT_URL, {
+              method: 'POST',
+              body: formData
+            });
+
+            const result = await res.json();
+
+            if (!result.success) {
+              throw new Error(result.message || 'Calendar update failed');
+            }
+
+            if (result.data && result.data.eventId) {
+              await updateDoc(bookingRef, { eventId: result.data.eventId });
+              session.eventId = result.data.eventId;
+            }
+
+            results.success.push(sessionId);
+          } catch (err) {
+            console.error('Bulk edit failure for session', sessionId, err);
+            results.failed.push({ sessionId, error: err });
+          }
+        }
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+        }
+      }
+
+      closeBulkEditModal();
+      selectedSessionIds.clear();
+      bulkEditSessionIds = [];
+      bulkEditRecurringKey = null;
+      updateSessionSelectionUI();
+
+      let message = '';
+      if (results.success.length) {
+        message = `✅ Updated ${results.success.length} session(s).`;
+      }
+      if (results.failed.length) {
+        message += `${message ? '\n' : ''}⚠️ Failed to update ${results.failed.length} session(s). Check console for details.`;
+      }
+      if (!message) {
+        message = 'No sessions were updated.';
+      }
+      alert(message);
+
+      loadSessions();
+    };
 
 
 
@@ -1408,6 +2096,211 @@ window.saveSessionChanges = async function (sessionId) {
     let bookingsSortColumn = 'date';
     let bookingsSortDirection = 'asc';
     let selectedBookingIds = new Set();
+    let takenBookingSlots = [];
+
+    function parseDateValue(rawDate) {
+      if (!rawDate) {
+        return { dateObj: null, dateKey: null, display: '-' };
+      }
+
+      let dateObj = null;
+
+      if (rawDate instanceof Date) {
+        dateObj = rawDate;
+      } else if (typeof rawDate === 'string') {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+          dateObj = new Date(rawDate + 'T00:00:00');
+        } else {
+          const parsed = new Date(rawDate);
+          if (!Number.isNaN(parsed.valueOf())) {
+            dateObj = parsed;
+          }
+        }
+      } else if (rawDate && typeof rawDate.toDate === 'function') {
+        dateObj = rawDate.toDate();
+      } else {
+        const parsed = new Date(rawDate);
+        if (!Number.isNaN(parsed.valueOf())) {
+          dateObj = parsed;
+        }
+      }
+
+      if (!dateObj || Number.isNaN(dateObj.valueOf())) {
+        return { dateObj: null, dateKey: null, display: '-' };
+      }
+
+      const dateKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+      return {
+        dateObj,
+        dateKey,
+        display: dateObj.toLocaleDateString()
+      };
+    }
+
+    function timeStringToMinutes(timeStr) {
+      if (!timeStr || typeof timeStr !== 'string') {
+        return null;
+      }
+
+      let trimmed = timeStr.trim();
+      if (!trimmed) {
+        return null;
+      }
+
+      let period = null;
+      const periodMatch = trimmed.match(/(AM|PM)$/i);
+      if (periodMatch) {
+        period = periodMatch[1].toUpperCase();
+        trimmed = trimmed.slice(0, -periodMatch[0].length).trim();
+      }
+
+      const parts = trimmed.split(':');
+      if (!parts.length) {
+        return null;
+      }
+
+      let hours = parseInt(parts[0], 10);
+      let minutes = parts.length > 1 ? parseInt(parts[1], 10) : 0;
+
+      if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+        return null;
+      }
+
+      if (period) {
+        if (period === 'AM' && hours === 12) {
+          hours = 0;
+        } else if (period === 'PM' && hours < 12) {
+          hours += 12;
+        }
+      }
+
+      return hours * 60 + minutes;
+    }
+
+    function minutesToTimeValue(minutes) {
+      if (minutes == null || Number.isNaN(minutes)) {
+        return '';
+      }
+
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    }
+
+    function normalizeTimeForInput(rawValue) {
+      if (!rawValue) {
+        return '';
+      }
+
+      const trimmed = rawValue.trim();
+      if (!trimmed) {
+        return '';
+      }
+
+      if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+        const [h, m] = trimmed.split(':');
+        return `${String(parseInt(h, 10)).padStart(2, '0')}:${m}`;
+      }
+
+      const minutes = timeStringToMinutes(trimmed);
+      if (minutes == null) {
+        return '';
+      }
+
+      return minutesToTimeValue(minutes);
+    }
+
+    function getISODateString(value) {
+      if (!value) {
+        return '';
+      }
+
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) {
+          return '';
+        }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+          return trimmed;
+        }
+        const parsed = new Date(trimmed);
+        if (Number.isNaN(parsed.valueOf())) {
+          return '';
+        }
+        return parsed.toISOString().substring(0, 10);
+      }
+
+      if (value instanceof Date) {
+        return value.toISOString().substring(0, 10);
+      }
+
+      if (value && typeof value.toDate === 'function') {
+        const date = value.toDate();
+        return date.toISOString().substring(0, 10);
+      }
+
+      const fallback = new Date(value);
+      if (Number.isNaN(fallback.valueOf())) {
+        return '';
+      }
+
+      return fallback.toISOString().substring(0, 10);
+    }
+
+    function deriveEndMinutes(startMinutes, entry) {
+      if (startMinutes == null) {
+        return null;
+      }
+
+      const explicitEnd = timeStringToMinutes(entry.endTime);
+      if (explicitEnd != null) {
+        return explicitEnd;
+      }
+
+      const durationCandidates = [entry.durationHours, entry.duration, entry.hours];
+      for (const candidate of durationCandidates) {
+        if (candidate == null) {
+          continue;
+        }
+        const duration = parseFloat(candidate);
+        if (!Number.isNaN(duration) && duration > 0) {
+          return startMinutes + Math.round(duration * 60);
+        }
+      }
+
+      return startMinutes + 60;
+    }
+
+    function hasTimeConflict(booking, slots) {
+      if (!slots.length) {
+        return false;
+      }
+
+      const dateKey = booking.dateKey || parseDateValue(booking.sessionDate || booking.date).dateKey;
+      if (!dateKey) {
+        return false;
+      }
+
+      const startMinutes = timeStringToMinutes(booking.startTime);
+      if (startMinutes == null) {
+        return false;
+      }
+
+      const endMinutes = deriveEndMinutes(startMinutes, booking);
+      if (endMinutes == null) {
+        return false;
+      }
+
+      return slots.some(slot => {
+        if (slot.dateKey !== dateKey) {
+          return false;
+        }
+        if (slot.id === booking.id) {
+          return false;
+        }
+        return startMinutes < slot.end && endMinutes > slot.start;
+      });
+    }
 
     // Bookings
     window.loadBookings = async () => {
@@ -1415,45 +2308,97 @@ window.saveSessionChanges = async function (sessionId) {
       container.innerHTML = '<div class="loading">Loading bookings...</div>';
 
       try {
-        const q = query(collection(db, 'bookings'), where('status', '==', 'pending'));
-        const snapshot = await getDocs(q);
+        const pendingQuery = query(collection(db, 'bookings'), where('status', '==', 'pending'));
+        const approvedQuery = query(collection(db, 'bookings'), where('status', '==', 'approved'));
 
-        if (snapshot.empty) {
+        const [pendingSnapshot, approvedSnapshot] = await Promise.all([
+          getDocs(pendingQuery),
+          getDocs(approvedQuery)
+        ]);
+
+        takenBookingSlots = [];
+        approvedSnapshot.forEach(doc => {
+          const data = doc.data();
+          const dateInfo = parseDateValue(data.sessionDate || data.date);
+          if (!dateInfo.dateKey) {
+            return;
+          }
+
+          const start = timeStringToMinutes(data.startTime);
+          if (start == null) {
+            return;
+          }
+
+          const end = deriveEndMinutes(start, data);
+          if (end == null) {
+            return;
+          }
+
+          takenBookingSlots.push({
+            id: doc.id,
+            dateKey: dateInfo.dateKey,
+            start,
+            end
+          });
+        });
+
+        if (pendingSnapshot.empty) {
+          allBookings = [];
           container.innerHTML = '<div class="empty-state"><h3>No pending bookings</h3><p>New booking requests will appear here.</p></div>';
           return;
         }
 
-        // Store all bookings with parsed data
+        selectedBookingIds.clear();
         allBookings = [];
-        snapshot.forEach(doc => {
+
+        pendingSnapshot.forEach(doc => {
           const booking = doc.data();
-          
-          // Parse session date
-          const dateValue = booking.sessionDate || booking.date;
-          let dateObj = null;
-          let dateStr = '-';
-          
-          if (dateValue) {
-            if (dateValue.toDate) {
-              dateObj = dateValue.toDate();
-              dateStr = dateObj.toLocaleDateString();
-            } else if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
-              dateObj = new Date(dateValue + 'T00:00:00');
-              dateStr = dateObj.toLocaleDateString();
-            } else {
-              dateObj = new Date(dateValue);
-              dateStr = dateObj.toLocaleDateString();
-            }
-          }
-          
-          allBookings.push({
+          const dateInfo = parseDateValue(booking.sessionDate || booking.date);
+          const startMinutes = timeStringToMinutes(booking.startTime);
+          const endMinutes = deriveEndMinutes(startMinutes, booking);
+
+          const bookingEntry = {
             id: doc.id,
             ...booking,
-            dateObj: dateObj,
-            dateStr: dateStr,
+            dateObj: dateInfo.dateObj,
+            dateStr: dateInfo.display,
+            dateKey: dateInfo.dateKey,
             studentName: booking.studentNames || booking.studentName || 'Unknown',
-            email: booking.guardianEmail || booking.email || '-'
-          });
+            email: booking.guardianEmail || booking.email || '-',
+            startMinutes,
+            endMinutes,
+            pendingOverlap: false
+          };
+
+          bookingEntry.hasConflict = hasTimeConflict(bookingEntry, takenBookingSlots);
+          allBookings.push(bookingEntry);
+        });
+
+        const bookingsByDate = new Map();
+        allBookings.forEach(entry => {
+          if (!entry.dateKey || entry.startMinutes == null || entry.endMinutes == null) {
+            return;
+          }
+          if (!bookingsByDate.has(entry.dateKey)) {
+            bookingsByDate.set(entry.dateKey, []);
+          }
+          bookingsByDate.get(entry.dateKey).push(entry);
+        });
+
+        bookingsByDate.forEach(list => {
+          if (list.length < 2) {
+            return;
+          }
+          for (let i = 0; i < list.length; i++) {
+            for (let j = i + 1; j < list.length; j++) {
+              const a = list[i];
+              const b = list[j];
+              if (a.startMinutes < b.endMinutes && a.endMinutes > b.startMinutes) {
+                a.pendingOverlap = true;
+                b.pendingOverlap = true;
+              }
+            }
+          }
         });
 
         renderBookingsTable();
@@ -1568,8 +2513,28 @@ window.saveSessionChanges = async function (sessionId) {
 
       sortedBookings.forEach(booking => {
         const isSelected = selectedBookingIds.has(booking.id);
-        
-        html += `<tr style="${isSelected ? 'background: rgba(102, 126, 234, 0.1);' : ''}">
+
+        const rowClasses = [];
+        if (isSelected) {
+          rowClasses.push('selected-row');
+        }
+        if (booking.hasConflict) {
+          rowClasses.push('conflict-row');
+        } else if (booking.pendingOverlap) {
+          rowClasses.push('pending-conflict');
+        }
+
+        const attrParts = [];
+        if (rowClasses.length) {
+          attrParts.push(`class="${rowClasses.join(' ')}"`);
+        }
+        if (booking.hasConflict) {
+          attrParts.push('title="Time conflicts with an approved session"');
+        }
+
+        const attrString = attrParts.length ? ' ' + attrParts.join(' ') : '';
+
+        html += `<tr${attrString}>
           <td>
             <input type="checkbox" 
               ${isSelected ? 'checked' : ''} 
@@ -1622,9 +2587,19 @@ window.saveSessionChanges = async function (sessionId) {
             const email = booking.guardianEmail || booking.email;
 
             if (!bookingsByGuardian.has(email)) {
-              bookingsByGuardian.set(email, []);
+              bookingsByGuardian.set(email, {
+                bookings: [],
+                suppressEmail: false
+              });
             }
-            bookingsByGuardian.get(email).push(booking);
+
+            const group = bookingsByGuardian.get(email);
+            group.bookings.push(booking);
+
+            const suppress = await shouldSuppressApprovalEmail(booking);
+            if (suppress) {
+              group.suppressEmail = true;
+            }
 
           } catch (error) {
             console.error("Fetch error:", error);
@@ -1633,7 +2608,9 @@ window.saveSessionChanges = async function (sessionId) {
         }
 
         // 2️⃣ Process each guardian ONCE
-        for (const [guardianEmail, bookings] of bookingsByGuardian) {
+        for (const [guardianEmail, group] of bookingsByGuardian) {
+          const bookings = group.bookings;
+          const suppressEmail = group.suppressEmail === true;
           console.log(`Processing ${bookings.length} bookings for ${guardianEmail}`);
 
           // 2A — Mark all bookings approved in Firestore
@@ -1659,7 +2636,8 @@ window.saveSessionChanges = async function (sessionId) {
               studentNames: b.studentNames || b.studentName,
               subject: b.subject,
               comments: b.comments || b.notes || ""
-            }))
+            })),
+            suppressEmail
           };
 
           // 2C — Send ONE request per guardian
@@ -1677,7 +2655,7 @@ window.saveSessionChanges = async function (sessionId) {
 
             const json = await res.json();
 
-            if (!json.success) {
+                if (!json.success) {
               throw new Error(json.message || "Bulk approve failed");
             }
 
@@ -1761,18 +2739,19 @@ window.saveSessionChanges = async function (sessionId) {
     };
 
     window.approveBooking = async (bookingId) => {
-        if (!confirm('Approve this booking? This will add it to Google Calendar and send a confirmation email to the user.')) return;
+        if (!confirm('Approve this booking? This will add it to Google Calendar and email the guardian if they have notifications enabled.')) return;
 
         try {
-            // Get booking details first
-            const bookingRef = doc(db, 'bookings', bookingId);
-            const bookingDoc = await getDoc(bookingRef);
-            if (!bookingDoc.exists()) {
-            alert('Booking not found!');
-            return;
-            }
+          // Get booking details first
+          const bookingRef = doc(db, 'bookings', bookingId);
+          const bookingDoc = await getDoc(bookingRef);
+          if (!bookingDoc.exists()) {
+          alert('Booking not found!');
+          return;
+          }
 
-            const booking = bookingDoc.data();
+          const booking = bookingDoc.data();
+          const suppressEmail = await shouldSuppressApprovalEmail(booking);
             console.log('Approving booking:', bookingId, booking);
             
             // 👇 NOTE: also store bookingId field on the document
@@ -1794,7 +2773,8 @@ window.saveSessionChanges = async function (sessionId) {
             subject: booking.subject,
             guardianName: booking.guardianName,
             guardianEmail: booking.guardianEmail || booking.email,
-            comments: booking.comments || booking.notes || ''
+            comments: booking.comments || booking.notes || '',
+            suppressEmail
             };
             
             console.log('Sending to Apps Script:', syncData);
@@ -1944,6 +2924,8 @@ window.saveSessionChanges = async function (sessionId) {
           const user = doc.data();
           const userId = doc.id;
           const joined = user.createdAt ? new Date(user.createdAt.toDate()).toLocaleDateString() : '-';
+          const safeEmail = (user.email || '-').replace(/'/g, "\\'");
+          const safeName = (user.fullName || 'User').replace(/'/g, "\\'");
           html += `<tr>
             <td>${user.fullName || '-'}</td>
             <td>${user.email || '-'}</td>
@@ -1952,7 +2934,8 @@ window.saveSessionChanges = async function (sessionId) {
             <td class="action-buttons">
               <button class="btn btn-secondary btn-sm" onclick="viewUserSessions('${userId}')">View Sessions</button>
               <button class="btn btn-secondary btn-sm" onclick="viewUserStudents('${userId}')">View Students</button>
-              <button class="btn btn-sm" onclick="showAddSessionModal('${userId}', '${user.fullName || 'User'}')">Add Session</button>
+              <button class="btn btn-sm" onclick="showAddSessionModal('${userId}', '${safeName}')">Add Session</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteUser('${userId}', '${safeEmail}')">Delete</button>
             </td>
           </tr>`;
         });
@@ -1962,6 +2945,194 @@ window.saveSessionChanges = async function (sessionId) {
       } catch (error) {
         console.error('Error loading users:', error);
         container.innerHTML = `<div class="empty-state"><h3>Error loading users</h3><p>${error.message}</p></div>`;
+      }
+    };
+
+    window.deleteUser = async (userId, email) => {
+      const label = email && email !== '-' ? email : 'this user';
+      if (!confirm(`Delete user ${label}? This will remove their account, students, and bookings. This cannot be undone.`)) {
+        return;
+      }
+
+      const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec';
+      let bookingsDeleted = 0;
+      let bookingErrors = 0;
+      let studentsDeleted = 0;
+
+      try {
+        const bookingsSnap = await getDocs(query(collection(db, 'bookings'), where('userId', '==', userId)));
+        for (const bookingDoc of bookingsSnap.docs) {
+          const bookingData = bookingDoc.data();
+
+          const deletePayload = {
+            action: 'deleteCalendarEvent',
+            bookingId: bookingData.bookingId || bookingDoc.id,
+            sessionDate: bookingData.sessionDate || null
+          };
+
+          try {
+            const formData = new URLSearchParams();
+            formData.append('payload', JSON.stringify(deletePayload));
+
+            await fetch(APPS_SCRIPT_URL, {
+              method: 'POST',
+              body: formData
+            });
+          } catch (calendarError) {
+            console.warn('Calendar cleanup failed for booking', bookingDoc.id, calendarError);
+          }
+
+          try {
+            await deleteDoc(bookingDoc.ref);
+            bookingsDeleted++;
+          } catch (bookingError) {
+            bookingErrors++;
+            console.error('Failed to delete booking', bookingDoc.id, bookingError);
+          }
+        }
+
+        const studentsSnap = await getDocs(query(collection(db, 'students'), where('userId', '==', userId)));
+        for (const studentDoc of studentsSnap.docs) {
+          try {
+            await deleteDoc(studentDoc.ref);
+            studentsDeleted++;
+          } catch (studentError) {
+            console.error('Failed to delete student', studentDoc.id, studentError);
+          }
+        }
+
+        await deleteDoc(doc(db, 'users', userId));
+
+        let message = `User deleted. Removed ${studentsDeleted} student(s) and ${bookingsDeleted} booking(s).`;
+        if (bookingErrors > 0) {
+          message += ` Failed to delete ${bookingErrors} booking(s). See console for details.`;
+        }
+        alert(message);
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        alert('Error deleting user: ' + error.message);
+      } finally {
+        loadUsers();
+        loadStudents();
+        loadBookings();
+        loadSessions();
+        loadDashboard();
+      }
+    };
+
+    window.loadBlockedEmails = async () => {
+      const container = document.getElementById('blocked-container');
+      if (!container) {
+        return;
+      }
+
+      container.innerHTML = '<div class="loading">Loading blocked emails...</div>';
+
+      try {
+        const snapshot = await getDocs(collection(db, 'blockedEmails'));
+
+        if (snapshot.empty) {
+          container.innerHTML = '<div class="empty-state"><h3>No blocked emails</h3><p>Add an email to prevent new registrations.</p></div>';
+          return;
+        }
+
+        const entries = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+        const toMillis = (value) => (value && typeof value.toMillis === 'function') ? value.toMillis() : 0;
+        entries.sort((a, b) => {
+          const millisDiff = toMillis(b.createdAt) - toMillis(a.createdAt);
+          if (millisDiff !== 0) {
+            return millisDiff;
+          }
+          const emailA = (a.email || a.id || '').toLowerCase();
+          const emailB = (b.email || b.id || '').toLowerCase();
+          if (emailA < emailB) return -1;
+          if (emailA > emailB) return 1;
+          return 0;
+        });
+
+        let html = '<div class="data-table"><table><thead><tr>';
+        html += '<th>Email</th><th>Added On</th><th>Added By</th><th>Reason</th><th>Actions</th>';
+        html += '</tr></thead><tbody>';
+
+        entries.forEach(entry => {
+          const addedAt = entry.createdAt && entry.createdAt.toDate ? entry.createdAt.toDate().toLocaleString() : '-';
+          const emailValue = entry.email || entry.id;
+          const addedBy = entry.addedBy || '-';
+          const reason = entry.reason || entry.note || '-';
+          const safeDocId = entry.id.replace(/'/g, "\\'");
+          html += `<tr>
+            <td>${emailValue}</td>
+            <td>${addedAt}</td>
+            <td>${addedBy}</td>
+            <td>${reason}</td>
+            <td class="action-buttons">
+              <button class="btn btn-danger btn-sm" onclick="deleteBlockedEmail('${safeDocId}')">Delete</button>
+            </td>
+          </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+      } catch (error) {
+        console.error('Error loading blocked emails:', error);
+        container.innerHTML = `<div class="empty-state"><h3>Error loading blocked emails</h3><p>${error.message}</p></div>`;
+      }
+    };
+
+    window.addBlockedEmail = async () => {
+      const input = prompt('Enter the email address to block:');
+      if (!input) {
+        return;
+      }
+
+      const email = input.trim().toLowerCase();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        alert('Please enter a valid email address.');
+        return;
+      }
+
+      const notePrompt = prompt('Optional: add a note for this block (cancel to skip).');
+      const note = notePrompt ? notePrompt.trim() : '';
+
+      try {
+        const docRef = doc(db, 'blockedEmails', email);
+        const existing = await getDoc(docRef);
+        if (existing.exists()) {
+          alert('That email is already blocked.');
+          return;
+        }
+
+        await setDoc(docRef, {
+          email,
+          createdAt: serverTimestamp(),
+          addedBy: currentUser?.email || null,
+          reason: note || null
+        });
+
+        alert(`${email} has been added to the blocked list.`);
+        loadBlockedEmails();
+      } catch (error) {
+        console.error('Error blocking email:', error);
+        alert('Error blocking email: ' + error.message);
+      }
+    };
+
+    window.deleteBlockedEmail = async (docId) => {
+      if (!docId) {
+        return;
+      }
+
+      if (!confirm(`Remove ${docId} from the blocked list?`)) {
+        return;
+      }
+
+      try {
+        await deleteDoc(doc(db, 'blockedEmails', docId));
+        loadBlockedEmails();
+      } catch (error) {
+        console.error('Error deleting blocked email:', error);
+        alert('Error deleting blocked email: ' + error.message);
       }
     };
 
