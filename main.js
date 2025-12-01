@@ -17,7 +17,6 @@ document.addEventListener("DOMContentLoaded", () => {
   
   setupThemeToggle();
   // setupCurrentTime();
-  setupUserGreeting();
 });
 
 // Setup validation for input fields with patterns
@@ -80,178 +79,6 @@ function setupThemeToggle() {
     localStorage.setItem("site-theme", next);
     applyTheme(next);
   });
-}
-
-// Display current time, day, and date
-function setupCurrentTime() {
-  const timeElem = document.getElementById("current-time");
-  if (!timeElem) return;
-
-  function updateTime() {
-    const now = new Date();
-    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
-    const hours = String(now.getHours()).padStart(2, "0");
-    const minutes = String(now.getMinutes()).padStart(2, "0");
-    const ampm = now.getHours() >= 12 ? "pm" : "am";
-    const dayName = days[now.getDay()];
-    const monthName = months[now.getMonth()];
-    const date = now.getDate();
-    const year = now.getFullYear();
-
-    timeElem.textContent = `${dayName}, ${monthName} ${date}, ${year}, ${hours}:${minutes}${ampm}`;
-  }
-
-  // Update immediately and then every second
-  updateTime();
-  setInterval(updateTime, 1000);
-}
-
-// Setup user greeting and logout button in header
-async function setupUserGreeting() {
-  const header = document.querySelector('.site-header .container.header-inner');
-  if (!header) return;
-
-  // Check if Firebase auth is available
-  if (!window.firebaseAuth || !window.firebaseOnAuth) {
-    return;
-  }
-
-  const auth = window.firebaseAuth;
-  const onAuth = window.firebaseOnAuth;
-  const signOut = window.firebaseSignOut;
-  const db = window.firestoreDb;
-  const getDoc = window.firestoreGetDoc;
-  const doc = window.firestoreDoc;
-
-  // Create greeting element (goes after logo)
-  const greetingSpan = document.createElement('span');
-  greetingSpan.style.display = 'none';
-  greetingSpan.style.color = 'var(--text-color, #e5e7eb)';
-  greetingSpan.style.fontSize = '1rem';
-  greetingSpan.style.marginLeft = '1.5rem';
-  greetingSpan.style.fontWeight = '500';
-  greetingSpan.id = 'user-greeting-text';
-  
-  // Create logout button (goes after nav in the center)
-  const logoutBtn = document.createElement('button');
-  logoutBtn.textContent = 'Logout';
-  logoutBtn.className = 'btn secondary';
-  logoutBtn.style.padding = '0.4rem 0.8rem';
-  logoutBtn.style.fontSize = '0.85rem';
-  logoutBtn.style.cursor = 'pointer';
-  logoutBtn.style.display = 'none';
-  logoutBtn.id = 'logout-button';
-  
-  logoutBtn.addEventListener('click', async () => {
-    try {
-      await signOut(auth);
-      window.location.href = 'index.html';
-    } catch (error) {
-      console.error('Logout error:', error);
-      alert('Failed to logout. Please try again.');
-    }
-  });
-
-  // Insert greeting after logo
-  const logo = header.querySelector('.logo');
-  if (logo && logo.parentNode === header) {
-    logo.after(greetingSpan);
-  }
-
-  // Insert logout button after nav (in the center section)
-  const nav = header.querySelector('nav');
-  if (nav && nav.parentNode === header) {
-    nav.after(logoutBtn);
-  }
-
-  // Move current time below theme toggle
-  const currentTime = document.getElementById('current-time');
-  const headerRight = header.querySelector('.header-right');
-  if (currentTime && headerRight) {
-    currentTime.style.display = 'block';
-    currentTime.style.marginTop = '0.5rem';
-    currentTime.style.textAlign = 'right';
-    currentTime.style.fontSize = '0.75rem';
-  }
-
-  function generateRecurringDates(startDate, recurringEnd) {
-    const dates = [];
-    let current = new Date(startDate);
-    const end = new Date(recurringEnd);
-
-    while (current <= end) {
-      const y = current.getFullYear();
-      const m = String(current.getMonth() + 1).padStart(2, "0");
-      const d = String(current.getDate()).padStart(2, "0");
-
-      dates.push(`${y}-${m}-${d}`); // YYYY-MM-DD
-
-      current.setDate(current.getDate() + 7); // weekly recurrence
-    }
-
-    return dates;
-  }
-
-
-  // Wait for Firebase to be ready before setting up auth listener
-  function waitForFirebase() {
-    return new Promise((resolve) => {
-      const checkFirebase = () => {
-        if (window.firebaseAuth && window.firebaseDb) {
-          resolve();
-        } else {
-          setTimeout(checkFirebase, 50);
-        }
-      };
-      checkFirebase();
-    });
-  }
-
-  // Wait for Firebase, then set up auth listener
-  waitForFirebase().then(() => {
-    // Listen for auth state changes
-    onAuth(auth, async (user) => {
-      if (user) {
-        let firstName = 'User';
-        
-        try {
-          // Fetch user profile from Firestore
-          const userDocRef = doc(db, 'users', user.uid);
-          const userDoc = await getDoc(userDocRef);
-          
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            firstName = userData.firstName || userData.fullName?.split(' ')[0] || firstName;
-          }
-        } catch (error) {
-          console.error('Error fetching user data from Firestore:', error);
-        }
-        
-        // Fallback to Firebase Auth data if Firestore didn't provide a name
-        if (firstName === 'User') {
-          // Try displayName from Firebase Auth
-          if (user.displayName) {
-            firstName = user.displayName.split(' ')[0];
-          } 
-          // Try extracting from email as last resort
-          else if (user.email) {
-            firstName = user.email.split('@')[0].replace(/[._]/g, ' ').split(' ')[0];
-            // Capitalize first letter
-            firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
-          }
-        }
-        
-        greetingSpan.textContent = `Hello ${firstName}`;
-      greetingSpan.style.display = 'inline';
-      logoutBtn.style.display = 'inline-block';
-    } else {
-      greetingSpan.style.display = 'none';
-      logoutBtn.style.display = 'none';
-    }
-  });
-  }); // End waitForFirebase promise
 }
 
 function setupStudentForm() {
@@ -474,6 +301,29 @@ function setupBookingForm() {
     }
   }
 
+  function getMondayForOffset(offset = currentWeekOffset) {
+    const base = new Date();
+    const day = base.getDay();
+    const diff = (day === 0 ? -6 : 1) - day;
+    base.setDate(base.getDate() + diff + (offset * 7));
+    base.setHours(0, 0, 0, 0);
+    return base;
+  }
+
+  function getDateForDayIndex(dayIdx, offset = currentWeekOffset) {
+    const monday = getMondayForOffset(offset);
+    const target = new Date(monday);
+    target.setDate(monday.getDate() + dayIdx);
+    return target;
+  }
+
+  function formatDateForInput(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
   // Function to populate start time dropdown with 15-minute intervals
   function populateStartTimeOptions() {
     if (!startTimeInput) return;
@@ -558,7 +408,8 @@ function setupBookingForm() {
 
     const [h, m] = startTime.split(':').map(Number);
     const timeMin = h * 60 + m;
-    const endMin = timeMin + 60; // Need at least 1 hour available
+    const durationHours = durationSel ? parseFloat(durationSel.value || "1") : 1;
+    const endMin = timeMin + Math.round(durationHours * 60);
     
     // Update each day option
     Array.from(daySelect.options).forEach(opt => {
@@ -620,70 +471,55 @@ function setupBookingForm() {
   // Listen to start time changes to update the calendar label
   if (startTimeInput) {
     startTimeInput.addEventListener('change', () => {
-      updateEndTimeOptions(startTimeInput.value);
-      
-      // Update day availability based on selected start time
-      updateDayAvailability();
-      
-      // Update calendar selection if both day and start time are selected
-      const selectedDay = daySelect ? parseInt(daySelect.value) : null;
       const startTime = startTimeInput.value;
-      
-      if (!isNaN(selectedDay) && startTime) {
-        const [startHour] = startTime.split(':').map(Number);
-        
-        // Clear previous selection
-        calElem.querySelectorAll(".av-slot.selected").forEach((el) => {
-          el.classList.remove("selected");
-          el.textContent = "";
-          // Remove any selection overlay
-          const overlay = el.querySelector('.selection-overlay');
-          if (overlay) overlay.remove();
-        });
-        
-        // Find and select the matching cell
-        const newBlockId = `${selectedDay}-${startHour}`;
-        const newBlock = calElem.querySelector(`[data-block-id="${newBlockId}"]`);
-        
-        if (newBlock && newBlock.classList.contains('available')) {
-          newBlock.classList.add("selected");
-          selectedBlockId = newBlockId;
-          selectedBlockElem = newBlock;
+      updateEndTimeOptions(startTime);
+      updateDayAvailability();
 
-          // Calculate the actual date for the selected day
-          const today = new Date();
-          const monday = new Date(today);
-          const day = monday.getDay();
-          const diff = (day === 0 ? -6 : 1) - day;
-          monday.setDate(today.getDate() + diff + (currentWeekOffset * 7));
-          const date = new Date(monday);
-          date.setDate(monday.getDate() + selectedDay);
-          
-          // Use local date format instead of UTC to avoid timezone issues
-          const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, '0');
-          const day_of_month = String(date.getDate()).padStart(2, '0');
-          hiddenDate.value = `${year}-${month}-${day_of_month}`;
-          
-          hiddenStart.value = startTime;
+      const selectedDay = daySelect ? parseInt(daySelect.value) : NaN;
+      if (isNaN(selectedDay) || !startTime) {
+        selectedBlockId = null;
+        selectedBlockElem = null;
+        return;
+      }
 
-          // Update the label
-          if (durationSel.value) {
-            durationSel.dispatchEvent(new Event('change'));
-          }
-          
-          // Update recurring options if recurring is checked
-          if (recurringCb && recurringCb.checked && originalCalendarDate) {
-            populateRecurringEndOptions(originalCalendarDate);
-          }
-        } else {
-          // Selected time is not available on this day
-          selectedBlockId = null;
-          selectedBlockElem = null;
-        }
-      } else if (selectedBlockElem && durationSel.value) {
-        // Just update the label if a block is already selected
+      const [startHour, startMinute] = startTime.split(':').map(Number);
+      const startTotalMinutes = (startHour * 60) + (startMinute || 0);
+
+      // Clear previous selection overlays
+      calElem.querySelectorAll('.av-slot.selected').forEach((el) => {
+        el.classList.remove('selected');
+        el.textContent = '';
+        const overlay = el.querySelector('.selection-overlay');
+        if (overlay) overlay.remove();
+      });
+
+      const newBlockId = `${selectedDay}-${startHour}`;
+      const newBlock = calElem.querySelector(`[data-block-id="${newBlockId}"]`);
+
+      const targetDate = getDateForDayIndex(selectedDay);
+      originalCalendarDate = targetDate;
+      hiddenDate.value = formatDateForInput(targetDate);
+      hiddenStart.value = startTime;
+
+      updateDurationOptions(selectedDay, startTotalMinutes);
+
+      if (newBlock && newBlock.classList.contains('available')) {
+        newBlock.classList.add('selected');
+        selectedBlockId = newBlockId;
+        selectedBlockElem = newBlock;
+      } else {
+        selectedBlockId = null;
+        selectedBlockElem = null;
+      }
+
+      if (durationSel.value) {
         durationSel.dispatchEvent(new Event('change'));
+      } else {
+        updateCost();
+      }
+
+      if (recurringCb && recurringCb.checked) {
+        populateRecurringEndOptions(targetDate);
       }
     });
   }
@@ -701,13 +537,13 @@ function setupBookingForm() {
       const startTime = startTimeInput ? startTimeInput.value : hiddenStart.value;
       if (!startTime) return;
 
-      const [startHour] = startTime.split(':').map(Number);
+      const [startHour, startMinute] = startTime.split(':').map(Number);
+      const startTotalMinutes = (startHour * 60) + (startMinute || 0);
 
       // Clear previous selection
-      calElem.querySelectorAll(".av-slot.selected").forEach((el) => {
-        el.classList.remove("selected");
-        el.textContent = "";
-        // Remove any selection overlay
+      calElem.querySelectorAll('.av-slot.selected').forEach((el) => {
+        el.classList.remove('selected');
+        el.textContent = '';
         const overlay = el.querySelector('.selection-overlay');
         if (overlay) overlay.remove();
       });
@@ -715,37 +551,31 @@ function setupBookingForm() {
       // Find and select the matching cell
       const newBlockId = `${selectedDay}-${startHour}`;
       const newBlock = calElem.querySelector(`[data-block-id="${newBlockId}"]`);
-      
+
+      const targetDate = getDateForDayIndex(selectedDay);
+      originalCalendarDate = targetDate;
+      hiddenDate.value = formatDateForInput(targetDate);
+      hiddenStart.value = startTime;
+
+      updateDurationOptions(selectedDay, startTotalMinutes);
+
       if (newBlock && newBlock.classList.contains('available')) {
-        newBlock.classList.add("selected");
+        newBlock.classList.add('selected');
         selectedBlockId = newBlockId;
         selectedBlockElem = newBlock;
-
-        // Calculate the actual date for the selected day
-        const today = new Date();
-        const monday = new Date(today);
-        const day = monday.getDay();
-        const diff = (day === 0 ? -6 : 1) - day;
-        monday.setDate(today.getDate() + diff + (currentWeekOffset * 7));
-        const date = new Date(monday);
-        date.setDate(monday.getDate() + selectedDay);
-        
-        // Use local date format instead of UTC to avoid timezone issues
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day_of_month = String(date.getDate()).padStart(2, '0');
-        hiddenDate.value = `${year}-${month}-${day_of_month}`;
-        
-        hiddenStart.value = startTime;
-
-        // Update the label
-        if (durationSel.value) {
-          durationSel.dispatchEvent(new Event('change'));
-        }
       } else {
-        // Selected time is not available on this day
         selectedBlockId = null;
         selectedBlockElem = null;
+      }
+
+      if (durationSel.value) {
+        durationSel.dispatchEvent(new Event('change'));
+      } else {
+        updateCost();
+      }
+
+      if (recurringCb && recurringCb.checked) {
+        populateRecurringEndOptions(targetDate);
       }
     });
   }
@@ -760,20 +590,28 @@ function setupBookingForm() {
     2: [],
     3: [],
     4: [],
+    5: [],
+    6: [],
   };
 
   // To let updateDurationOptions look at available blocks we keep demoAvailable
   // in an outer variable and fill it later in loadAvailability().
-  let demoAvailable = {};
+  let demoAvailable = {
+    0: [],
+    1: [],
+    2: [],
+    3: [],
+    4: [],
+    5: [],
+    6: [[11 * 60, 16 * 60]],
+  };
 
   // Compute which durations are valid for the selected start time.
-  function updateDurationOptions(dayIdx, startHour) {
-    if (dayIdx == null || startHour == null) return;
+  function updateDurationOptions(dayIdx, startMin) {
+    if (dayIdx == null || startMin == null || Number.isNaN(startMin)) return;
 
     // Build availability for that day from demoAvailable
     const blocks = demoAvailable[dayIdx] || [];
-    // Convert start to minutes
-    const startMin = startHour * 60;
 
     // A helper to test if a requested endMin is within any availability block
     function withinAvailability(endMin) {
@@ -821,14 +659,22 @@ function setupBookingForm() {
 
   // Update the selected block label when duration changes
   durationSel.addEventListener("change", () => {
-    if (!selectedBlockElem || !selectedBlockId) return;
     const val = durationSel.value;
+
+    // Update cost and availability even if no calendar block is selected
+    updateCost();
+    updateStartTimeAvailability();
+    updateDayAvailability();
+
+    if (recurringCb && recurringCb.checked && originalCalendarDate) {
+      populateRecurringEndOptions(originalCalendarDate);
+    }
+
+    if (!selectedBlockElem || !selectedBlockId) return;
+
     if (!val) {
-      // no duration selected => clear text
       const overlay = selectedBlockElem.querySelector('.selection-overlay');
       if (overlay) overlay.remove();
-      updateCost(); // Update cost when duration changes
-      updateStartTimeAvailability(); // Update available start times
       return;
     }
 
@@ -836,27 +682,16 @@ function setupBookingForm() {
     if (isNaN(durHours)) {
       const overlay = selectedBlockElem.querySelector('.selection-overlay');
       if (overlay) overlay.remove();
-      updateCost(); // Update cost when duration changes
-      updateStartTimeAvailability(); // Update available start times
       return;
     }
 
     // Get start time from dropdown
     const startTime = startTimeInput ? startTimeInput.value : hiddenStart.value;
     if (!startTime) return;
-    
+
     const [startHour, startMinute] = startTime.split(':').map(Number);
     const startMin = startHour * 60 + (startMinute || 0);
     const endMin = startMin + Math.round(durHours * 60);
-    
-    // Update cost and available start times
-    updateCost();
-    updateStartTimeAvailability();
-    
-    // Update recurring options if recurring is checked
-    if (recurringCb && recurringCb.checked && originalCalendarDate) {
-      populateRecurringEndOptions(originalCalendarDate);
-    }
 
     function fmt(min) {
       const h = Math.floor(min / 60);
@@ -1170,6 +1005,12 @@ function setupBookingForm() {
       // Populate demoAvailable and demoBooked from server response
       demoAvailable = data.available || {};
       demoBooked = data.booked || {};
+
+      // Ensure weekend keys exist (Saturday placeholder, Sunday availability)
+      if (!demoAvailable[5]) demoAvailable[5] = [];
+      if (!demoBooked[5]) demoBooked[5] = [];
+      if (!demoAvailable[6]) demoAvailable[6] = [[11 * 60, 16 * 60]];
+      if (!demoBooked[6]) demoBooked[6] = [];
       
       console.log('Available slots:', demoAvailable);
       console.log('Booked slots:', demoBooked);
@@ -1194,6 +1035,8 @@ function setupBookingForm() {
 
       // Render the calendar
       renderCalendar(monday);
+      updateStartTimeAvailability();
+      updateDayAvailability();
       
     } catch (error) {
       console.error("Error loading availability:", error);
@@ -1222,10 +1065,22 @@ function setupBookingForm() {
       
       // Fallback to empty availability on error
       demoAvailable = {
-        0: [], 1: [], 2: [], 3: [], 4: []
+        0: [],
+        1: [],
+        2: [],
+        3: [],
+        4: [],
+        5: [],
+        6: [[11 * 60, 16 * 60]],
       };
       demoBooked = {
-        0: [], 1: [], 2: [], 3: [], 4: []
+        0: [],
+        1: [],
+        2: [],
+        3: [],
+        4: [],
+        5: [],
+        6: [],
       };
       
       // Still update week display
@@ -1243,11 +1098,14 @@ function setupBookingForm() {
         prevWeekBtn.style.opacity = (currentWeekOffset === 0) ? '0.5' : '1';
         prevWeekBtn.style.cursor = (currentWeekOffset === 0) ? 'not-allowed' : 'pointer';
       }
+
+      updateStartTimeAvailability();
+      updateDayAvailability();
     }
   }
   
   function renderCalendar(monday) {
-    const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+    const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri"];
     const startHour = 8, endHour = 20;
 
     // Clear and build header row
@@ -1266,7 +1124,7 @@ function setupBookingForm() {
       const date = new Date(monday);
       date.setDate(monday.getDate() + dayIdx);
       date.setHours(0, 0, 0, 0);
-      const dayName = days[dayIdx];
+      const dayName = dayLabels[dayIdx];
       const dateNum = date.getDate();
       const isToday = date.getTime() === today.getTime();
       const isPast = date < today;
@@ -1309,26 +1167,45 @@ function setupBookingForm() {
           continue; // Skip the rest of the logic for past days
         }
 
-        // Check if this whole hour is within any available block (>= 60 mins)
         const blocks = demoAvailable[dayIdx] || [];
+        const bookedBlocks = demoBooked[dayIdx] || [];
         const startMin = h * 60;
         const endMin = (h + 1) * 60;
-        const isFree = blocks.some(
-          ([s, e]) => s <= startMin && e >= endMin
-        );
 
-        if (isFree) {
+        // Determine if there is at least one 60-minute slot starting within this hour
+        const potentialOffsets = [0, 15, 30, 45];
+        const hasSelectableStart = potentialOffsets.some((offset) => {
+          const candidateStart = startMin + offset;
+          const candidateEnd = candidateStart + 60;
+          if (candidateEnd > 24 * 60) {
+            return false;
+          }
+
+          const fitsAvailability = blocks.some(([s, e]) => s <= candidateStart && e >= candidateEnd);
+          if (!fitsAvailability) {
+            return false;
+          }
+
+          const overlapsBooking = bookedBlocks.some(([bs, be]) => !(be <= candidateStart || bs >= candidateEnd));
+          return !overlapsBooking;
+        });
+
+        cell.dataset.dayIdx = dayIdx;
+        cell.dataset.hour = h;
+        cell.style.position = 'relative';
+
+        if (hasSelectableStart) {
           cell.classList.add('available');
           cell.dataset.blockId = `${dayIdx}-${h}`;
-          cell.style.position = 'relative'; // Enable positioning for children
           cell.addEventListener("click", (e) => {
-            // Determine if click is in top or bottom half of cell
+            const latestBlocks = demoAvailable[dayIdx] || [];
+            const latestBooked = demoBooked[dayIdx] || [];
+
             const rect = cell.getBoundingClientRect();
             const clickY = e.clientY - rect.top;
             const cellHeight = rect.height;
-            const clickRatio = clickY / cellHeight;
-            
-            // Determine minutes based on click position
+            const clickRatio = cellHeight ? (clickY / cellHeight) : 0;
+
             let minutes = 0;
             if (clickRatio < 0.25) {
               minutes = 0;
@@ -1339,84 +1216,58 @@ function setupBookingForm() {
             } else {
               minutes = 45;
             }
-            
-            // Calculate the start time in minutes
+
             const clickStartMin = h * 60 + minutes;
-            
-            // Check if at least 1 hour is available from this click point
-            const minEndMin = clickStartMin + 60; // Need at least 1 hour
-            
-            // Check if this time fits within available blocks
-            const fitsInAvailable = blocks.some(([s, e]) => s <= clickStartMin && e >= minEndMin);
-            
+            const minEndMin = clickStartMin + 60;
+
+            const fitsInAvailable = latestBlocks.some(([s, e]) => s <= clickStartMin && e >= minEndMin);
             if (!fitsInAvailable) {
-              // Can't select this time - not enough availability
               return;
             }
-            
-            // Check if this time conflicts with any bookings
-            const bookedBlocks = demoBooked[dayIdx] || [];
-            const hasConflict = bookedBlocks.some(([bs, be]) => {
-              return !(be <= clickStartMin || bs >= minEndMin);
-            });
-            
+
+            const hasConflict = latestBooked.some(([bs, be]) => !(be <= clickStartMin || bs >= minEndMin));
             if (hasConflict) {
-              // Can't select this time - conflicts with booking
               return;
             }
-            
-            // Clear previous selected block(s) and restore their label
-            calElem.querySelectorAll(".av-slot.selected").forEach((el) => {
-              el.classList.remove("selected");
-              el.textContent = "";
-              // Remove any selection overlay
+
+            calElem.querySelectorAll('.av-slot.selected').forEach((el) => {
+              el.classList.remove('selected');
+              el.textContent = '';
               const overlay = el.querySelector('.selection-overlay');
               if (overlay) overlay.remove();
             });
 
-            // Select this cell
-            cell.classList.add("selected");
+            cell.classList.add('selected');
             selectedBlockId = `${dayIdx}-${h}`;
             selectedBlockElem = cell;
 
-            // Re-enable duration options and recompute (updateDurationOptions will disable appropriately)
             Array.from(durationSel.options).forEach((opt) => (opt.disabled = false));
 
-            // Calculate the actual date for the selected day
             const date = new Date(monday);
             date.setDate(monday.getDate() + dayIdx);
-            originalCalendarDate = date; // Store for recurring options
-            // Use local date formatting to avoid timezone conversion issues
+            originalCalendarDate = date;
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
             hiddenDate.value = `${year}-${month}-${day}`;
-            const timeStr = `${String(h).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+            const timeStr = `${String(h).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
             hiddenStart.value = timeStr;
-            
-            // Update day dropdown
+
             if (daySelect) {
               daySelect.value = String(dayIdx);
             }
-            
-            // Update start time dropdown
+
             if (startTimeInput) {
               startTimeInput.value = timeStr;
               updateEndTimeOptions(timeStr);
-              // Update day availability after setting time
               updateDayAvailability();
             }
 
-            // Update duration options to reflect any bookings around this time
-            updateDurationOptions(dayIdx, h);
-
-            // Trigger change so the selectedBlockElem label updates to the chosen time range
+            updateDurationOptions(dayIdx, clickStartMin);
             durationSel.dispatchEvent(new Event('change'));
 
-            // Populate recurring-end dropdown starting from the week after the selected date
             if (recurringEndSel) {
               populateRecurringEndOptions(date);
-              // If recurring is checked, ensure the row is visible and required
               if (recurringCb.checked) {
                 recurringRow.style.display = 'flex';
                 recurringEndSel.required = true;
@@ -1424,10 +1275,42 @@ function setupBookingForm() {
             }
           });
         } else {
-          // Add unavailable block for grayed out slots
-          const unavailableBlock = document.createElement("div");
-          unavailableBlock.className = "av-block-unavailable";
-          cell.appendChild(unavailableBlock);
+          cell.classList.add('unavailable');
+          cell.style.cursor = 'not-allowed';
+        }
+
+        // Render unavailable overlays within the hour to match real booking boundaries
+        const availableSegments = blocks
+          .map(([s, e]) => [Math.max(s, startMin), Math.min(e, endMin)])
+          .filter(([s, e]) => e > s)
+          .sort((a, b) => a[0] - b[0]);
+
+        let cursorMin = startMin;
+        availableSegments.forEach(([segStart, segEnd]) => {
+          if (segStart > cursorMin) {
+            const blockEl = document.createElement('div');
+            blockEl.className = 'av-block-unavailable';
+            const topPct = ((cursorMin - startMin) / 60) * 100;
+            const heightPct = ((segStart - cursorMin) / 60) * 100;
+            if (heightPct > 0) {
+              blockEl.style.top = `${topPct}%`;
+              blockEl.style.height = `${heightPct}%`;
+              cell.appendChild(blockEl);
+            }
+          }
+          cursorMin = Math.max(cursorMin, segEnd);
+        });
+
+        if (cursorMin < endMin) {
+          const blockEl = document.createElement('div');
+          blockEl.className = 'av-block-unavailable';
+          const topPct = ((cursorMin - startMin) / 60) * 100;
+          const heightPct = ((endMin - cursorMin) / 60) * 100;
+          if (heightPct > 0) {
+            blockEl.style.top = `${topPct}%`;
+            blockEl.style.height = `${heightPct}%`;
+            cell.appendChild(blockEl);
+          }
         }
 
         row.appendChild(cell);

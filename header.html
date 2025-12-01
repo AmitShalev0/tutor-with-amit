@@ -1,34 +1,165 @@
-<!-- Site Header (both states) -->
-<div id="header-in" style="display: none;">
-  <!-- Logged-in header content -->
-  <header class="site-header">
-    <div class="container header-inner">
-      <h1 class="logo"><a href="index.html">Amit Tutoring</a></h1>
-      <nav>
-        <a href="dashboard.html">Dashboard</a>
-        <a href="sessions.html">Sessions</a>
-        <!-- <a href="book-session.html">Book Session</a> -->
-        <!-- <a href="edit-profile.html">Profile</a> -->
-        <!-- <a href="logout.html" id="logout-link">Logout</a> -->
-        <button id="logout-btn" class="logout-btn">Log Out</button>
-      </nav>
-      <div class="header-right">
-        <div id="current-time" class="current-time"></div>
-      </div>
-    </div>
-  </header>
-</div>
 
-<div id="header-out" style="display: none;">
-  <!-- Logged-out header content -->
-  <header class="site-header">
-    <div class="container header-inner">
-      <h1 class="logo"><a href="index.html">Amit Tutoring</a></h1>
-      <nav>
-        <a href="login.html">Login</a>
-        <a href="signup.html">Sign Up</a>
-        <a href="contact.html">Contact</a>
-      </nav>
+<!-- Unified Site Header -->
+<header class="site-header">
+  <div class="container header-inner">
+    <h1 class="logo">
+      <a href="index.html" class="logo-text">
+        <span class="logo-text-primary">Amit</span>
+        <span class="logo-text-secondary">tutoring</span>
+      </a>
+    </h1>
+    <span id="header-greeting" class="header-greeting header-hidden" aria-live="polite"></span>
+    <nav class="header-nav">
+      <a href="dashboard.html" id="dashboard-link">Dashboard</a>
+      <a href="sessions.html" id="sessions-link">Sessions</a>
+      <button id="header-auth-btn" class="btn secondary header-auth-btn" type="button">Login</button>
+    </nav>
+    <div class="header-right">
+      <div id="current-time" class="current-time"></div>
     </div>
-  </header>
-</div>
+  </div>
+</header>
+
+<script>
+(function () {
+  const INIT_FLAG = '__headerInitialized';
+
+  function waitForFirebase(timeoutMs = 10000) {
+    return new Promise((resolve, reject) => {
+      const start = Date.now();
+      function check() {
+        if (window.firebaseAuth && window.firebaseOnAuth) {
+          resolve();
+        } else if (Date.now() - start >= timeoutMs) {
+          reject(new Error('Firebase not ready'));
+        } else {
+          setTimeout(check, 50);
+        }
+      }
+      check();
+    });
+  }
+
+  function formatName(raw) {
+    if (!raw) return '';
+    const [first] = raw.trim().split(/\s+/);
+    if (!first) return '';
+    return first.charAt(0).toUpperCase() + first.slice(1);
+  }
+
+  async function resolveFirstName(user) {
+    const db = window.firestoreDb;
+    const docFn = window.firestoreDoc;
+    const getDocFn = window.firestoreGetDoc;
+
+    if (db && docFn && getDocFn) {
+      try {
+        const ref = docFn(db, 'users', user.uid);
+        const snapshot = await getDocFn(ref);
+        if (snapshot && snapshot.exists()) {
+          const data = snapshot.data();
+          const fromProfile = data.firstName || formatName(data.fullName || '');
+          if (fromProfile) {
+            return fromProfile;
+          }
+        }
+      } catch (error) {
+        console.warn('Header: failed to load profile name', error);
+      }
+    }
+
+    if (user.displayName) {
+      const fromDisplayName = formatName(user.displayName);
+      if (fromDisplayName) return fromDisplayName;
+    }
+
+    if (user.email) {
+      const localPart = user.email.split('@')[0];
+      const cleaned = localPart.replace(/[._]/g, ' ');
+      const formatted = formatName(cleaned);
+      if (formatted) return formatted;
+    }
+
+    return 'User';
+  }
+
+  function setLoggedOutState(greetingEl, authBtn) {
+    if (greetingEl) {
+      greetingEl.textContent = '';
+      greetingEl.classList.add('header-hidden');
+    }
+    if (authBtn) {
+      authBtn.textContent = 'Login';
+      authBtn.onclick = () => {
+        window.location.href = 'login.html';
+      };
+    }
+  }
+
+  function setLoggedInState(greetingEl, authBtn, firstName) {
+    if (greetingEl) {
+      greetingEl.textContent = `Hello, ${firstName}`;
+      greetingEl.classList.remove('header-hidden');
+    }
+    if (authBtn) {
+      authBtn.textContent = 'Logout';
+      authBtn.onclick = async () => {
+        try {
+          if (window.firebaseSignOut && window.firebaseAuth) {
+            await window.firebaseSignOut(window.firebaseAuth);
+          }
+        } catch (err) {
+          console.error('Header: logout failed', err);
+        } finally {
+          window.location.href = 'index.html';
+        }
+      };
+    }
+  }
+
+  window.initializeHeader = function initializeHeader() {
+    if (window[INIT_FLAG]) return;
+    window[INIT_FLAG] = true;
+
+    const headerScope = document.getElementById('site-header') || document;
+    const greetingEl = headerScope.querySelector('#header-greeting');
+    const authBtn = headerScope.querySelector('#header-auth-btn');
+
+    if (!greetingEl || !authBtn) {
+      window[INIT_FLAG] = false;
+      return;
+    }
+
+    setLoggedOutState(greetingEl, authBtn);
+
+    waitForFirebase()
+      .then(() => {
+        const auth = window.firebaseAuth;
+        const onAuth = window.firebaseOnAuth;
+        if (!auth || !onAuth) {
+          setLoggedOutState(greetingEl, authBtn);
+          return;
+        }
+
+        onAuth(auth, async (user) => {
+          if (!user) {
+            setLoggedOutState(greetingEl, authBtn);
+            return;
+          }
+
+          const firstName = await resolveFirstName(user);
+          setLoggedInState(greetingEl, authBtn, firstName);
+        });
+      })
+      .catch(() => {
+        setLoggedOutState(greetingEl, authBtn);
+      });
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', window.initializeHeader, { once: true });
+  } else {
+    window.initializeHeader();
+  }
+})();
+</script>

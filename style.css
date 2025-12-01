@@ -45,6 +45,28 @@ a:hover { text-decoration: underline; }
   gap: 1.5rem;
 }
 
+.header-greeting {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text);
+  margin-left: 1.5rem;
+}
+
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-left: 2rem;
+}
+
+.header-auth-btn {
+  margin-left: 1.5rem;
+}
+
+.header-hidden {
+  display: none !important;
+}
+
 .logo {
   font-size: 1.2rem;
   letter-spacing: 0.03em;
@@ -57,10 +79,26 @@ a:hover { text-decoration: underline; }
 }
 .logo a:hover { text-decoration: underline; }
 
+.logo-text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  line-height: 1.1;
+}
+
+.logo-text-primary,
+.logo-text-secondary {
+  display: inline-block;
+}
+
+.logo-text-secondary {
+  text-transform: lowercase;
+}
+
 /* Navigation in the center */
 nav {
   display: flex;
-  gap: 1.5rem;
+  gap: 1.1rem;
   flex: 1;
   justify-content: center;
 }
@@ -433,6 +471,10 @@ nav .login-link:hover {
   background: rgba(79, 157, 255, 0.3);
 }
 
+.av-slot.unavailable {
+  cursor: not-allowed;
+}
+
 .av-slot.selected {
   background: transparent;
   color: #020203;
@@ -469,9 +511,13 @@ nav .login-link:hover {
 
 .av-block-unavailable {
   position: absolute;
-  inset: 0;
-  background: #3a3a3c;
-  cursor: not-allowed;
+  left: 2px;
+  right: 2px;
+  top: 0;
+  height: 100%;
+  background: rgba(58, 58, 60, 0.9);
+  border-radius: 4px;
+  pointer-events: none;
 }
 
 #duration-hours option:disabled {
@@ -494,6 +540,11 @@ nav .login-link:hover {
     padding: 0 12px;
   }
 
+  .time-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
   /* .header-inner {
     grid-template-columns: 1fr;
     gap: 8px;
@@ -501,40 +552,65 @@ nav .login-link:hover {
   } */
 
     .header-inner {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 8px 0;
-  }
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 0;
+    }
 
-  .logo {
-    font-size: 1rem;
-    grid-column: 1;
-  }
+    .logo {
+      font-size: 0.95rem;
+    }
 
-  .header-inner nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    justify-self: center;
-    grid-column: 1;
-    order: 2;
-  }
+    .logo-text {
+      flex-direction: column;
+      gap: 0;
+    }
 
-  .header-inner nav a {
-    margin-left: 0;
-    font-size: 0.8rem;
-    padding: 4px 8px;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.05);
-  }
+    .logo-text-secondary {
+      margin-top: 2px;
+      letter-spacing: 0.08em;
+    }
 
-  .header-right {
-    grid-column: 1;
-    justify-self: start;
-    order: 3;
-  }
+    .header-greeting {
+      order: 1;
+      margin-left: 0;
+      font-size: 0.85rem;
+    }
+
+    .header-nav {
+      order: 2;
+      width: 100%;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 6px;
+      margin-left: 0;
+    }
+
+    .header-nav a,
+    .header-nav button {
+      margin-left: 0;
+      font-size: 0.78rem;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      white-space: nowrap;
+    }
+
+    .header-auth-btn {
+      margin-left: 0;
+    }
+
+    .header-right {
+      order: 3;
+      width: 100%;
+      align-items: flex-end;
+    }
+
+    .current-time {
+      font-size: 0.65rem;
+    }
 
   .theme-toggle {
     padding: 4px 6px;
@@ -682,6 +758,11 @@ nav .login-link:hover {
     padding: 0 14px;
   }
 
+  .time-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
   .header-inner {
     grid-template-columns: auto 1fr auto;
     gap: 8px;
@@ -814,6 +895,14 @@ nav .login-link:hover {
   gap: 12px;
 }
 
+.time-grid > div {
+  min-width: 0;
+}
+
+.time-grid select {
+  width: 100%;
+}
+
 .pointer-cursor {
   cursor: pointer;
 }
@@ -920,33 +1009,3 @@ nav .login-link:hover {
   font-size: 0.95rem;
 }
 
-/* --- Mobile: Move switch-slider to right and align with nav --- */
-@media (max-width: 480px) {
-  .header-inner {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    display: flex;
-    gap: 8px;
-    padding: 8px 0;
-  }
-  nav {
-    flex: 1;
-    justify-content: flex-start;
-    gap: 4px;
-  }
-  .header-right {
-    flex-direction: row;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    margin-left: auto;
-    margin-right: 0;
-    order: 2;
-  }
-  .theme-switch {
-    margin-left: auto;
-    margin-right: 0;
-    order: 3;
-  }
-}
