@@ -40,7 +40,7 @@ a:hover { text-decoration: underline; }
 .header-inner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding: 12px 0;
   gap: 1.5rem;
 }
@@ -53,14 +53,28 @@ a:hover { text-decoration: underline; }
 }
 
 .header-nav {
+  flex: 1 1 auto;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(120px, 1fr);
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin: 0 auto;
+  max-width: 420px;
+}
+
+.header-nav-item {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  margin-left: 2rem;
+  justify-content: center;
+  width: 100%;
+  text-decoration: none;
+  min-width: 0;
 }
 
 .header-auth-btn {
-  margin-left: 1.5rem;
+  margin-left: 0;
 }
 
 .header-hidden {
@@ -110,6 +124,7 @@ nav {
   align-items: flex-end;
   gap: 0.25rem;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* Theme toggle switch */
@@ -792,24 +807,24 @@ nav .login-link:hover {
     .header-nav {
       order: 2;
       width: 100%;
-      justify-content: flex-end;
-      align-items: center;
+      grid-auto-flow: row;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 6px;
-      margin-left: 0;
+      margin: 0;
+      justify-content: center;
+      max-width: 100%;
     }
 
-    .header-nav a,
-    .header-nav button {
-      margin-left: 0;
-      font-size: 0.78rem;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.06);
-      white-space: nowrap;
+    .header-nav .header-nav-item {
+      font-size: 0.68rem;
+      padding: 3px 6px;
+      border-radius: 16px;
     }
 
-    .header-auth-btn {
-      margin-left: 0;
+    .header-nav .btn {
+      display: flex;
+      margin-bottom: 0;
+      width: 100%;
     }
 
     .header-right {
