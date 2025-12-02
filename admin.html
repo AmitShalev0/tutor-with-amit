@@ -194,6 +194,95 @@
       gap: 0.5rem;
     }
 
+    .invoice-notes {
+      white-space: pre-wrap;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+
+    .calendar-card {
+      background: var(--surface);
+      padding: 24px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+    }
+
+    .calendar-card p {
+      margin-top: 0;
+    }
+
+    .calendar-description {
+      color: var(--muted);
+    }
+
+    .calendar-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-top: 20px;
+    }
+
+    .sync-result {
+      margin-top: 20px;
+      color: var(--muted);
+    }
+
+    .sync-success {
+      color: #28a745;
+      margin: 0;
+    }
+
+    .sync-warning {
+      color: #ffc107;
+      margin: 0;
+    }
+
+    .sync-error {
+      color: #dc3545;
+      margin: 0;
+    }
+
+    .sync-summary-list {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    .paid-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      background: #198754;
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .paid-meta {
+      display: inline-block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .invoice-row-clickable {
+      cursor: pointer;
+    }
+
+    .invoice-row-clickable:hover {
+      background: rgba(148, 163, 184, 0.15);
+    }
+
+    .invoice-notes-row td {
+      background: var(--surface-alt);
+    }
+
+    .invoice-comment-wrapper {
+      padding: 16px;
+    }
+
     .btn {
       background: var(--accent);
       color: white;
@@ -692,16 +781,17 @@
         <div class="section-header">
           <h2>Google Calendar Sync</h2>
         </div>
-        <div style="background: var(--surface); padding: 24px; border-radius: var(--radius-lg); border: 1px solid var(--border);">
-          <p style="margin-top: 0;">Sync your sessions with Google Calendar. This will create calendar events for any sessions that haven't been synced yet.</p>
-          <div style="display: flex; gap: 12px; align-items: center; margin-top: 20px;">
+        <div class="calendar-card">
+          <p class="calendar-description">Sync your sessions with Google Calendar. This will create calendar events for any sessions that haven't been synced yet.</p>
+          <div class="calendar-actions">
             <button class="btn" onclick="triggerSync()">🔄 Sync Now</button>
+            <button class="btn btn-warning" onclick="fullCalendarCleanup()">🧹 Clean &amp; Resync</button>
             <span class="sync-status">
               <span class="sync-indicator" id="sync-indicator"></span>
               <span id="sync-status-text">Ready to sync</span>
             </span>
           </div>
-          <div id="sync-result" style="margin-top: 20px; color: var(--muted);"></div>
+          <div id="sync-result" class="sync-result"></div>
         </div>
       </section>
 
@@ -709,11 +799,11 @@
       <section id="invoices-section" class="admin-section">
         <div class="section-header">
           <h2>Invoices</h2>
-          <button class="btn" onclick="showInvoiceGenerator()">+ Generate Invoice</button>
+          <div class="section-actions">
+            <button class="btn" onclick="loadInvoices()">🔄 Refresh</button>
+          </div>
         </div>
-        <div id="invoices-container">
-          <p style="color: var(--muted);">Invoice generation feature coming soon. Will integrate with your existing invoices.py backend.</p>
-        </div>
+        <div id="invoices-container" class="loading">Loading invoices...</div>
       </section>
     </main>
   </div>
@@ -796,7 +886,7 @@
   </div>
 
   <script type="module">
-    import { auth, db, onAuthStateChanged, signOut, collection, getDocs, getDoc, query, where, orderBy, deleteDoc, doc, updateDoc, setDoc, serverTimestamp } from './firebase.js';
+    import { auth, db, storage, ref, uploadBytes, getDownloadURL, onAuthStateChanged, signOut, collection, getDocs, getDoc, query, where, orderBy, deleteDoc, doc, updateDoc, setDoc, serverTimestamp } from './firebase.js';
 
     const ADMIN_UID = 'fUXnvGI024fYp4w1AvKUcbM7p8z2';
     let currentUser = null;
@@ -808,6 +898,337 @@
     let expandedRecurringGroupIds = new Set();
     let bulkEditSessionIds = [];
     let bulkEditRecurringKey = null;
+    let invoiceCache = [];
+
+    const INVOICE_STATUS_READY = 'ready';
+    const INVOICE_STATUS_SENT = 'sent';
+    const INVOICE_STATUS_PAID = 'paid';
+    const NON_BILLABLE_STATUSES = new Set(['pending', 'cancelled', 'rejected']);
+
+    function escapeHtml(str) {
+      if (str == null) {
+        return '';
+      }
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatDurationFromMinutes(minutes) {
+      if (minutes == null || Number.isNaN(minutes)) {
+        return '-';
+      }
+
+      const totalMinutes = Math.max(0, Math.round(minutes));
+      const hours = Math.floor(totalMinutes / 60);
+      const mins = totalMinutes % 60;
+      const parts = [];
+      if (hours) {
+        parts.push(`${hours}h`);
+      }
+      if (mins) {
+        parts.push(`${mins}m`);
+      }
+      if (!parts.length) {
+        return '0m';
+      }
+      return parts.join(' ');
+    }
+
+    function formatCurrency(amount) {
+      const value = Number(amount);
+      if (Number.isNaN(value)) {
+        return '--';
+      }
+      return `$${value.toFixed(2)}`;
+    }
+
+    function base64ToUint8Array(base64) {
+      if (!base64) {
+        return new Uint8Array();
+      }
+      const clean = base64.replace(/\s/g, '');
+      const binary = atob(clean);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    }
+
+    function calculateDurationMinutesForSession(session) {
+      if (!session) {
+        return null;
+      }
+      const startMinutes = timeStringToMinutes(session.startTime);
+      if (startMinutes == null) {
+        return null;
+      }
+      const endMinutes = deriveEndMinutes(startMinutes, session);
+      if (endMinutes == null || endMinutes <= startMinutes) {
+        return null;
+      }
+      return endMinutes - startMinutes;
+    }
+
+    function isSessionInPast(session) {
+      if (!session) {
+        return false;
+      }
+
+      const parsed = parseDateValue(session.sessionDate || session.date);
+      if (!parsed.dateObj) {
+        return false;
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const sessionDate = new Date(parsed.dateObj);
+      sessionDate.setHours(0, 0, 0, 0);
+
+      if (sessionDate < today) {
+        return true;
+      }
+
+      if (sessionDate > today) {
+        return false;
+      }
+
+      const endMinutes = deriveEndMinutes(timeStringToMinutes(session.startTime), session);
+      if (endMinutes == null) {
+        return false;
+      }
+
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      return currentMinutes >= endMinutes;
+    }
+
+    function shouldGenerateInvoiceForSession(session) {
+      if (!session) {
+        return false;
+      }
+
+      if (!isSessionInPast(session)) {
+        return false;
+      }
+
+      const status = (session.status || '').toLowerCase();
+      if (status && NON_BILLABLE_STATUSES.has(status)) {
+        return false;
+      }
+
+      return true;
+    }
+
+    function getGuardianName(session) {
+      return session.guardianName || session.guardianFullName || session.guardian_full_name || session.fullName || session.userName || '';
+    }
+
+    function getGuardianEmail(session) {
+      return session.guardianEmail || session.email || session.userEmail || '';
+    }
+
+    function valuesAreEquivalent(a, b) {
+      if (a == null && b == null) {
+        return true;
+      }
+      if (typeof a === 'number' || typeof b === 'number') {
+        const numA = Number(a);
+        const numB = Number(b);
+        if (Number.isNaN(numA) && Number.isNaN(numB)) {
+          return true;
+        }
+        return numA === numB;
+      }
+      return a === b;
+    }
+
+    function buildInvoiceFieldsFromSession(session) {
+      const sessionDate = getISODateString(session.sessionDate || session.date);
+      const startTime = normalizeTimeForInput(session.startTime);
+      const endTime = normalizeTimeForInput(session.endTime);
+      const durationMinutes = calculateDurationMinutesForSession({ ...session, startTime, endTime });
+      const guardianName = getGuardianName(session);
+      const guardianFirstName = guardianName ? guardianName.trim().split(/\s+/)[0] : '';
+      const totalAmountRaw = Number(session.cost ?? session.totalAmount ?? session.amount ?? 0);
+      const totalAmount = Number.isNaN(totalAmountRaw) ? 0 : totalAmountRaw;
+      const studentNames = session.studentNames || session.studentName || '';
+
+      return {
+        bookingId: session.id,
+        userId: session.userId || null,
+        sessionDate,
+        startTime,
+        endTime,
+        durationMinutes,
+        durationFormatted: formatDurationFromMinutes(durationMinutes),
+        totalAmount,
+        totalAmountFormatted: formatCurrency(totalAmount),
+        studentNames,
+        guardianName,
+        guardianFirstName,
+        guardianEmail: getGuardianEmail(session),
+        sessionSummary: session.sessionSummary || '',
+        subject: session.subject || ''
+      };
+    }
+
+    async function refreshInvoiceCache() {
+      try {
+        const snapshot = await getDocs(collection(db, 'invoices'));
+        invoiceCache = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+      } catch (error) {
+        console.error('Error refreshing invoice cache:', error);
+        invoiceCache = [];
+      }
+      return invoiceCache;
+    }
+
+    async function syncInvoicesWithSessions(sessions) {
+      if (!sessions || !sessions.length) {
+        await refreshInvoiceCache();
+        return;
+      }
+
+      let invoicesChanged = false;
+
+      try {
+        const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
+        const existingInvoices = new Map();
+        invoicesSnapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          existingInvoices.set(docSnap.id, { id: docSnap.id, ...data });
+        });
+
+        for (const session of sessions) {
+          if (!shouldGenerateInvoiceForSession(session)) {
+            continue;
+          }
+
+          const invoiceRef = doc(db, 'invoices', session.id);
+          const desiredFields = buildInvoiceFieldsFromSession(session);
+          const existing = existingInvoices.get(session.id);
+
+          if (!existing) {
+            const payload = {
+              ...desiredFields,
+              status: INVOICE_STATUS_READY,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+              sentAt: null
+            };
+
+            await setDoc(invoiceRef, payload);
+            invoicesChanged = true;
+            existingInvoices.set(session.id, { id: session.id, ...payload });
+
+            const bookingUpdates = {
+              invoiceStatus: INVOICE_STATUS_READY,
+              invoiceCreatedAt: serverTimestamp()
+            };
+
+            try {
+              await updateDoc(doc(db, 'bookings', session.id), bookingUpdates);
+            } catch (bookingErr) {
+              console.warn('Failed to update booking invoice status for', session.id, bookingErr);
+            }
+          } else {
+            const currentStatus = (existing.status || INVOICE_STATUS_READY).toLowerCase();
+            const sessionInvoiceStatus = (session.invoiceStatus || '').toLowerCase();
+
+            if (currentStatus !== sessionInvoiceStatus) {
+              try {
+                await updateDoc(doc(db, 'bookings', session.id), {
+                  invoiceStatus: currentStatus
+                });
+              } catch (bookingErr) {
+                console.warn('Failed to sync booking invoice status for', session.id, bookingErr);
+              }
+            }
+
+            if (currentStatus === INVOICE_STATUS_SENT) {
+              continue;
+            }
+
+            const updates = {};
+            for (const [key, value] of Object.entries(desiredFields)) {
+              if (!valuesAreEquivalent(existing[key], value)) {
+                updates[key] = value;
+              }
+            }
+
+            if (Object.keys(updates).length) {
+              updates.updatedAt = serverTimestamp();
+              await updateDoc(invoiceRef, updates);
+              invoicesChanged = true;
+              existingInvoices.set(session.id, { ...existing, ...updates });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error syncing invoices with sessions:', error);
+      }
+
+      if (invoicesChanged) {
+        await refreshInvoiceCache();
+      } else if (!invoiceCache.length) {
+        await refreshInvoiceCache();
+      }
+    }
+
+    async function syncInvoicesUsingLatestSessions() {
+      try {
+        const snapshot = await getDocs(collection(db, 'bookings'));
+        const sessions = [];
+        snapshot.forEach(docSnap => {
+          sessions.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        await syncInvoicesWithSessions(sessions);
+      } catch (error) {
+        console.error('Error syncing invoices from Firestore:', error);
+        if (!invoiceCache.length) {
+          await refreshInvoiceCache();
+        }
+      }
+    }
+
+    function formatInvoiceDate(value) {
+      const parsed = parseDateValue(value);
+      if (!parsed.dateObj) {
+        return '-';
+      }
+      return parsed.dateObj.toLocaleDateString();
+    }
+
+    function formatInvoiceTimeRange(startTime, endTime) {
+      const start = normalizeTimeForInput(startTime);
+      const end = normalizeTimeForInput(endTime);
+      if (start && end) {
+        return `${start} - ${end}`;
+      }
+      return start || end || '-';
+    }
+
+    function getMillis(value) {
+      if (!value) {
+        return 0;
+      }
+      if (typeof value.toMillis === 'function') {
+        return value.toMillis();
+      }
+      if (value instanceof Date) {
+        return value.getTime();
+      }
+      if (typeof value === 'number') {
+        return value;
+      }
+      return 0;
+    }
 
     async function shouldSuppressApprovalEmail(booking) {
       try {
@@ -853,6 +1274,7 @@
       loadStudents();
       loadUsers();
       loadBlockedEmails();
+      loadInvoices();
     });
 
     // Navigation
@@ -862,6 +1284,10 @@
       
       document.getElementById(`${sectionName}-section`).classList.add('active');
       document.querySelector(`[data-section="${sectionName}"]`).classList.add('active');
+
+      if (sectionName === 'invoices') {
+        loadInvoices();
+      }
     };
 
     // Sign out
@@ -2948,6 +3374,623 @@ window.saveSessionChanges = async function (sessionId) {
       }
     };
 
+    window.loadInvoices = async () => {
+      const container = document.getElementById('invoices-container');
+      if (!container) {
+        return;
+      }
+
+      container.innerHTML = '<div class="loading">Loading invoices...</div>';
+
+      try {
+        await syncInvoicesUsingLatestSessions();
+        if (!invoiceCache.length) {
+          await refreshInvoiceCache();
+        }
+
+        const readyInvoices = invoiceCache
+            .filter(inv => ((inv.status || INVOICE_STATUS_READY) || '').toLowerCase() === INVOICE_STATUS_READY)
+          .sort((a, b) => {
+            const dateDiff = getMillis(parseDateValue(a.sessionDate).dateObj) - getMillis(parseDateValue(b.sessionDate).dateObj);
+            if (dateDiff !== 0) {
+              return dateDiff;
+            }
+            const startA = timeStringToMinutes(a.startTime);
+            const startB = timeStringToMinutes(b.startTime);
+            return (startA || 0) - (startB || 0);
+          });
+
+          const sentInvoices = invoiceCache
+            .filter(inv => ((inv.status || '').toLowerCase() === INVOICE_STATUS_SENT))
+            .sort((a, b) => {
+              const sentDiff = getMillis(b.sentAt) - getMillis(a.sentAt);
+              if (sentDiff !== 0) {
+                return sentDiff;
+              }
+              return getMillis(parseDateValue(b.sessionDate).dateObj) - getMillis(parseDateValue(a.sessionDate).dateObj);
+            });
+
+          const paidInvoices = invoiceCache
+            .filter(inv => ((inv.status || '').toLowerCase() === INVOICE_STATUS_PAID))
+            .sort((a, b) => {
+              const paidDiff = getMillis(b.paidAt) - getMillis(a.paidAt);
+              if (paidDiff !== 0) {
+                return paidDiff;
+              }
+              return getMillis(parseDateValue(b.sessionDate).dateObj) - getMillis(parseDateValue(a.sessionDate).dateObj);
+            });
+
+        let html = '';
+          html += buildInvoiceTable(readyInvoices, 'Ready to Send', 'No invoices ready to send yet.', { showActions: true, showPaidToggle: true, enableNotes: true });
+          html += buildInvoiceTable(sentInvoices, 'Sent Invoices', 'No invoices have been sent yet.', { showSentAt: true, showPaidToggle: true });
+          html += buildInvoiceTable(paidInvoices, 'Paid Invoices', 'No invoices marked as paid yet.', { showSentAt: true, showPaidBadge: true });
+
+        container.innerHTML = html;
+      } catch (error) {
+        console.error('Error loading invoices:', error);
+        container.innerHTML = `<div class="empty-state"><h3>Error loading invoices</h3><p>${error.message}</p></div>`;
+      }
+    };
+
+    function buildInvoiceTable(invoices, title, emptyMessage, options = {}) {
+      const {
+        showActions = false,
+        showSentAt = false,
+        showPaidToggle = false,
+        showPaidBadge = false,
+        enableNotes = false
+      } = options;
+      let html = `<h3 style="margin-top: 1.5rem; margin-bottom: 1rem; color: var(--accent);">${title}</h3>`;
+
+      if (!invoices.length) {
+        html += `<div class="empty-state"><p>${emptyMessage}</p></div>`;
+        return html;
+      }
+
+      html += '<div class="data-table"><table><thead><tr>';
+      html += '<th>Students</th><th>Guardian</th><th>Date</th><th>Time</th><th>Duration</th><th>Amount</th><th>Notes</th>';
+      if (showSentAt) {
+        html += '<th>Sent</th>';
+      }
+      if (showPaidBadge) {
+        html += '<th>Status</th>';
+      }
+      if (showActions || showPaidToggle) {
+        html += '<th>Actions</th>';
+      }
+      html += '</tr></thead><tbody>';
+
+      const baseColumnCount = 7
+        + (showSentAt ? 1 : 0)
+        + (showPaidBadge ? 1 : 0)
+        + ((showActions || showPaidToggle) ? 1 : 0);
+
+      invoices.forEach((invoice, index) => {
+        const rawId = String(invoice.id || invoice.bookingId || '');
+        const jsSafeId = rawId.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+        const domIdBase = rawId || `invoice_${index}`;
+        const domId = domIdBase.replace(/[^a-zA-Z0-9_-]/g, '_') || `invoice_${index}`;
+        const students = escapeHtml(invoice.studentNames || '-');
+        const guardianName = escapeHtml(invoice.guardianName || '-');
+        const guardianEmail = invoice.guardianEmail ? escapeHtml(invoice.guardianEmail) : '';
+        const guardianCell = guardianEmail
+          ? `${guardianName}<br><span style="color: var(--muted); font-size: 0.85rem;">${guardianEmail}</span>`
+          : guardianName;
+        const dateDisplay = formatInvoiceDate(invoice.sessionDate);
+        const timeDisplay = formatInvoiceTimeRange(invoice.startTime, invoice.endTime);
+        const durationDisplay = invoice.durationFormatted || formatDurationFromMinutes(invoice.durationMinutes);
+        const amountDisplay = invoice.totalAmountFormatted || formatCurrency(invoice.totalAmount);
+        const notesRaw = invoice.sessionSummary || '';
+        const notesHtml = notesRaw
+          ? escapeHtml(notesRaw).replace(/\n/g, '<br>')
+          : '<span style="color: var(--muted);">No notes yet.</span>';
+
+        const rowClasses = ['invoice-table-row'];
+        if (enableNotes) {
+          rowClasses.push('invoice-row-clickable');
+        }
+
+        const rowAttrs = [];
+        if (rowClasses.length) {
+          rowAttrs.push(`class="${rowClasses.join(' ')}"`);
+        }
+        if (enableNotes) {
+          rowAttrs.push(`onclick="toggleInvoiceNotes('${jsSafeId}')"`);
+        }
+
+        html += `<tr ${rowAttrs.join(' ')}>`;
+        html += `<td>${students}</td>`;
+        html += `<td>${guardianCell}</td>`;
+        html += `<td>${dateDisplay}</td>`;
+        html += `<td>${timeDisplay}</td>`;
+        html += `<td>${durationDisplay}</td>`;
+        html += `<td>${amountDisplay}</td>`;
+        html += `<td><div class="invoice-notes">${notesHtml}</div></td>`;
+
+        if (showSentAt) {
+          const sentAtDisplay = invoice.sentAt && typeof invoice.sentAt.toDate === 'function'
+            ? invoice.sentAt.toDate().toLocaleString()
+            : '-';
+          html += `<td>${sentAtDisplay}</td>`;
+        }
+
+        if (showPaidBadge) {
+          const paidAtDisplay = invoice.paidAt && typeof invoice.paidAt.toDate === 'function'
+            ? invoice.paidAt.toDate().toLocaleString()
+            : '-';
+          html += `<td><span class="paid-badge">Paid</span><br><span class="paid-meta">${paidAtDisplay}</span></td>`;
+        }
+
+        if (showActions || showPaidToggle) {
+          const disabledAttr = invoice.guardianEmail ? '' : ' disabled title="Missing guardian email"';
+          const actionButtons = [];
+          if (showActions) {
+            actionButtons.push(`<button class="btn btn-success btn-sm" onclick="event.stopPropagation(); sendInvoice('${jsSafeId}')"${disabledAttr}>Send</button>`);
+          }
+          if (showPaidToggle) {
+            actionButtons.push(`<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); markInvoicePaid('${jsSafeId}')">Paid</button>`);
+          }
+          html += `<td class="action-buttons">${actionButtons.join(' ')}</td>`;
+        }
+
+        html += '</tr>';
+
+        if (enableNotes) {
+          const notesValue = escapeHtml(notesRaw);
+          html += `<tr id="invoice-notes-row-${domId}" class="invoice-notes-row" style="display: none;">
+            <td colspan="${baseColumnCount}">
+              <div class="session-comment-wrapper invoice-comment-wrapper">
+                <textarea
+                  id="invoice-notes-input-${domId}"
+                  class="session-comment-input"
+                  rows="5"
+                  placeholder="Add tutor notes for this session...">${notesValue}</textarea>
+                <div class="session-comment-actions">
+                  <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); saveInvoiceNotes('${jsSafeId}')">Save Notes</button>
+                  <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); cancelInvoiceNotes('${jsSafeId}')">Cancel</button>
+                </div>
+              </div>
+            </td>
+          </tr>`;
+        }
+      });
+
+      html += '</tbody></table></div>';
+      return html;
+    }
+
+    const normalizeInvoiceId = (value) => (value == null ? '' : String(value));
+
+    function getInvoiceDomId(invoiceId) {
+      const base = normalizeInvoiceId(invoiceId);
+      const safe = base.replace(/[^a-zA-Z0-9_-]/g, '_');
+      return safe || 'invoice_row';
+    }
+
+    function findInvoiceById(invoiceId) {
+      const target = normalizeInvoiceId(invoiceId);
+      if (!target) {
+        return null;
+      }
+      return invoiceCache.find(inv =>
+        normalizeInvoiceId(inv.id) === target || normalizeInvoiceId(inv.bookingId) === target
+      ) || null;
+    }
+
+    window.toggleInvoiceNotes = (invoiceId) => {
+      const domId = getInvoiceDomId(invoiceId);
+      const row = document.getElementById(`invoice-notes-row-${domId}`);
+      if (!row) {
+        return;
+      }
+
+      document.querySelectorAll('.invoice-notes-row').forEach(otherRow => {
+        if (otherRow !== row) {
+          otherRow.style.display = 'none';
+        }
+      });
+
+      const isHidden = row.style.display === 'none';
+      if (isHidden) {
+        const invoice = findInvoiceById(invoiceId);
+        const textarea = document.getElementById(`invoice-notes-input-${domId}`);
+        if (textarea) {
+          textarea.value = invoice?.sessionSummary || '';
+        }
+        row.style.display = 'table-row';
+      } else {
+        row.style.display = 'none';
+      }
+    };
+
+    window.cancelInvoiceNotes = (invoiceId) => {
+      const domId = getInvoiceDomId(invoiceId);
+      const row = document.getElementById(`invoice-notes-row-${domId}`);
+      if (!row) {
+        return;
+      }
+
+      const invoice = findInvoiceById(invoiceId);
+      const textarea = document.getElementById(`invoice-notes-input-${domId}`);
+      if (textarea) {
+        textarea.value = invoice?.sessionSummary || '';
+      }
+
+      row.style.display = 'none';
+    };
+
+    window.saveInvoiceNotes = async (invoiceId) => {
+      const domId = getInvoiceDomId(invoiceId);
+      const textarea = document.getElementById(`invoice-notes-input-${domId}`);
+      if (!textarea) {
+        return;
+      }
+
+      const notes = textarea.value.trim();
+      const invoice = findInvoiceById(invoiceId);
+      const invoiceDocId = normalizeInvoiceId(invoice?.id || invoiceId);
+
+      if (!invoiceDocId) {
+        alert('Could not determine invoice ID to update.');
+        return;
+      }
+
+      const timestamp = serverTimestamp();
+
+      try {
+        await updateDoc(doc(db, 'invoices', invoiceDocId), {
+          sessionSummary: notes,
+          updatedAt: timestamp
+        });
+
+        const bookingId = normalizeInvoiceId(invoice?.bookingId || invoiceDocId);
+        if (bookingId) {
+          try {
+            await updateDoc(doc(db, 'bookings', bookingId), {
+              sessionSummary: notes,
+              updatedAt: timestamp
+            });
+          } catch (bookingErr) {
+            console.warn('Failed to sync notes to booking for invoice', bookingId, bookingErr);
+          }
+        }
+
+        if (invoice) {
+          invoice.sessionSummary = notes;
+        }
+
+        alert('Tutor notes saved.');
+        await loadInvoices();
+      } catch (error) {
+        console.error('Error saving invoice notes:', error);
+        alert('Error saving notes: ' + error.message);
+      }
+    };
+
+    window.sendInvoice = async (invoiceId) => {
+      if (!invoiceId) {
+        alert('Invoice ID missing.');
+        return;
+      }
+      try {
+        const invoiceRef = doc(db, 'invoices', invoiceId);
+        const invoiceSnap = await getDoc(invoiceRef);
+
+        if (!invoiceSnap.exists()) {
+          alert('Invoice not found.');
+          return;
+        }
+
+        const invoice = invoiceSnap.data();
+        const guardianEmail = invoice.guardianEmail;
+        if (!guardianEmail) {
+          alert('Cannot send invoice without a guardian email address.');
+          return;
+        }
+
+        const confirmMessage = `Send this invoice to ${guardianEmail}?${invoice.sessionSummary ? '' : '\n\nNote: session notes are currently empty.'}`;
+        if (!confirm(confirmMessage)) {
+          return;
+        }
+
+        const payload = {
+          action: 'sendInvoiceEmail',
+          invoiceId,
+          bookingId: invoice.bookingId || invoiceId,
+          guardianEmail,
+          guardianName: invoice.guardianName || '',
+          guardianFirstName: invoice.guardianFirstName || '',
+          studentNames: invoice.studentNames || '',
+          sessionDate: invoice.sessionDate || '',
+          startTime: invoice.startTime || '',
+          endTime: invoice.endTime || '',
+          durationMinutes: invoice.durationMinutes ?? null,
+          durationFormatted: invoice.durationFormatted || formatDurationFromMinutes(invoice.durationMinutes),
+          totalAmount: invoice.totalAmount ?? 0,
+          totalAmountFormatted: invoice.totalAmountFormatted || formatCurrency(invoice.totalAmount),
+          sessionSummary: invoice.sessionSummary || '',
+          subject: invoice.subject || ''
+        };
+
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec';
+        const formData = new URLSearchParams();
+        formData.append('payload', JSON.stringify(payload));
+
+        const response = await fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          body: formData
+        });
+
+        const result = await response.json();
+        if (!result.success) {
+          throw new Error(result.message || 'Failed to send invoice email.');
+        }
+
+        const bookingId = invoice.bookingId || invoiceId;
+        let pdfDownloadUrl = invoice.invoicePdfUrl || null;
+        let pdfStoragePath = invoice.invoicePdfStoragePath || null;
+        const pdfFileName = result.data?.pdfFileName || null;
+        const emailHtml = result.data?.emailHtml || null;
+
+        if (result.data?.pdfBase64) {
+          try {
+            const pdfBytes = base64ToUint8Array(result.data.pdfBase64);
+            if (pdfBytes.length) {
+              const storagePath = `invoices/${bookingId}.pdf`;
+              const storageRefObj = ref(storage, storagePath);
+              await uploadBytes(storageRefObj, pdfBytes, { contentType: 'application/pdf' });
+              pdfDownloadUrl = await getDownloadURL(storageRefObj);
+              pdfStoragePath = storagePath;
+            }
+          } catch (uploadErr) {
+            console.warn('Invoice PDF upload failed:', uploadErr);
+          }
+        }
+
+        const sentTimestamp = serverTimestamp();
+        const updates = {
+          status: INVOICE_STATUS_SENT,
+          sentAt: sentTimestamp,
+          sentBy: currentUser?.email || null,
+          updatedAt: sentTimestamp
+        };
+
+        if (pdfDownloadUrl) {
+          updates.invoicePdfUrl = pdfDownloadUrl;
+          updates.invoicePdfStoragePath = pdfStoragePath;
+        }
+        if (pdfFileName) {
+          updates.invoicePdfFileName = pdfFileName;
+        }
+        if (emailHtml) {
+          updates.invoiceEmailHtml = emailHtml;
+        }
+
+        await updateDoc(invoiceRef, updates);
+
+        try {
+          const bookingUpdates = {
+            invoiceStatus: INVOICE_STATUS_SENT,
+            invoiceSentAt: sentTimestamp
+          };
+
+          if (pdfDownloadUrl) {
+            bookingUpdates.invoicePdfUrl = pdfDownloadUrl;
+            bookingUpdates.invoicePdfStoragePath = pdfStoragePath;
+          }
+          if (pdfFileName) {
+            bookingUpdates.invoicePdfFileName = pdfFileName;
+          }
+          if (emailHtml) {
+            bookingUpdates.invoiceEmailHtml = emailHtml;
+          }
+
+          await updateDoc(doc(db, 'bookings', bookingId), bookingUpdates);
+        } catch (bookingErr) {
+          console.warn('Failed to update booking after sending invoice:', bookingErr);
+        }
+
+        alert('Invoice sent successfully.');
+        await loadInvoices();
+      } catch (error) {
+        console.error('Error sending invoice:', error);
+        alert('Error sending invoice: ' + error.message);
+      }
+    };
+
+    window.markInvoicePaid = async (invoiceId) => {
+      if (!invoiceId) {
+        alert('Invoice ID missing.');
+        return;
+      }
+
+      const invoiceRef = doc(db, 'invoices', invoiceId);
+
+      try {
+        const invoiceSnap = await getDoc(invoiceRef);
+        if (!invoiceSnap.exists()) {
+          alert('Invoice not found.');
+          return;
+        }
+
+        const invoice = invoiceSnap.data();
+        const currentStatus = (invoice.status || '').toLowerCase();
+
+        if (currentStatus === INVOICE_STATUS_PAID) {
+          if (!confirm('This invoice is already marked as paid. Mark it as unpaid (sent) again?')) {
+            return;
+          }
+
+          const resetTimestamp = serverTimestamp();
+          await updateDoc(invoiceRef, {
+            status: INVOICE_STATUS_SENT,
+            paidAt: null,
+            updatedAt: resetTimestamp,
+            receiptPdfUrl: null,
+            receiptPdfStoragePath: null,
+            receiptPdfFileName: null,
+            receiptHtml: null,
+            receiptGeneratedAt: null
+          });
+
+          if (invoice.bookingId) {
+            try {
+              await updateDoc(doc(db, 'bookings', invoice.bookingId), {
+                invoiceStatus: INVOICE_STATUS_SENT,
+                invoicePaidAt: null,
+                receiptPdfUrl: null,
+                receiptPdfStoragePath: null,
+                receiptPdfFileName: null,
+                receiptHtml: null,
+                receiptGeneratedAt: null
+              });
+            } catch (bookingErr) {
+              console.warn('Failed to update booking invoice status when toggling paid off:', bookingErr);
+            }
+          }
+
+          alert('Invoice marked as sent.');
+          await loadInvoices();
+          return;
+        }
+
+        if (!confirm('Mark this invoice as paid?')) {
+          return;
+        }
+
+        const bookingId = invoice.bookingId || invoiceId;
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec';
+        const paidDisplay = new Date().toLocaleString('en-CA', { hour12: true, timeZoneName: 'short' });
+
+        let receiptPdfUrl = invoice.receiptPdfUrl || null;
+        let receiptStoragePath = invoice.receiptPdfStoragePath || null;
+        let receiptFileName = invoice.receiptPdfFileName || null;
+        let receiptHtml = invoice.receiptHtml || null;
+        let receiptError = null;
+
+        if (bookingId) {
+          try {
+            const receiptPayload = {
+              action: 'generateInvoiceReceipt',
+              invoiceId,
+              bookingId,
+              guardianName: invoice.guardianName || '',
+              guardianFirstName: invoice.guardianFirstName || '',
+              studentNames: invoice.studentNames || '',
+              sessionDate: invoice.sessionDate || '',
+              startTime: invoice.startTime || '',
+              endTime: invoice.endTime || '',
+              durationMinutes: invoice.durationMinutes ?? null,
+              durationFormatted: invoice.durationFormatted || formatDurationFromMinutes(invoice.durationMinutes),
+              totalAmount: invoice.totalAmount ?? 0,
+              totalAmountFormatted: invoice.totalAmountFormatted || formatCurrency(invoice.totalAmount),
+              sessionSummary: invoice.sessionSummary || '',
+              subject: invoice.subject || '',
+              paidDisplay
+            };
+
+            const receiptFormData = new URLSearchParams();
+            receiptFormData.append('payload', JSON.stringify(receiptPayload));
+
+            const receiptResponse = await fetch(APPS_SCRIPT_URL, {
+              method: 'POST',
+              body: receiptFormData
+            });
+
+            const receiptResult = await receiptResponse.json();
+            if (!receiptResult.success) {
+              receiptError = receiptResult.message || 'Unable to generate receipt PDF.';
+            } else {
+              if (receiptResult.data?.pdfBase64) {
+                try {
+                  const receiptBytes = base64ToUint8Array(receiptResult.data.pdfBase64);
+                  if (receiptBytes.length) {
+                    const storagePath = `receipts/${bookingId}.pdf`;
+                    const storageRefObj = ref(storage, storagePath);
+                    await uploadBytes(storageRefObj, receiptBytes, { contentType: 'application/pdf' });
+                    receiptPdfUrl = await getDownloadURL(storageRefObj);
+                    receiptStoragePath = storagePath;
+                  }
+                } catch (uploadErr) {
+                  console.warn('Receipt PDF upload failed:', uploadErr);
+                  receiptError = uploadErr.message || 'Receipt PDF upload failed.';
+                }
+              }
+
+              if (receiptResult.data?.pdfFileName) {
+                receiptFileName = receiptResult.data.pdfFileName;
+              }
+              if (receiptResult.data?.receiptHtml) {
+                receiptHtml = receiptResult.data.receiptHtml;
+              }
+            }
+          } catch (generationErr) {
+            console.warn('Receipt generation failed:', generationErr);
+            receiptError = generationErr.message || String(generationErr);
+          }
+        }
+
+        const paidTimestamp = serverTimestamp();
+        const invoiceUpdates = {
+          status: INVOICE_STATUS_PAID,
+          paidAt: paidTimestamp,
+          updatedAt: paidTimestamp
+        };
+
+        if (receiptPdfUrl) {
+          invoiceUpdates.receiptPdfUrl = receiptPdfUrl;
+          invoiceUpdates.receiptPdfStoragePath = receiptStoragePath;
+          invoiceUpdates.receiptGeneratedAt = paidTimestamp;
+        }
+        if (receiptFileName) {
+          invoiceUpdates.receiptPdfFileName = receiptFileName;
+        }
+        if (receiptHtml) {
+          invoiceUpdates.receiptHtml = receiptHtml;
+        }
+
+        await updateDoc(invoiceRef, invoiceUpdates);
+
+        if (bookingId) {
+          try {
+            const bookingUpdates = {
+              invoiceStatus: INVOICE_STATUS_PAID,
+              invoicePaidAt: paidTimestamp
+            };
+
+            if (receiptPdfUrl) {
+              bookingUpdates.receiptPdfUrl = receiptPdfUrl;
+              bookingUpdates.receiptPdfStoragePath = receiptStoragePath;
+              bookingUpdates.receiptGeneratedAt = paidTimestamp;
+            }
+            if (receiptFileName) {
+              bookingUpdates.receiptPdfFileName = receiptFileName;
+            }
+            if (receiptHtml) {
+              bookingUpdates.receiptHtml = receiptHtml;
+            }
+
+            await updateDoc(doc(db, 'bookings', bookingId), bookingUpdates);
+          } catch (bookingErr) {
+            console.warn('Failed to update booking invoice status when marking paid:', bookingErr);
+          }
+        }
+
+        if (receiptError) {
+          alert('Invoice marked as paid, but the receipt PDF could not be generated. Please check the console for details.');
+        } else if (receiptPdfUrl) {
+          alert('Invoice marked as paid. Receipt is available for families.');
+        } else {
+          alert('Invoice marked as paid.');
+        }
+
+        await loadInvoices();
+      } catch (error) {
+        console.error('Error updating invoice paid status:', error);
+        alert('Error updating invoice: ' + error.message);
+      }
+    };
+
     window.deleteUser = async (userId, email) => {
       const label = email && email !== '-' ? email : 'this user';
       if (!confirm(`Delete user ${label}? This will remove their account, students, and bookings. This cannot be undone.`)) {
@@ -3214,6 +4257,97 @@ window.saveSessionChanges = async function (sessionId) {
       }
     };
 
+    async function syncApprovedBookings(options = {}) {
+      const { suppressEmail = false, throttleMs = 500 } = options;
+
+      const approvedQuery = query(collection(db, 'bookings'), where('status', '==', 'approved'));
+      const snapshot = await getDocs(approvedQuery);
+
+      if (snapshot.empty) {
+        return {
+          total: 0,
+          successCount: 0,
+          errorCount: 0,
+          message: 'No approved sessions found to sync.'
+        };
+      }
+
+      const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec';
+      let successCount = 0;
+      let errorCount = 0;
+
+      const docs = snapshot.docs;
+
+      for (let i = 0; i < docs.length; i++) {
+        const bookingDoc = docs[i];
+        const booking = bookingDoc.data();
+        const syncData = {
+          action: 'syncToCalendar',
+          bookingId: bookingDoc.id,
+          sessionDate: booking.sessionDate,
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          studentNames: booking.studentNames || booking.studentName,
+          subject: booking.subject,
+          guardianName: booking.guardianName,
+          guardianEmail: booking.guardianEmail || booking.email,
+          comments: booking.comments || booking.notes || '',
+          suppressEmail
+        };
+
+        try {
+          const formData = new URLSearchParams();
+          formData.append('payload', JSON.stringify(syncData));
+
+          const response = await fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            body: formData
+          });
+
+          const json = await response.json();
+          if (!json.success) {
+            throw new Error(json.message || 'Apps Script returned an error.');
+          }
+
+          try {
+            const bookingRef = doc(db, 'bookings', bookingDoc.id);
+            await updateDoc(bookingRef, {
+              eventId: json.data?.eventId || null,
+              syncedAt: serverTimestamp()
+            });
+          } catch (updateError) {
+            console.warn('Sync succeeded but failed to update Firestore booking', bookingDoc.id, updateError);
+          }
+
+          successCount++;
+        } catch (error) {
+          errorCount++;
+          console.error(`Failed to sync booking ${bookingDoc.id}:`, error);
+        }
+
+        if (throttleMs && i < docs.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, throttleMs));
+        }
+      }
+
+      return {
+        total: docs.length,
+        successCount,
+        errorCount,
+        message: 'Sync completed.'
+      };
+    }
+
+    function buildSyncSummaryHtml(summary) {
+      const { successCount, errorCount } = summary;
+      const parts = [];
+      parts.push(`<li><strong>${successCount}</strong> session(s) synced to Google Calendar.</li>`);
+      if (errorCount > 0) {
+        parts.push(`<li><strong>${errorCount}</strong> session(s) failed to sync. See console for details.</li>`);
+      }
+      return `<p class="sync-success">✓ Bulk sync completed!</p><ul class="sync-summary-list">${parts.join('')}</ul>`;
+    }
+
     // Calendar Sync - Bulk sync all approved bookings
     window.triggerSync = async () => {
       const indicator = document.getElementById('sync-indicator');
@@ -3225,96 +4359,166 @@ window.saveSessionChanges = async function (sessionId) {
       resultDiv.textContent = 'Finding approved sessions to sync...';
 
       try {
-        // Get all approved bookings
-        const q = query(collection(db, 'bookings'), where('status', '==', 'approved'));
-        const snapshot = await getDocs(q);
-        
-        if (snapshot.empty) {
+        const summary = await syncApprovedBookings();
+
+        if (!summary.total) {
           indicator.className = 'sync-indicator';
           statusText.textContent = 'No sessions to sync';
-          resultDiv.innerHTML = '<p style="color: #ffc107;">⚠️ No approved sessions found to sync.</p>';
+          resultDiv.innerHTML = '<p class="sync-warning">⚠️ No approved sessions found to sync.</p>';
           return;
-        }
-
-        resultDiv.textContent = `Syncing ${snapshot.size} approved session(s) to Google Calendar...`;
-        
-        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec';
-        let successCount = 0;
-        let errorCount = 0;
-
-        // Sync each booking
-        for (const bookingDoc of snapshot.docs) {
-          const booking = bookingDoc.data();
-          const syncData = {
-            action: 'syncToCalendar',
-            bookingId: bookingDoc.id,
-            sessionDate: booking.sessionDate,
-            startTime: booking.startTime,
-            endTime: booking.endTime,
-            studentNames: booking.studentNames || booking.studentName,
-            subject: booking.subject,
-            guardianName: booking.guardianName,
-            guardianEmail: booking.guardianEmail || booking.email,
-            comments: booking.comments || booking.notes || ''
-          };
-          
-          try {
-            // Use URLSearchParams to avoid CORS preflight
-            const formData = new URLSearchParams();
-            formData.append('payload', JSON.stringify(syncData));
-            
-            const response = await fetch(APPS_SCRIPT_URL, {
-                method: 'POST',
-                body: formData
-                });
-
-                const json = await response.json();
-
-                if (!json.success) {
-                throw new Error(json.message || 'Apps Script returned an error.');
-                }
-
-            // Update Firestore after syncing to Google Calendar
-            const bookingRef = doc(db, "bookings", bookingDoc.id);
-            await updateDoc(bookingRef, {
-              eventId: json.data?.eventId || null,   // store event ID for future updates
-              syncedAt: serverTimestamp()
-            });
-
-
-                console.log(`Synced booking ${bookingDoc.id}`);
-
-          } catch (error) {
-            errorCount++;
-            console.error(`Failed to sync booking ${bookingDoc.id}:`, error);
-          }
-          
-          // Small delay to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 500));
         }
 
         indicator.className = 'sync-indicator success';
         statusText.textContent = 'Last synced: just now';
-        resultDiv.innerHTML = `
-          <p style="color: #28a745;">✓ Bulk sync completed!</p>
-          <p style="margin-top: 8px;">
-            <strong>${successCount}</strong> session(s) synced to Google Calendar${errorCount > 0 ? `, <strong style="color: #dc3545;">${errorCount}</strong> failed` : ''}
-          </p>
-          <p style="margin-top: 8px; color: var(--muted); font-size: 0.9rem;">
-            Check your Google Calendar and Apps Script execution logs for details.
-          </p>
-        `;
+        resultDiv.innerHTML = buildSyncSummaryHtml(summary);
       } catch (error) {
         console.error('Bulk sync error:', error);
         indicator.className = 'sync-indicator error';
         statusText.textContent = 'Sync failed';
-        resultDiv.innerHTML = `<p style="color: #dc3545;">✗ Sync failed: ${error.message}</p>`;
+        resultDiv.innerHTML = `<p class="sync-error">✗ Sync failed: ${escapeHtml(error.message || error)}</p>`;
       }
     };
 
-    // Invoice Generator (placeholder)
-    window.showInvoiceGenerator = () => {
-      alert('Invoice generator coming soon! This will integrate with your existing invoices.py backend.');
+    window.fullCalendarCleanup = async () => {
+      const indicator = document.getElementById('sync-indicator');
+      const statusText = document.getElementById('sync-status-text');
+      const resultDiv = document.getElementById('sync-result');
+
+      if (!confirm('This will remove duplicate sessions and resync Google Calendar without sending any emails. Continue?')) {
+        return;
+      }
+
+      indicator.className = 'sync-indicator';
+      statusText.textContent = 'Cleaning duplicates...';
+      resultDiv.textContent = 'Scanning for duplicate sessions...';
+
+      const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec';
+
+      try {
+        const snapshot = await getDocs(collection(db, 'bookings'));
+
+        const seenSessionKeys = new Map();
+        const seenEventIds = new Map();
+        const duplicatesToRemove = new Map();
+
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          const dateKey = getISODateString(data.sessionDate || data.date || '');
+          const startKey = normalizeTimeForInput(data.startTime || '');
+          const endKey = normalizeTimeForInput(data.endTime || '');
+          const studentKey = (data.studentNames || data.studentName || '')
+            .split(',')
+            .map(name => name.trim().toLowerCase())
+            .filter(Boolean)
+            .sort()
+            .join('|');
+          const userKey = data.userId || '';
+
+          if (dateKey && startKey && studentKey) {
+            const compositeKey = `${dateKey}::${startKey}::${endKey}::${studentKey}::${userKey}`;
+            if (!seenSessionKeys.has(compositeKey)) {
+              seenSessionKeys.set(compositeKey, docSnap.id);
+            } else {
+              duplicatesToRemove.set(docSnap.id, {
+                docSnap,
+                reason: 'Duplicate session entry',
+                primaryId: seenSessionKeys.get(compositeKey)
+              });
+            }
+          }
+
+          const eventId = (data.eventId || '').trim();
+          if (eventId) {
+            if (!seenEventIds.has(eventId)) {
+              seenEventIds.set(eventId, docSnap.id);
+            } else if (!duplicatesToRemove.has(docSnap.id)) {
+              duplicatesToRemove.set(docSnap.id, {
+                docSnap,
+                reason: 'Duplicate calendar event',
+                primaryId: seenEventIds.get(eventId)
+              });
+            }
+          }
+        });
+
+        const duplicates = Array.from(duplicatesToRemove.values());
+        let duplicatesDeleted = 0;
+        let duplicateErrors = 0;
+
+        for (const entry of duplicates) {
+          const { docSnap, reason } = entry;
+          const docId = docSnap.id;
+          const data = docSnap.data();
+
+          resultDiv.textContent = `Removing duplicate session ${docId} (${reason})...`;
+
+          const bookingId = data.bookingId || docId;
+
+          try {
+            const payload = {
+              action: 'deleteCalendarEvent',
+              bookingId,
+              sessionDate: data.sessionDate || data.date || null
+            };
+
+            const formData = new URLSearchParams();
+            formData.append('payload', JSON.stringify(payload));
+
+            const response = await fetch(APPS_SCRIPT_URL, {
+              method: 'POST',
+              body: formData
+            });
+
+            await response.json();
+          } catch (calendarErr) {
+            console.warn('Calendar cleanup failed for', bookingId, calendarErr);
+          }
+
+          try {
+            await deleteDoc(doc(db, 'bookings', docId));
+            duplicatesDeleted++;
+          } catch (deleteErr) {
+            duplicateErrors++;
+            console.error('Failed to delete duplicate session', docId, deleteErr);
+          }
+        }
+
+        statusText.textContent = 'Resyncing calendar...';
+        resultDiv.textContent = 'Syncing approved sessions without sending emails...';
+
+        const syncSummary = await syncApprovedBookings({ suppressEmail: true });
+
+        indicator.className = 'sync-indicator success';
+        statusText.textContent = 'Cleanup & resync complete';
+
+        const summaryParts = [];
+        summaryParts.push(`<li>Removed ${duplicatesDeleted} duplicate session(s).</li>`);
+        if (duplicateErrors > 0) {
+          summaryParts.push(`<li>Failed to delete ${duplicateErrors} session(s). See console for details.</li>`);
+        }
+        if (syncSummary.total) {
+          summaryParts.push(`<li>Synced ${syncSummary.successCount} session(s) to Google Calendar without sending emails.</li>`);
+        } else {
+          summaryParts.push('<li>No approved sessions required syncing.</li>');
+        }
+        if (syncSummary.errorCount > 0) {
+          summaryParts.push(`<li>${syncSummary.errorCount} session(s) failed to sync. Check console logs.</li>`);
+        }
+
+        resultDiv.innerHTML = `<p class="sync-success">Cleanup complete.</p><ul class="sync-summary-list">${summaryParts.join('')}</ul>`;
+
+        await Promise.all([
+          loadSessions(),
+          loadBookings(),
+          loadDashboard(),
+          loadInvoices()
+        ]);
+      } catch (error) {
+        console.error('Cleanup & resync error:', error);
+        indicator.className = 'sync-indicator error';
+        statusText.textContent = 'Cleanup failed';
+        resultDiv.innerHTML = `<p class="sync-error">✗ Cleanup failed: ${escapeHtml(error.message || error)}</p>`;
+      }
     };
 
     // Add Session Modal

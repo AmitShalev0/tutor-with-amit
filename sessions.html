@@ -82,6 +82,30 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+
+    .invoice-icon-button {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 1.25rem;
+      line-height: 1;
+      transition: transform 0.2s ease;
+    }
+
+    .invoice-icon-button:hover {
+      transform: scale(1.1);
+    }
+
+    .invoice-icon-button[disabled] {
+      opacity: 0.4;
+      cursor: default;
+      transform: none;
+    }
+
+    .invoice-placeholder {
+      color: #6b7280;
+      font-size: 0.9rem;
+    }
   </style>
 </head>
 <body>
@@ -366,10 +390,11 @@
               <th>Start & End Time</th>
               <th>Student Name</th>
               <th>Comments / Questions</th>
+              <th>Invoice</th>
             </tr>
           </thead>
           <tbody>
-            ${past.map(session => renderUnifiedSessionRow(session)).join('')}
+            ${past.map(session => renderUnifiedSessionRow(session, { showInvoiceButton: true })).join('')}
           </tbody>
         </table>
       `;
@@ -390,7 +415,9 @@
   }
 
 
-  function renderUnifiedSessionRow(session) {
+  function renderUnifiedSessionRow(session, options = {}) {
+    const showInvoiceButton = options.showInvoiceButton === true;
+    const columnCount = showInvoiceButton ? 5 : 4;
     const dateStr = formatSessionDate(session.sessionDate);
     const timeStr = session.startTime && session.endTime 
       ? `${session.startTime} - ${session.endTime}` 
@@ -414,15 +441,35 @@
       </div>
     ` : '<div style="color: #b0b0b5; font-style: italic; padding: 12px;">No tutor notes yet</div>';
 
+    let invoiceCellHtml = '';
+    if (showInvoiceButton) {
+      const iconButtons = [];
+      if (session.invoicePdfUrl) {
+        const encodedInvoiceUrl = encodeURIComponent(session.invoicePdfUrl);
+        iconButtons.push(`<button class="invoice-icon-button" title="View invoice PDF" onclick="event.stopPropagation(); openPdfLink('${encodedInvoiceUrl}')">🧾</button>`);
+      }
+      if (session.receiptPdfUrl) {
+        const encodedReceiptUrl = encodeURIComponent(session.receiptPdfUrl);
+        iconButtons.push(`<button class="invoice-icon-button" title="View payment receipt" onclick="event.stopPropagation(); openPdfLink('${encodedReceiptUrl}')">📄</button>`);
+      }
+
+      if (iconButtons.length) {
+        invoiceCellHtml = `<td class="invoice-cell">${iconButtons.join(' ')}</td>`;
+      } else {
+        invoiceCellHtml = '<td class="invoice-cell"><span class="invoice-placeholder">—</span></td>';
+      }
+    }
+
     return `
       <tr style="cursor: pointer;" onclick="toggleTutorNotes('${session.id}')" title="Click to ${hasTutorNotes ? 'view' : 'see'} tutor notes">
         <td>${dateStr}</td>
         <td>${timeStr}</td>
         <td>${students}</td>
         <td>${studentCommentsHtml}</td>
+        ${invoiceCellHtml}
       </tr>
       <tr id="tutor-notes-row-${session.id}" style="display: none;">
-        <td colspan="4" style="background: rgba(0, 0, 0, 0.2); padding: 0;">
+        <td colspan="${columnCount}" style="background: rgba(0, 0, 0, 0.2); padding: 0;">
           ${tutorNotesHtml}
         </td>
       </tr>
@@ -433,6 +480,20 @@
     const row = document.getElementById(`tutor-notes-row-${sessionId}`);
     if (row) {
       row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+    }
+  };
+
+  window.openPdfLink = function(encodedUrl) {
+    try {
+      const url = decodeURIComponent(encodedUrl || '');
+      if (!url) {
+        alert('This document is not available yet.');
+        return;
+      }
+      window.open(url, '_blank', 'noopener');
+    } catch (err) {
+      console.error('Failed to open document PDF:', err);
+      alert('Unable to open the document.');
     }
   };
 
