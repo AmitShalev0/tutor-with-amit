@@ -200,6 +200,34 @@
       color: var(--text);
     }
 
+    .invoice-notes-trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .invoice-notes-trigger.empty {
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .invoice-notes-display {
+      white-space: pre-wrap;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      color: var(--text);
+    }
+
+    .invoice-notes-display.empty {
+      color: var(--muted);
+    }
+
+    .invoice-comment-wrapper.readonly {
+      background: var(--surface);
+    }
+
     .calendar-card {
       background: var(--surface);
       padding: 24px;
@@ -1096,10 +1124,12 @@
       }
 
       let invoicesChanged = false;
+      let existingInvoices = new Map();
+      let invoiceSyncError = false;
 
       try {
         const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
-        const existingInvoices = new Map();
+        existingInvoices = new Map();
         invoicesSnapshot.forEach(docSnap => {
           const data = docSnap.data();
           existingInvoices.set(docSnap.id, { id: docSnap.id, ...data });
@@ -1172,6 +1202,11 @@
         }
       } catch (error) {
         console.error('Error syncing invoices with sessions:', error);
+        invoiceSyncError = true;
+      }
+
+      if (!invoiceSyncError) {
+        invoiceCache = Array.from(existingInvoices.values());
       }
 
       if (invoicesChanged) {
@@ -2006,8 +2041,10 @@
           <td>${session.startTime || '-'} - ${session.endTime || '-'}</td>
           <td>${session.studentName || session.studentNames || 'Unknown'}</td>
           <td>${session.subject || '-'}</td>
-          <td class="action-buttons" onclick="event.stopPropagation()">
-            ${actionButtons.join(' ')}
+          <td onclick="event.stopPropagation()">
+            <div class="action-buttons">
+              ${actionButtons.join(' ')}
+            </div>
           </td>
         </tr>`;
 
@@ -3010,16 +3047,19 @@ window.saveSessionChanges = async function (sessionId) {
             }
 
             const booking = { id: bookingId, ...snap.data() };
-            const email = booking.guardianEmail || booking.email;
+            const rawEmail = booking.guardianEmail || booking.email || '';
+            const normalizedEmail = rawEmail.trim().toLowerCase() || bookingId;
+            const safeEmail = rawEmail.trim();
 
-            if (!bookingsByGuardian.has(email)) {
-              bookingsByGuardian.set(email, {
+            if (!bookingsByGuardian.has(normalizedEmail)) {
+              bookingsByGuardian.set(normalizedEmail, {
                 bookings: [],
-                suppressEmail: false
+                suppressEmail: false,
+                guardianEmail: safeEmail
               });
             }
 
-            const group = bookingsByGuardian.get(email);
+            const group = bookingsByGuardian.get(normalizedEmail);
             group.bookings.push(booking);
 
             const suppress = await shouldSuppressApprovalEmail(booking);
@@ -3034,10 +3074,11 @@ window.saveSessionChanges = async function (sessionId) {
         }
 
         // 2️⃣ Process each guardian ONCE
-        for (const [guardianEmail, group] of bookingsByGuardian) {
+        for (const [normalizedEmail, group] of bookingsByGuardian) {
           const bookings = group.bookings;
           const suppressEmail = group.suppressEmail === true;
-          console.log(`Processing ${bookings.length} bookings for ${guardianEmail}`);
+          const guardianEmail = group.guardianEmail || (bookings[0].guardianEmail || bookings[0].email || '').trim();
+          console.log(`Processing ${bookings.length} bookings for ${guardianEmail || normalizedEmail}`);
 
           // 2A — Mark all bookings approved in Firestore
           for (const b of bookings) {
@@ -3050,7 +3091,7 @@ window.saveSessionChanges = async function (sessionId) {
           }
 
           // 2B — Build ONE bulkApprove payload
-          const syncData = {
+            const syncData = {
             action: "bulkApprove",
             guardianEmail,
             guardianName: bookings[0].guardianName,
@@ -3357,11 +3398,13 @@ window.saveSessionChanges = async function (sessionId) {
             <td>${user.email || '-'}</td>
             <td>${user.phone || '-'}</td>
             <td>${joined}</td>
-            <td class="action-buttons">
-              <button class="btn btn-secondary btn-sm" onclick="viewUserSessions('${userId}')">View Sessions</button>
-              <button class="btn btn-secondary btn-sm" onclick="viewUserStudents('${userId}')">View Students</button>
-              <button class="btn btn-sm" onclick="showAddSessionModal('${userId}', '${safeName}')">Add Session</button>
-              <button class="btn btn-danger btn-sm" onclick="deleteUser('${userId}', '${safeEmail}')">Delete</button>
+            <td>
+              <div class="action-buttons">
+                <button class="btn btn-secondary btn-sm" onclick="viewUserSessions('${userId}')">View Sessions</button>
+                <button class="btn btn-secondary btn-sm" onclick="viewUserStudents('${userId}')">View Students</button>
+                <button class="btn btn-sm" onclick="showAddSessionModal('${userId}', '${safeName}')">Add Session</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteUser('${userId}', '${safeEmail}')">Delete</button>
+              </div>
             </td>
           </tr>`;
         });
@@ -3421,9 +3464,9 @@ window.saveSessionChanges = async function (sessionId) {
             });
 
         let html = '';
-          html += buildInvoiceTable(readyInvoices, 'Ready to Send', 'No invoices ready to send yet.', { showActions: true, showPaidToggle: true, enableNotes: true });
-          html += buildInvoiceTable(sentInvoices, 'Sent Invoices', 'No invoices have been sent yet.', { showSentAt: true, showPaidToggle: true });
-          html += buildInvoiceTable(paidInvoices, 'Paid Invoices', 'No invoices marked as paid yet.', { showSentAt: true, showPaidBadge: true });
+          html += buildInvoiceTable(readyInvoices, 'Ready to Send', 'No invoices ready to send yet.', { showActions: true, showPaidToggle: true, notesMode: 'edit' });
+          html += buildInvoiceTable(sentInvoices, 'Sent Invoices', 'No invoices have been sent yet.', { showSentAt: true, showPaidToggle: true, allowResend: true, notesMode: 'view' });
+          html += buildInvoiceTable(paidInvoices, 'Paid Invoices', 'No invoices marked as paid yet.', { showSentAt: true, showPaidBadge: true, allowResend: true, notesMode: 'view' });
 
         container.innerHTML = html;
       } catch (error) {
@@ -3438,8 +3481,11 @@ window.saveSessionChanges = async function (sessionId) {
         showSentAt = false,
         showPaidToggle = false,
         showPaidBadge = false,
-        enableNotes = false
+        notesMode = 'none',
+        allowResend = false
       } = options;
+      const hasNotesMode = notesMode !== 'none';
+      const isNotesEditable = notesMode === 'edit';
       let html = `<h3 style="margin-top: 1.5rem; margin-bottom: 1rem; color: var(--accent);">${title}</h3>`;
 
       if (!invoices.length) {
@@ -3481,12 +3527,14 @@ window.saveSessionChanges = async function (sessionId) {
         const durationDisplay = invoice.durationFormatted || formatDurationFromMinutes(invoice.durationMinutes);
         const amountDisplay = invoice.totalAmountFormatted || formatCurrency(invoice.totalAmount);
         const notesRaw = invoice.sessionSummary || '';
-        const notesHtml = notesRaw
-          ? escapeHtml(notesRaw).replace(/\n/g, '<br>')
+        const hasNotesContent = notesRaw.trim().length > 0;
+        const safeNotesHtml = escapeHtml(notesRaw).replace(/\n/g, '<br>');
+        const notesTableHtml = hasNotesContent
+          ? safeNotesHtml
           : '<span style="color: var(--muted);">No notes yet.</span>';
 
         const rowClasses = ['invoice-table-row'];
-        if (enableNotes) {
+        if (hasNotesMode) {
           rowClasses.push('invoice-row-clickable');
         }
 
@@ -3494,8 +3542,21 @@ window.saveSessionChanges = async function (sessionId) {
         if (rowClasses.length) {
           rowAttrs.push(`class="${rowClasses.join(' ')}"`);
         }
-        if (enableNotes) {
+        if (hasNotesMode) {
           rowAttrs.push(`onclick="toggleInvoiceNotes('${jsSafeId}')"`);
+          rowAttrs.push(`data-notes-mode="${notesMode}"`);
+        }
+
+        let notesCellContent;
+        if (isNotesEditable) {
+          const label = hasNotesContent ? 'Edit notes' : 'Add notes';
+          notesCellContent = `<span class="invoice-notes-trigger${hasNotesContent ? '' : ' empty'}">${label}</span>`;
+        } else if (hasNotesMode) {
+          notesCellContent = hasNotesContent
+            ? '<span class="invoice-notes-trigger">View notes</span>'
+            : '<span class="invoice-notes-trigger empty">No notes yet.</span>';
+        } else {
+          notesCellContent = `<div class="invoice-notes">${notesTableHtml}</div>`;
         }
 
         html += `<tr ${rowAttrs.join(' ')}>`;
@@ -3505,7 +3566,7 @@ window.saveSessionChanges = async function (sessionId) {
         html += `<td>${timeDisplay}</td>`;
         html += `<td>${durationDisplay}</td>`;
         html += `<td>${amountDisplay}</td>`;
-        html += `<td><div class="invoice-notes">${notesHtml}</div></td>`;
+        html += `<td>${notesCellContent}</td>`;
 
         if (showSentAt) {
           const sentAtDisplay = invoice.sentAt && typeof invoice.sentAt.toDate === 'function'
@@ -3527,17 +3588,20 @@ window.saveSessionChanges = async function (sessionId) {
           if (showActions) {
             actionButtons.push(`<button class="btn btn-success btn-sm" onclick="event.stopPropagation(); sendInvoice('${jsSafeId}')"${disabledAttr}>Send</button>`);
           }
+          if (allowResend) {
+            actionButtons.push(`<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); resendInvoice('${jsSafeId}')"${disabledAttr}>Resend</button>`);
+          }
           if (showPaidToggle) {
             actionButtons.push(`<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); markInvoicePaid('${jsSafeId}')">Paid</button>`);
           }
-          html += `<td class="action-buttons">${actionButtons.join(' ')}</td>`;
+          html += `<td><div class="action-buttons">${actionButtons.join(' ')}</div></td>`;
         }
 
         html += '</tr>';
 
-        if (enableNotes) {
+        if (isNotesEditable) {
           const notesValue = escapeHtml(notesRaw);
-          html += `<tr id="invoice-notes-row-${domId}" class="invoice-notes-row" style="display: none;">
+          html += `<tr id="invoice-notes-row-${domId}" class="invoice-notes-row" data-notes-mode="edit" style="display: none;">
             <td colspan="${baseColumnCount}">
               <div class="session-comment-wrapper invoice-comment-wrapper">
                 <textarea
@@ -3549,6 +3613,15 @@ window.saveSessionChanges = async function (sessionId) {
                   <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); saveInvoiceNotes('${jsSafeId}')">Save Notes</button>
                   <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); cancelInvoiceNotes('${jsSafeId}')">Cancel</button>
                 </div>
+              </div>
+            </td>
+          </tr>`;
+        } else if (notesMode === 'view') {
+          const viewNotesContent = hasNotesContent ? safeNotesHtml : 'No notes yet.';
+          html += `<tr id="invoice-notes-row-${domId}" class="invoice-notes-row" data-notes-mode="view" style="display: none;">
+            <td colspan="${baseColumnCount}">
+              <div class="session-comment-wrapper invoice-comment-wrapper readonly">
+                <div id="invoice-notes-display-${domId}" class="invoice-notes-display${hasNotesContent ? '' : ' empty'}">${viewNotesContent}</div>
               </div>
             </td>
           </tr>`;
@@ -3567,6 +3640,21 @@ window.saveSessionChanges = async function (sessionId) {
       return safe || 'invoice_row';
     }
 
+    function canAttemptStorageUpload() {
+      try {
+        const { protocol, hostname } = window.location;
+        if (protocol === 'file:') {
+          return false;
+        }
+        if (protocol === 'http:' && /^(localhost|127\.0\.0\.1|::1)$/i.test(hostname)) {
+          return false;
+        }
+      } catch (_err) {
+        // Fall through and allow uploads if environment probing fails.
+      }
+      return true;
+    }
+
     function findInvoiceById(invoiceId) {
       const target = normalizeInvoiceId(invoiceId);
       if (!target) {
@@ -3575,6 +3663,61 @@ window.saveSessionChanges = async function (sessionId) {
       return invoiceCache.find(inv =>
         normalizeInvoiceId(inv.id) === target || normalizeInvoiceId(inv.bookingId) === target
       ) || null;
+    }
+
+    const userNotificationPrefsCache = new Map();
+
+    async function getUserNotificationPrefs(userId) {
+      const defaultPrefs = { notifyInvoiceEmail: false, notifyReceiptEmail: false };
+      if (!userId) {
+        return defaultPrefs;
+      }
+
+      if (userNotificationPrefsCache.has(userId)) {
+        return userNotificationPrefsCache.get(userId);
+      }
+
+      try {
+        const userSnap = await getDoc(doc(db, 'users', userId));
+        if (!userSnap.exists()) {
+          userNotificationPrefsCache.set(userId, defaultPrefs);
+          return defaultPrefs;
+        }
+
+        const data = userSnap.data() || {};
+        const prefs = {
+          notifyInvoiceEmail: data.notifyInvoiceEmail === true,
+          notifyReceiptEmail: data.notifyReceiptEmail === true
+        };
+        userNotificationPrefsCache.set(userId, prefs);
+        return prefs;
+      } catch (err) {
+        console.warn('Failed to load user notification preferences:', err);
+        userNotificationPrefsCache.set(userId, defaultPrefs);
+        return defaultPrefs;
+      }
+    }
+
+    async function shouldSendInvoiceEmail(invoice) {
+      if (!invoice) {
+        return true;
+      }
+      if (!invoice.userId) {
+        return true;
+      }
+      const prefs = await getUserNotificationPrefs(invoice.userId);
+      return prefs.notifyInvoiceEmail === true;
+    }
+
+    async function shouldSendReceiptEmail(invoice) {
+      if (!invoice) {
+        return false;
+      }
+      if (!invoice.userId) {
+        return false;
+      }
+      const prefs = await getUserNotificationPrefs(invoice.userId);
+      return prefs.notifyReceiptEmail === true;
     }
 
     window.toggleInvoiceNotes = (invoiceId) => {
@@ -3592,10 +3735,24 @@ window.saveSessionChanges = async function (sessionId) {
 
       const isHidden = row.style.display === 'none';
       if (isHidden) {
+        const mode = row.getAttribute('data-notes-mode') || 'view';
         const invoice = findInvoiceById(invoiceId);
-        const textarea = document.getElementById(`invoice-notes-input-${domId}`);
-        if (textarea) {
-          textarea.value = invoice?.sessionSummary || '';
+        if (mode === 'edit') {
+          const textarea = document.getElementById(`invoice-notes-input-${domId}`);
+          if (textarea) {
+            textarea.value = invoice?.sessionSummary || '';
+          }
+        } else {
+          const display = document.getElementById(`invoice-notes-display-${domId}`);
+          if (display) {
+            if (invoice?.sessionSummary) {
+              display.innerHTML = escapeHtml(invoice.sessionSummary).replace(/\n/g, '<br>');
+              display.classList.remove('empty');
+            } else {
+              display.innerHTML = 'No notes yet.';
+              display.classList.add('empty');
+            }
+          }
         }
         row.style.display = 'table-row';
       } else {
@@ -3667,29 +3824,49 @@ window.saveSessionChanges = async function (sessionId) {
       }
     };
 
-    window.sendInvoice = async (invoiceId) => {
+    window.sendInvoice = async (invoiceId, options = {}) => {
+      const {
+        bypassConfirm = false,
+        confirmMessage: confirmMessageOverride = null,
+        preserveStatus = false,
+        existingInvoice = null,
+        existingInvoiceRef = null,
+        suppressSuccessAlert = false
+      } = options;
+
       if (!invoiceId) {
         alert('Invoice ID missing.');
         return;
       }
       try {
-        const invoiceRef = doc(db, 'invoices', invoiceId);
-        const invoiceSnap = await getDoc(invoiceRef);
+        const invoiceRef = existingInvoiceRef || doc(db, 'invoices', invoiceId);
+        let invoice = existingInvoice || null;
 
-        if (!invoiceSnap.exists()) {
-          alert('Invoice not found.');
-          return;
+        if (!invoice) {
+          const invoiceSnap = await getDoc(invoiceRef);
+
+          if (!invoiceSnap.exists()) {
+            alert('Invoice not found.');
+            return;
+          }
+
+          invoice = invoiceSnap.data();
         }
 
-        const invoice = invoiceSnap.data();
         const guardianEmail = invoice.guardianEmail;
-        if (!guardianEmail) {
+        const shouldEmailInvoice = await shouldSendInvoiceEmail(invoice);
+
+        if (shouldEmailInvoice && !guardianEmail) {
           alert('Cannot send invoice without a guardian email address.');
           return;
         }
 
-        const confirmMessage = `Send this invoice to ${guardianEmail}?${invoice.sessionSummary ? '' : '\n\nNote: session notes are currently empty.'}`;
-        if (!confirm(confirmMessage)) {
+        const confirmMessage = confirmMessageOverride ?? (
+          shouldEmailInvoice
+            ? `Send this invoice to ${guardianEmail}?${invoice.sessionSummary ? '' : '\n\nNote: session notes are currently empty.'}`
+            : 'Guardian has opted out of invoice emails. Mark this invoice as sent without sending an email?'
+        );
+        if (!bypassConfirm && !confirm(confirmMessage)) {
           return;
         }
 
@@ -3709,7 +3886,8 @@ window.saveSessionChanges = async function (sessionId) {
           totalAmount: invoice.totalAmount ?? 0,
           totalAmountFormatted: invoice.totalAmountFormatted || formatCurrency(invoice.totalAmount),
           sessionSummary: invoice.sessionSummary || '',
-          subject: invoice.subject || ''
+          subject: invoice.subject || '',
+          sendEmail: shouldEmailInvoice
         };
 
         const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec';
@@ -3729,27 +3907,38 @@ window.saveSessionChanges = async function (sessionId) {
         const bookingId = invoice.bookingId || invoiceId;
         let pdfDownloadUrl = invoice.invoicePdfUrl || null;
         let pdfStoragePath = invoice.invoicePdfStoragePath || null;
+        let pdfBase64 = invoice.invoicePdfBase64 || null;
         const pdfFileName = result.data?.pdfFileName || null;
         const emailHtml = result.data?.emailHtml || null;
 
         if (result.data?.pdfBase64) {
-          try {
-            const pdfBytes = base64ToUint8Array(result.data.pdfBase64);
-            if (pdfBytes.length) {
-              const storagePath = `invoices/${bookingId}.pdf`;
-              const storageRefObj = ref(storage, storagePath);
-              await uploadBytes(storageRefObj, pdfBytes, { contentType: 'application/pdf' });
-              pdfDownloadUrl = await getDownloadURL(storageRefObj);
-              pdfStoragePath = storagePath;
+          pdfBase64 = result.data.pdfBase64;
+          if (canAttemptStorageUpload()) {
+            try {
+              const pdfBytes = base64ToUint8Array(result.data.pdfBase64);
+              if (pdfBytes.length) {
+                const storagePath = `invoices/${bookingId}.pdf`;
+                const storageRefObj = ref(storage, storagePath);
+                await uploadBytes(storageRefObj, pdfBytes, { contentType: 'application/pdf' });
+                pdfDownloadUrl = await getDownloadURL(storageRefObj);
+                pdfStoragePath = storagePath;
+              }
+            } catch (uploadErr) {
+              console.warn('Invoice PDF upload failed:', uploadErr);
             }
-          } catch (uploadErr) {
-            console.warn('Invoice PDF upload failed:', uploadErr);
+          } else {
+            console.info('Skipping invoice PDF upload while running locally; Base64 fallback stored instead.');
           }
         }
 
         const sentTimestamp = serverTimestamp();
+        const currentStatus = (invoice.status || '').toLowerCase();
+        const shouldPreserveStatus = preserveStatus && currentStatus === INVOICE_STATUS_PAID;
+        const nextStatus = shouldPreserveStatus
+          ? (invoice.status || INVOICE_STATUS_PAID)
+          : INVOICE_STATUS_SENT;
         const updates = {
-          status: INVOICE_STATUS_SENT,
+          status: nextStatus,
           sentAt: sentTimestamp,
           sentBy: currentUser?.email || null,
           updatedAt: sentTimestamp
@@ -3759,24 +3948,34 @@ window.saveSessionChanges = async function (sessionId) {
           updates.invoicePdfUrl = pdfDownloadUrl;
           updates.invoicePdfStoragePath = pdfStoragePath;
         }
+        if (pdfBase64) {
+          updates.invoicePdfBase64 = pdfBase64;
+        }
         if (pdfFileName) {
           updates.invoicePdfFileName = pdfFileName;
         }
         if (emailHtml) {
           updates.invoiceEmailHtml = emailHtml;
         }
+        updates.invoiceEmailSent = shouldEmailInvoice;
 
         await updateDoc(invoiceRef, updates);
 
+        const emailSent = shouldEmailInvoice && result.data?.emailSent !== false;
+
         try {
           const bookingUpdates = {
-            invoiceStatus: INVOICE_STATUS_SENT,
-            invoiceSentAt: sentTimestamp
+            invoiceStatus: nextStatus,
+            invoiceSentAt: sentTimestamp,
+            invoiceEmailSent: shouldEmailInvoice
           };
 
           if (pdfDownloadUrl) {
             bookingUpdates.invoicePdfUrl = pdfDownloadUrl;
             bookingUpdates.invoicePdfStoragePath = pdfStoragePath;
+          }
+          if (pdfBase64) {
+            bookingUpdates.invoicePdfBase64 = pdfBase64;
           }
           if (pdfFileName) {
             bookingUpdates.invoicePdfFileName = pdfFileName;
@@ -3790,13 +3989,103 @@ window.saveSessionChanges = async function (sessionId) {
           console.warn('Failed to update booking after sending invoice:', bookingErr);
         }
 
-        alert('Invoice sent successfully.');
+        if (!suppressSuccessAlert) {
+          const successMessage = shouldPreserveStatus
+            ? (emailSent ? 'Invoice resent successfully.' : 'Invoice refreshed (email preference disabled).')
+            : (emailSent ? 'Invoice sent successfully.' : 'Invoice marked as sent (email preference disabled).');
+          alert(successMessage);
+        }
         await loadInvoices();
+        return { emailSent };
       } catch (error) {
         console.error('Error sending invoice:', error);
         alert('Error sending invoice: ' + error.message);
+        return null;
       }
     };
+
+    window.resendInvoice = async (invoiceId) => {
+      if (!invoiceId) {
+        alert('Invoice ID missing.');
+        return;
+      }
+
+      try {
+        const invoiceRef = doc(db, 'invoices', invoiceId);
+        const invoiceSnap = await getDoc(invoiceRef);
+        if (!invoiceSnap.exists()) {
+          alert('Invoice not found.');
+          return;
+        }
+
+        const invoice = invoiceSnap.data();
+        const shouldEmailInvoice = await shouldSendInvoiceEmail(invoice);
+        const guardianEmail = invoice.guardianEmail;
+        const confirmMessage = shouldEmailInvoice
+          ? (guardianEmail ? `Resend this invoice email to ${guardianEmail}?` : 'Resend this invoice email?')
+          : 'Guardian has opted out of invoice emails. Refresh invoice details without sending an email?';
+
+        if (!confirm(confirmMessage)) {
+          return;
+        }
+
+        const currentStatus = (invoice.status || '').toLowerCase();
+        const preserveStatus = currentStatus === INVOICE_STATUS_PAID;
+
+        const result = await sendInvoice(invoiceId, {
+          bypassConfirm: true,
+          preserveStatus,
+          existingInvoice: invoice,
+          existingInvoiceRef: invoiceRef,
+          suppressSuccessAlert: true
+        });
+        const emailSent = result?.emailSent === true;
+        alert(emailSent ? 'Invoice resent successfully.' : 'Invoice refreshed (email preference disabled).');
+      } catch (error) {
+        console.error('Error resending invoice:', error);
+        alert('Error resending invoice: ' + error.message);
+      }
+    };
+
+    async function persistReceiptRecord(invoiceId, bookingId, record = {}) {
+      if (!invoiceId) {
+        return;
+      }
+
+      try {
+        const receiptData = {
+          invoiceId,
+          bookingId: bookingId || invoiceId,
+          status: record.status || null,
+          guardianEmail: record.guardianEmail || null,
+          guardianName: record.guardianName || null,
+          guardianFirstName: record.guardianFirstName || null,
+          studentNames: record.studentNames || null,
+          sessionDate: record.sessionDate || null,
+          startTime: record.startTime || null,
+          endTime: record.endTime || null,
+          totalAmount: record.totalAmount ?? null,
+          totalAmountFormatted: record.totalAmountFormatted || null,
+          receiptHtml: record.receiptHtml || null,
+          receiptPdfUrl: record.receiptPdfUrl || null,
+          receiptPdfStoragePath: record.receiptPdfStoragePath || null,
+          receiptPdfFileName: record.receiptPdfFileName || null,
+          receiptPdfBase64: record.receiptPdfBase64 || null,
+          paidAt: record.paidAt || null,
+          paidDisplay: record.paidDisplay || null,
+          errorMessage: record.errorMessage || null,
+          updatedAt: serverTimestamp()
+        };
+
+        if (!record.skipCreatedAt) {
+          receiptData.createdAt = serverTimestamp();
+        }
+
+        await setDoc(doc(db, 'receipts', invoiceId), receiptData, { merge: true });
+      } catch (err) {
+        console.warn('Failed to persist receipt record:', err);
+      }
+    }
 
     window.markInvoicePaid = async (invoiceId) => {
       if (!invoiceId) {
@@ -3830,7 +4119,8 @@ window.saveSessionChanges = async function (sessionId) {
             receiptPdfStoragePath: null,
             receiptPdfFileName: null,
             receiptHtml: null,
-            receiptGeneratedAt: null
+            receiptGeneratedAt: null,
+            receiptPdfBase64: null
           });
 
           if (invoice.bookingId) {
@@ -3842,12 +4132,26 @@ window.saveSessionChanges = async function (sessionId) {
                 receiptPdfStoragePath: null,
                 receiptPdfFileName: null,
                 receiptHtml: null,
-                receiptGeneratedAt: null
+                receiptGeneratedAt: null,
+                receiptPdfBase64: null
               });
             } catch (bookingErr) {
               console.warn('Failed to update booking invoice status when toggling paid off:', bookingErr);
             }
           }
+
+          await persistReceiptRecord(invoiceId, invoice.bookingId || invoiceId, {
+            status: 'void',
+            receiptPdfUrl: null,
+            receiptPdfStoragePath: null,
+            receiptPdfFileName: null,
+            receiptPdfBase64: null,
+            receiptHtml: null,
+            paidAt: null,
+            paidDisplay: null,
+            errorMessage: 'Invoice marked as unpaid again.',
+            skipCreatedAt: true
+          });
 
           alert('Invoice marked as sent.');
           await loadInvoices();
@@ -3866,6 +4170,7 @@ window.saveSessionChanges = async function (sessionId) {
         let receiptStoragePath = invoice.receiptPdfStoragePath || null;
         let receiptFileName = invoice.receiptPdfFileName || null;
         let receiptHtml = invoice.receiptHtml || null;
+        let receiptPdfBase64 = invoice.receiptPdfBase64 || null;
         let receiptError = null;
 
         if (bookingId) {
@@ -3902,18 +4207,23 @@ window.saveSessionChanges = async function (sessionId) {
               receiptError = receiptResult.message || 'Unable to generate receipt PDF.';
             } else {
               if (receiptResult.data?.pdfBase64) {
-                try {
-                  const receiptBytes = base64ToUint8Array(receiptResult.data.pdfBase64);
-                  if (receiptBytes.length) {
-                    const storagePath = `receipts/${bookingId}.pdf`;
-                    const storageRefObj = ref(storage, storagePath);
-                    await uploadBytes(storageRefObj, receiptBytes, { contentType: 'application/pdf' });
-                    receiptPdfUrl = await getDownloadURL(storageRefObj);
-                    receiptStoragePath = storagePath;
+                receiptPdfBase64 = receiptResult.data.pdfBase64;
+                if (canAttemptStorageUpload()) {
+                  try {
+                    const receiptBytes = base64ToUint8Array(receiptResult.data.pdfBase64);
+                    if (receiptBytes.length) {
+                      const storagePath = `receipts/${bookingId}.pdf`;
+                      const storageRefObj = ref(storage, storagePath);
+                      await uploadBytes(storageRefObj, receiptBytes, { contentType: 'application/pdf' });
+                      receiptPdfUrl = await getDownloadURL(storageRefObj);
+                      receiptStoragePath = storagePath;
+                    }
+                  } catch (uploadErr) {
+                    console.warn('Receipt PDF upload failed:', uploadErr);
+                    receiptError = uploadErr.message || 'Receipt PDF upload failed.';
                   }
-                } catch (uploadErr) {
-                  console.warn('Receipt PDF upload failed:', uploadErr);
-                  receiptError = uploadErr.message || 'Receipt PDF upload failed.';
+                } else {
+                  console.info('Skipping receipt PDF upload while running locally; Base64 fallback stored instead.');
                 }
               }
 
@@ -3948,6 +4258,9 @@ window.saveSessionChanges = async function (sessionId) {
         if (receiptHtml) {
           invoiceUpdates.receiptHtml = receiptHtml;
         }
+        if (receiptPdfBase64) {
+          invoiceUpdates.receiptPdfBase64 = receiptPdfBase64;
+        }
 
         await updateDoc(invoiceRef, invoiceUpdates);
 
@@ -3969,12 +4282,39 @@ window.saveSessionChanges = async function (sessionId) {
             if (receiptHtml) {
               bookingUpdates.receiptHtml = receiptHtml;
             }
+            if (receiptPdfBase64) {
+              bookingUpdates.receiptPdfBase64 = receiptPdfBase64;
+            }
+            if (!receiptPdfUrl && receiptPdfBase64 && receiptStoragePath) {
+              bookingUpdates.receiptPdfStoragePath = receiptStoragePath;
+            }
 
             await updateDoc(doc(db, 'bookings', bookingId), bookingUpdates);
           } catch (bookingErr) {
             console.warn('Failed to update booking invoice status when marking paid:', bookingErr);
           }
         }
+
+        await persistReceiptRecord(invoiceId, bookingId, {
+          status: receiptError ? 'error' : 'ready',
+          guardianEmail: invoice.guardianEmail || null,
+          guardianName: invoice.guardianName || null,
+          guardianFirstName: invoice.guardianFirstName || null,
+          studentNames: invoice.studentNames || null,
+          sessionDate: invoice.sessionDate || null,
+          startTime: invoice.startTime || null,
+          endTime: invoice.endTime || null,
+          totalAmount: invoice.totalAmount ?? null,
+          totalAmountFormatted: invoice.totalAmountFormatted || null,
+          receiptHtml,
+          receiptPdfUrl,
+          receiptPdfStoragePath,
+          receiptPdfFileName,
+          receiptPdfBase64,
+          paidAt: paidTimestamp,
+          paidDisplay,
+          errorMessage: receiptError || null
+        });
 
         if (receiptError) {
           alert('Invoice marked as paid, but the receipt PDF could not be generated. Please check the console for details.');

@@ -197,6 +197,19 @@
       await loadSessions();
     });
 
+  function base64ToUint8Array(base64) {
+    if (!base64) {
+      return new Uint8Array();
+    }
+    const clean = base64.replace(/\s/g, '');
+    const binaryString = atob(clean);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+  }
+
   async function loadSessions() {
     try {
       console.log("Loading sessions for user:", currentUser.uid);
@@ -227,6 +240,50 @@
       });
 
       console.log("Total sessions loaded:", allSessions.length);
+
+      // Pull matching invoices so guardians see icons even if booking doc missed the url
+      try {
+        const invoicesQuery = query(
+          collection(db, "invoices"),
+          where("userId", "==", currentUser.uid)
+        );
+        const invoiceSnapshot = await getDocs(invoicesQuery);
+        const invoicesByBooking = new Map();
+
+        invoiceSnapshot.forEach((invoiceDoc) => {
+          const invoiceData = invoiceDoc.data();
+          const primaryKey = invoiceDoc.id;
+          if (primaryKey) {
+            invoicesByBooking.set(primaryKey, invoiceData);
+          }
+          if (invoiceData.bookingId && invoiceData.bookingId !== primaryKey) {
+            invoicesByBooking.set(invoiceData.bookingId, invoiceData);
+          }
+        });
+
+        if (invoicesByBooking.size) {
+          allSessions = allSessions.map((session) => {
+            const bookingKey = session.id || session.bookingId;
+            const invoice = invoicesByBooking.get(bookingKey);
+            if (!invoice) {
+              return session;
+            }
+            return {
+              ...session,
+              invoiceStatus: invoice.status || session.invoiceStatus,
+              invoicePdfUrl: invoice.invoicePdfUrl || session.invoicePdfUrl,
+              invoicePdfBase64: invoice.invoicePdfBase64 || session.invoicePdfBase64,
+              invoicePdfFileName: invoice.invoicePdfFileName || session.invoicePdfFileName,
+              receiptPdfUrl: invoice.receiptPdfUrl || session.receiptPdfUrl,
+              receiptPdfBase64: invoice.receiptPdfBase64 || session.receiptPdfBase64,
+              receiptPdfFileName: invoice.receiptPdfFileName || session.receiptPdfFileName,
+              receiptHtml: invoice.receiptHtml || session.receiptHtml
+            };
+          });
+        }
+      } catch (invoiceErr) {
+        console.warn("Invoice lookup failed:", invoiceErr);
+      }
 
       // Sort by date (earliest first for better upcoming view)
       allSessions.sort((a, b) => a.sessionDate - b.sessionDate);
@@ -444,20 +501,24 @@
     let invoiceCellHtml = '';
     if (showInvoiceButton) {
       const iconButtons = [];
-      if (session.invoicePdfUrl) {
-        const encodedInvoiceUrl = encodeURIComponent(session.invoicePdfUrl);
-        iconButtons.push(`<button class="invoice-icon-button" title="View invoice PDF" onclick="event.stopPropagation(); openPdfLink('${encodedInvoiceUrl}')">🧾</button>`);
+      const sessionLookupId = String(session.id || session.bookingId || '');
+      const safeLookupId = sessionLookupId
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"');
+      const hasInvoiceDoc = Boolean(session.invoicePdfUrl || session.invoicePdfBase64);
+      const hasReceiptDoc = Boolean(session.receiptPdfUrl || session.receiptPdfBase64);
+
+      if (hasInvoiceDoc) {
+        iconButtons.push(`<button class="invoice-icon-button" title="View invoice PDF" onclick="event.stopPropagation(); openSessionDocument('${safeLookupId}', 'invoice')">🧾</button>`);
       }
-      if (session.receiptPdfUrl) {
-        const encodedReceiptUrl = encodeURIComponent(session.receiptPdfUrl);
-        iconButtons.push(`<button class="invoice-icon-button" title="View payment receipt" onclick="event.stopPropagation(); openPdfLink('${encodedReceiptUrl}')">📄</button>`);
+      if (hasReceiptDoc) {
+        iconButtons.push(`<button class="invoice-icon-button" title="View payment receipt" onclick="event.stopPropagation(); openSessionDocument('${safeLookupId}', 'receipt')">📄</button>`);
       }
 
-      if (iconButtons.length) {
-        invoiceCellHtml = `<td class="invoice-cell">${iconButtons.join(' ')}</td>`;
-      } else {
-        invoiceCellHtml = '<td class="invoice-cell"><span class="invoice-placeholder">—</span></td>';
-      }
+      invoiceCellHtml = iconButtons.length
+        ? `<td class="invoice-cell">${iconButtons.join(' ')}</td>`
+        : '<td class="invoice-cell"><span class="invoice-placeholder">—</span></td>';
     }
 
     return `
@@ -483,17 +544,63 @@
     }
   };
 
-  window.openPdfLink = function(encodedUrl) {
+  window.openSessionDocument = function(sessionKey, kind) {
+    if (!sessionKey) {
+      alert('This document is not available yet.');
+      return;
+    }
+
+    const normalizedKey = String(sessionKey);
+    const session = allSessions.find((s) => String(s.id) === normalizedKey || String(s.bookingId) === normalizedKey);
+    if (!session) {
+      alert('This document is not available yet.');
+      return;
+    }
+
+    const isInvoice = kind === 'invoice';
+    const docUrl = isInvoice ? (session.invoicePdfUrl || null) : (session.receiptPdfUrl || null);
+    const docBase64 = isInvoice ? (session.invoicePdfBase64 || null) : (session.receiptPdfBase64 || null);
+    const defaultName = `${isInvoice ? 'invoice' : 'receipt'}-${normalizedKey}.pdf`;
+    const fileName = isInvoice
+      ? (session.invoicePdfFileName || defaultName)
+      : (session.receiptPdfFileName || defaultName);
+
+    if (docUrl) {
+      window.open(docUrl, '_blank', 'noopener');
+      return;
+    }
+
+    if (!docBase64) {
+      alert('This document is not available yet.');
+      return;
+    }
+
     try {
-      const url = decodeURIComponent(encodedUrl || '');
-      if (!url) {
+      const pdfBytes = base64ToUint8Array(docBase64);
+      if (!pdfBytes.length) {
         alert('This document is not available yet.');
         return;
       }
-      window.open(url, '_blank', 'noopener');
+
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const blobUrl = URL.createObjectURL(blob);
+      const newWindow = window.open(blobUrl, '_blank', 'noopener');
+
+      if (!newWindow) {
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60 * 1000);
     } catch (err) {
-      console.error('Failed to open document PDF:', err);
-      alert('Unable to open the document.');
+      console.error('Unable to open PDF content:', err);
+      alert('Unable to open this document.');
     }
   };
 

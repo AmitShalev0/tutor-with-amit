@@ -35,15 +35,23 @@
       </div>
 
       <div class="field-row">
-        <label style="font-weight: 600; margin-bottom: 0.75rem; display: block;">Email Notifications</label>
-        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-          <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal; cursor: pointer;">
-            <input type="checkbox" id="notifyBookingApproved" name="notifyBookingApproved" style="width: auto; cursor: pointer;">
+        <label class="notification-section-label">Email Notifications</label>
+        <div class="notification-checkboxes">
+          <label class="notification-checkbox">
+            <input type="checkbox" id="notifyBookingApproved" name="notifyBookingApproved">
             <span>Notify me when my booking is approved</span>
           </label>
-          <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal; cursor: pointer;">
-            <input type="checkbox" id="notifySessionDeleted" name="notifySessionDeleted" style="width: auto; cursor: pointer;">
+          <label class="notification-checkbox">
+            <input type="checkbox" id="notifySessionDeleted" name="notifySessionDeleted">
             <span>Notify me when a session is deleted</span>
+          </label>
+          <label class="notification-checkbox">
+            <input type="checkbox" id="notifyInvoiceEmail" name="notifyInvoiceEmail">
+            <span>Email me a copy of my invoice when it is sent</span>
+          </label>
+          <label class="notification-checkbox">
+            <input type="checkbox" id="notifyReceiptEmail" name="notifyReceiptEmail">
+            <span>Email me a receipt when my payment is processed</span>
           </label>
         </div>
       </div>
@@ -83,6 +91,22 @@
 
   let currentUser = null;
 
+  const notificationCheckboxIds = [
+    "notifyBookingApproved",
+    "notifySessionDeleted",
+    "notifyInvoiceEmail",
+    "notifyReceiptEmail"
+  ];
+
+  function applyNotificationPreferences(prefs = {}) {
+    notificationCheckboxIds.forEach((id) => {
+      const checkbox = document.getElementById(id);
+      if (!checkbox) return;
+      const key = id;
+      checkbox.checked = prefs[key] === true;
+    });
+  }
+
   // Check authentication
   onAuth(auth, async (user) => {
     if (!user) {
@@ -95,6 +119,7 @@
 
   async function loadProfile() {
     try {
+      applyNotificationPreferences();
       const userDocRef = doc(db, "users", currentUser.uid);
       const userSnap = await getDoc(userDocRef);
 
@@ -103,10 +128,9 @@
         document.getElementById("fullName").value = userData.fullName || "";
         document.getElementById("email").value = currentUser.email || "";
         document.getElementById("phone").value = userData.phone || "";
-        
+
         // Load notification preferences (default to false if not set)
-        document.getElementById("notifyBookingApproved").checked = userData.notifyBookingApproved === true;
-        document.getElementById("notifySessionDeleted").checked = userData.notifySessionDeleted === true;
+        applyNotificationPreferences(userData);
       }
 
       // Show profile form
@@ -128,6 +152,8 @@
     const phone = document.getElementById("phone").value.trim();
     const notifyBookingApproved = document.getElementById("notifyBookingApproved").checked;
     const notifySessionDeleted = document.getElementById("notifySessionDeleted").checked;
+    const notifyInvoiceEmail = document.getElementById("notifyInvoiceEmail").checked;
+    const notifyReceiptEmail = document.getElementById("notifyReceiptEmail").checked;
 
     if (!fullName || !phone) {
       showError("Please fill in all required fields.");
@@ -141,6 +167,8 @@
         phone,
         notifyBookingApproved,
         notifySessionDeleted,
+        notifyInvoiceEmail,
+        notifyReceiptEmail,
       });
 
       showSuccess("Profile updated successfully!");
