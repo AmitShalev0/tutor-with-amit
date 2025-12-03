@@ -7,17 +7,17 @@
   <meta name="description" content="Calgary-based STEM tutoring that builds confidence in math, science, and engineering from elementary to university. Book personalized sessions with Amit." />
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body data-page-id="index">
 <div id="site-header"></div>
 <script src="header-loader.js"></script>
 
     <section class="hero">
       <div class="hero-header">
-        <h1 class="hero-title">Calgary Math & Science Tutoring that Sparks Confidence</h1>
+        <h1 class="hero-title" data-editable-block="heroTitle">Calgary Math & Science Tutoring that Sparks Confidence</h1>
         <button id="auth-action-btn" class="btn primary nowrap">Create Account</button>
       </div>
-      <p class="hero-lede">Hi, I’m Amit — a big-hair science nerd, and mentor who helps students truly understand STEM.</p>
-      <p>I design hands-on lessons that connect theory to real life, whether we are graphing polynomial functions, exploring real-life chemistry scenarios, or prepping for IB physics.</p>
+      <p class="hero-lede" data-editable-block="heroLede">Hi, I’m Amit — a big-hair science nerd, and mentor who helps students truly understand STEM.</p>
+      <p data-editable-block="heroIntro">I design hands-on lessons that connect theory to real life, whether we are graphing polynomial functions, exploring real-life chemistry scenarios, or prepping for IB physics.</p>
       <div class="hero-actions" id="hero-actions">
         <a class="btn primary" href="register.html">Create Account</a>
         <a class="btn secondary" href="booking.html">Book a Session</a>
@@ -32,7 +32,7 @@
 
     <section class="home-section">
       <div class="home-grid">
-        <article class="feature-card">
+        <article class="feature-card" data-editable-block="whyFamilies">
           <h2>Why Families Choose Amit Tutoring</h2>
           <p>I combine deep subject expertise with a playful, visual teaching style. We sketch on whiteboards, build intuition with analogies, and break big problems into friendly steps. My goal is to grow each student’s independence so they can tackle new topics without fear.</p>
           <ul class="feature-list">
@@ -41,7 +41,7 @@
             <li><strong>Progress updates.</strong> Guardians receive session summaries outlining focus areas and next steps.</li>
           </ul>
         </article>
-        <aside class="feature-card highlight-card">
+        <aside class="feature-card highlight-card" data-editable-block="quickFacts">
           <h3>Quick Facts</h3>
           <ul class="fact-list">
             <li><span>9+</span> years tutoring STEM</li>
@@ -56,7 +56,7 @@
 
     <section class = "home-section approach">
       <div class="home-grid">
-        <article class="feature-card">
+        <article class="feature-card" data-editable-block="approachBody">
           <h2>My Approach</h2>
           <p>
             <strong>Concepts:</strong> <a href="https://www.youtube.com/watch?v=ySeVe4stNzA" target="_blank" rel="noopener noreferrer">Put it all together (one big idea)</a> and <a href="https://www.scotthyoung.com/blog/Programs/HolisticLearningEBook.pdf" target="_blank" rel="noopener noreferrer">holistic approach</a><br>
@@ -73,7 +73,7 @@
           <p>Most students come to me feeling overwhelmed by fast-paced lessons or missing foundational skills. Together we build a roadmap: diagnose gaps, rebuild core concepts, and reinforce with practice designed around their interests. Expect whiteboard doodles, quick experiments, and lots of “aha” laughs.</p>
           <p class="small-note">Proudly serving Calgary, Airdrie, Chestermere, Okotoks, and online learners across Alberta.</p>
         </article> -->
-        <article class="feature-card">
+        <article class="feature-card" data-editable-block="subjectsCard">
           <h2>Subjects I Love Teaching</h2>
           <div class="tag-grid">
             <span class="tag">Math 7–12 &amp; Diploma</span>
@@ -202,5 +202,8 @@
       }
     });
   </script>
+
+  <!-- Admin page editor -->
+  <script type="module" src="page-editor.js"></script>
 </body>
 </html>

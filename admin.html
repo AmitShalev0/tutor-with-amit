@@ -663,6 +663,71 @@
       margin-bottom: 8px;
     }
 
+    .settings-form {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      padding: 24px;
+      max-width: 760px;
+    }
+
+    .settings-columns {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .availability-grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .day-checkbox-grid {
+      display: grid;
+      gap: 8px 16px;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+
+    .day-checkbox-grid label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+    }
+
+    .settings-hint {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-top: -6px;
+    }
+
+    .settings-heading {
+      margin: 0;
+    }
+
+    .settings-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .form-message {
+      font-size: 0.9rem;
+      margin: 0;
+    }
+
+    .form-message.ok {
+      color: #28a745;
+    }
+
+    .form-message.error {
+      color: #dc3545;
+    }
+
     .session-row {
       cursor: pointer;
     }
@@ -710,6 +775,7 @@
         <li><button onclick="showSection('dashboard')" class="nav-btn active" data-section="dashboard">📊 Dashboard</button></li>
         <li><button onclick="showSection('sessions')" class="nav-btn" data-section="sessions">📅 Sessions</button></li>
         <li><button onclick="showSection('bookings')" class="nav-btn" data-section="bookings">📝 Booking Approvals</button></li>
+        <li><button onclick="showSection('booking-info')" class="nav-btn" data-section="booking-info">⚙️ Booking Info</button></li>
         <li><button onclick="showSection('students')" class="nav-btn" data-section="students">👥 Students</button></li>
         <li><button onclick="showSection('users')" class="nav-btn" data-section="users">🔐 Users</button></li>
         <li><button onclick="showSection('blocked')" class="nav-btn" data-section="blocked">🚫 Blocked Emails</button></li>
@@ -769,6 +835,130 @@
           <button class="btn" onclick="loadBookings()">🔄 Refresh</button>
         </div>
         <div id="bookings-container" class="loading">Loading bookings...</div>
+      </section>
+
+      <!-- Booking Info -->
+      <section id="booking-info-section" class="admin-section">
+        <div class="section-header">
+          <h2>Booking Information</h2>
+        </div>
+        <p class="settings-hint">Configure the defaults that power the public booking form.</p>
+
+        <form id="booking-settings-form" class="settings-form">
+          <div class="settings-columns">
+            <div class="form-group">
+              <label for="booking-max-students">Max students per session</label>
+              <input type="number" id="booking-max-students" name="maxStudents" min="1" max="8" step="1" required>
+            </div>
+
+            <div class="form-group">
+              <label for="booking-max-hours">Max hours per session</label>
+              <input type="number" id="booking-max-hours" name="maxHours" min="1" max="6" step="0.25" required>
+            </div>
+
+            <div class="form-group">
+              <label for="booking-min-duration">Minimum session length (minutes)</label>
+              <input type="number" id="booking-min-duration" name="minDuration" min="30" max="360" step="15" required>
+              <p class="settings-hint">Sessions must run at least this long; booking options will follow this rule.</p>
+            </div>
+
+            <div class="form-group">
+              <label for="booking-base-rate">Cost per session (first student)</label>
+              <input type="number" id="booking-base-rate" name="baseRate" min="0" step="0.01" required>
+            </div>
+
+            <div class="form-group">
+              <label for="booking-extra-rate">Cost per additional student</label>
+              <input type="number" id="booking-extra-rate" name="extraRate" min="0" step="0.01" required>
+            </div>
+
+            <div class="form-group">
+              <label for="booking-summary-add-on">Session summary add-on</label>
+              <input type="number" id="booking-summary-add-on" name="summaryAddOn" min="0" step="0.01">
+            </div>
+
+            <div class="form-group">
+              <label for="booking-recurring-weeks">Max weeks in advance for recurring sessions</label>
+              <input type="number" id="booking-recurring-weeks" name="recurringWeeks" min="1" max="52" step="1" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="booking-courses">Courses you offer</label>
+            <textarea id="booking-courses" name="courses" rows="4" placeholder="One course per line"></textarea>
+            <p class="settings-hint">This list is informational for now; we will wire it into the booking form later.</p>
+          </div>
+
+          <div>
+            <h3 class="settings-heading">Calendar display</h3>
+            <p class="settings-hint">Choose which days appear in the booking calendar and the hour range that should be visible.</p>
+            <div class="settings-columns">
+              <div class="form-group">
+                <label for="calendar-start-time">Calendar start time</label>
+                <input type="time" id="calendar-start-time" step="3600" required>
+              </div>
+              <div class="form-group">
+                <label for="calendar-end-time">Calendar end time</label>
+                <input type="time" id="calendar-end-time" step="3600" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Days shown in calendar</label>
+              <div class="day-checkbox-grid" id="calendar-visible-days">
+                <label><input type="checkbox" value="0"> Monday</label>
+                <label><input type="checkbox" value="1"> Tuesday</label>
+                <label><input type="checkbox" value="2"> Wednesday</label>
+                <label><input type="checkbox" value="3"> Thursday</label>
+                <label><input type="checkbox" value="4"> Friday</label>
+                <label><input type="checkbox" value="5"> Saturday</label>
+                <label><input type="checkbox" value="6"> Sunday</label>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 class="settings-heading">Weekly availability</h3>
+            <p class="settings-hint">Use 24-hour ranges like 15:00-18:00. Separate multiple ranges with commas.</p>
+            <div class="availability-grid">
+              <div class="form-group">
+                <label for="availability-mon">Monday</label>
+                <input type="text" id="availability-mon" data-day="0" placeholder="15:00-18:00">
+              </div>
+              <div class="form-group">
+                <label for="availability-tue">Tuesday</label>
+                <input type="text" id="availability-tue" data-day="1" placeholder="15:00-18:00">
+              </div>
+              <div class="form-group">
+                <label for="availability-wed">Wednesday</label>
+                <input type="text" id="availability-wed" data-day="2" placeholder="15:00-18:00">
+              </div>
+              <div class="form-group">
+                <label for="availability-thu">Thursday</label>
+                <input type="text" id="availability-thu" data-day="3" placeholder="15:00-18:00">
+              </div>
+              <div class="form-group">
+                <label for="availability-fri">Friday</label>
+                <input type="text" id="availability-fri" data-day="4" placeholder="15:00-18:00">
+              </div>
+              <div class="form-group">
+                <label for="availability-sat">Saturday</label>
+                <input type="text" id="availability-sat" data-day="5" placeholder="15:00-18:00">
+              </div>
+              <div class="form-group">
+                <label for="availability-sun">Sunday</label>
+                <input type="text" id="availability-sun" data-day="6" placeholder="11:00-16:00">
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-actions">
+            <button type="submit" class="btn" id="booking-settings-save-btn">Save Settings</button>
+            <button type="button" class="btn btn-secondary" onclick="resetBookingSettingsForm()">Cancel</button>
+            <button type="button" class="btn btn-secondary" onclick="refreshBookingSettingsFromServer()">Reload</button>
+          </div>
+
+          <p id="booking-settings-status" class="form-message"></p>
+        </form>
       </section>
 
       <!-- Students -->
@@ -933,6 +1123,88 @@
     const INVOICE_STATUS_PAID = 'paid';
     const NON_BILLABLE_STATUSES = new Set(['pending', 'cancelled', 'rejected']);
 
+    const TUTORS_COLLECTION = 'tutors';
+    const TUTOR_RATE_CONFIG = {
+      baseRatePerHour: 50,
+      additionalStudentPerHour: 20,
+      sessionSummaryAddOn: 10,
+      currency: 'CAD'
+    };
+
+    const SITE_SETTINGS_COLLECTION = 'siteSettings';
+    const BOOKING_SETTINGS_DOC_ID = 'booking';
+
+    function getDefaultAvailabilityTemplate() {
+      return {
+        '0': [],
+        '1': [],
+        '2': [],
+        '3': [],
+        '4': [],
+        '5': [],
+        '6': [{ start: '11:00', end: '16:00' }]
+      };
+    }
+
+    const DEFAULT_BOOKING_SETTINGS = {
+      maxStudentsPerSession: 4,
+      maxHoursPerSession: 2,
+      minSessionMinutes: 60,
+      baseSessionCost: 50,
+      extraStudentCost: 20,
+      sessionSummaryAddOn: 10,
+      recurringMaxAdvanceWeeks: 12,
+      courses: [],
+      availability: getDefaultAvailabilityTemplate(),
+      calendarDisplay: {
+        startHour: 8,
+        endHour: 20,
+        visibleDays: ['0', '1', '2', '3', '4']
+      },
+      currency: 'CAD'
+    };
+
+    const AVAILABILITY_DAY_CONFIG = [
+      { key: '0', id: 'availability-mon' },
+      { key: '1', id: 'availability-tue' },
+      { key: '2', id: 'availability-wed' },
+      { key: '3', id: 'availability-thu' },
+      { key: '4', id: 'availability-fri' },
+      { key: '5', id: 'availability-sat' },
+      { key: '6', id: 'availability-sun' }
+    ];
+
+    const CALENDAR_DAY_CONFIG = [
+      { key: '0', label: 'Monday' },
+      { key: '1', label: 'Tuesday' },
+      { key: '2', label: 'Wednesday' },
+      { key: '3', label: 'Thursday' },
+      { key: '4', label: 'Friday' },
+      { key: '5', label: 'Saturday' },
+      { key: '6', label: 'Sunday' }
+    ];
+
+    const CALENDAR_DAY_VARIANTS = (() => {
+      const map = new Map();
+      CALENDAR_DAY_CONFIG.forEach(({ key, label }) => {
+        const lowerFull = label.toLowerCase();
+        map.set(lowerFull, key);
+        const abbreviation = lowerFull.slice(0, 3);
+        map.set(abbreviation, key);
+      });
+      map.set('thur', '3');
+      map.set('thurs', '3');
+      map.set('thu', '3');
+      map.set('tues', '1');
+      return map;
+    })();
+
+    let bookingSettingsCache = null;
+    let bookingSettingsLoadPromise = null;
+
+    let tutorProfileCache = null;
+    let tutorUpdatePromise = null;
+
     function escapeHtml(str) {
       if (str == null) {
         return '';
@@ -972,6 +1244,980 @@
         return '--';
       }
       return `$${value.toFixed(2)}`;
+    }
+
+    function cloneAvailabilityTemplate(source = getDefaultAvailabilityTemplate()) {
+      const base = getDefaultAvailabilityTemplate();
+      const result = {};
+      for (const [key, slots] of Object.entries(base)) {
+        result[key] = (Array.isArray(source[key]) ? source[key] : slots).map((slot) => ({
+          start: typeof slot?.start === 'string' ? slot.start : '',
+          end: typeof slot?.end === 'string' ? slot.end : ''
+        })).filter((slot) => slot.start && slot.end);
+      }
+      return result;
+    }
+
+    function normalizeTimeString(value) {
+      if (typeof value !== 'string') {
+        return null;
+      }
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return null;
+      }
+      const match = trimmed.match(/^([0-1]?\d|2[0-3]):([0-5]\d)$/);
+      if (!match) {
+        return null;
+      }
+      const hours = String(match[1]).padStart(2, '0');
+      const minutes = match[2];
+      return `${hours}:${minutes}`;
+    }
+
+    function timeToMinutes(time) {
+      if (typeof time !== 'string') {
+        return null;
+      }
+      const [hoursStr, minutesStr] = time.split(':');
+      const hours = Number(hoursStr);
+      const minutes = Number(minutesStr);
+      if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
+        return null;
+      }
+      return (hours * 60) + minutes;
+    }
+
+    function coerceCalendarHour(value) {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return Math.min(24, Math.max(0, Math.floor(value)));
+      }
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) {
+          return null;
+        }
+        const cleaned = trimmed.toLowerCase().replace(/[^0-9apm:]/g, '');
+        if (!cleaned) {
+          return null;
+        }
+        const match = cleaned.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
+        if (match) {
+          let hours = Number(match[1]);
+          const minutes = match[2] ? Number(match[2]) : 0;
+          const period = match[3];
+          if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+            return null;
+          }
+          if (minutes !== 0) {
+            return null;
+          }
+          if (period === 'am' || period === 'pm') {
+            hours = hours % 12;
+            if (period === 'pm') {
+              hours += 12;
+            }
+          }
+          return Math.min(24, Math.max(0, hours));
+        }
+        const numeric = Number(cleaned);
+        if (Number.isFinite(numeric)) {
+          return Math.min(24, Math.max(0, Math.floor(numeric)));
+        }
+      }
+      return null;
+    }
+
+    function normalizeCalendarDayKey(value) {
+      if (value == null) {
+        return null;
+      }
+      const raw = String(value).trim();
+      if (!raw) {
+        return null;
+      }
+      if (/^[0-6]$/.test(raw)) {
+        return raw;
+      }
+      const lowered = raw.toLowerCase().replace(/[^a-z]/g, '');
+      if (CALENDAR_DAY_VARIANTS.has(lowered)) {
+        return CALENDAR_DAY_VARIANTS.get(lowered);
+      }
+      return null;
+    }
+
+    function normalizeAvailability(rawAvailability = {}) {
+      const template = cloneAvailabilityTemplate();
+      for (const [key, slots] of Object.entries(rawAvailability || {})) {
+        if (!Object.prototype.hasOwnProperty.call(template, key)) {
+          continue;
+        }
+        if (!Array.isArray(slots)) {
+          continue;
+        }
+        const normalizedSlots = [];
+        slots.forEach((slot) => {
+          const start = normalizeTimeString(slot?.start ?? slot?.from ?? slot?.begin);
+          const end = normalizeTimeString(slot?.end ?? slot?.to ?? slot?.finish);
+          if (!start || !end) {
+            return;
+          }
+          const startMinutes = timeToMinutes(start);
+          const endMinutes = timeToMinutes(end);
+          if (startMinutes == null || endMinutes == null || endMinutes <= startMinutes) {
+            return;
+          }
+          normalizedSlots.push({ start, end });
+        });
+        if (normalizedSlots.length) {
+          template[key] = normalizedSlots;
+        }
+      }
+      return template;
+    }
+
+    function normalizeBookingSettings(raw = {}) {
+      const availability = normalizeAvailability(raw.availability);
+      const courses = Array.isArray(raw.courses)
+        ? raw.courses.map((course) => String(course || '').trim()).filter(Boolean)
+        : [];
+
+      const parseNumber = (value, fallback, options = {}) => {
+        const parsed = typeof value === 'number' ? value : Number(value);
+        let result = Number.isFinite(parsed) ? parsed : fallback;
+        if (options.min != null) {
+          result = Math.max(options.min, result);
+        }
+        if (options.max != null) {
+          result = Math.min(options.max, result);
+        }
+        if (options.step) {
+          result = Math.round(result / options.step) * options.step;
+        }
+        if (options.precision != null) {
+          const factor = 10 ** options.precision;
+          result = Math.round(result * factor) / factor;
+        }
+        return result;
+      };
+
+      const parseHour = (value, fallback) => {
+        const coerced = coerceCalendarHour(value);
+        return coerced != null ? coerced : fallback;
+      };
+
+      const defaultCalendarDisplay = DEFAULT_BOOKING_SETTINGS.calendarDisplay;
+      let calendarStartHour = parseHour(raw.calendarDisplay?.startHour, defaultCalendarDisplay.startHour);
+      let calendarEndHour = parseHour(raw.calendarDisplay?.endHour, defaultCalendarDisplay.endHour);
+      if (calendarEndHour <= calendarStartHour) {
+        calendarEndHour = Math.min(24, Math.max(calendarStartHour + 1, defaultCalendarDisplay.endHour));
+      }
+      const rawVisibleDays = Array.isArray(raw.calendarDisplay?.visibleDays)
+        ? raw.calendarDisplay.visibleDays
+        : typeof raw.calendarDisplay?.visibleDays === 'string'
+          ? raw.calendarDisplay.visibleDays.split(',').map((value) => value.trim()).filter(Boolean)
+          : defaultCalendarDisplay.visibleDays;
+      const visibleDays = Array.from(new Set(
+        rawVisibleDays
+          .map((day) => normalizeCalendarDayKey(day))
+          .filter((day) => day != null)
+      ));
+      if (!visibleDays.length) {
+        defaultCalendarDisplay.visibleDays.forEach((day) => {
+          const normalized = normalizeCalendarDayKey(day);
+          if (normalized != null) {
+            visibleDays.push(normalized);
+          }
+        });
+      }
+      visibleDays.sort((a, b) => Number(a) - Number(b));
+
+      const maxStudentsPerSession = parseNumber(raw.maxStudentsPerSession, DEFAULT_BOOKING_SETTINGS.maxStudentsPerSession, { min: 1, max: 8, step: 1 });
+      const maxHoursPerSession = parseNumber(raw.maxHoursPerSession, DEFAULT_BOOKING_SETTINGS.maxHoursPerSession, { min: 1, max: 6, precision: 2 });
+      const minSessionMinutes = parseNumber(
+        raw.minSessionMinutes,
+        DEFAULT_BOOKING_SETTINGS.minSessionMinutes,
+        { min: 30, max: Math.max(DEFAULT_BOOKING_SETTINGS.maxHoursPerSession * 60, maxHoursPerSession * 60), step: 15 }
+      );
+
+      const normalized = {
+        maxStudentsPerSession,
+        maxHoursPerSession,
+        minSessionMinutes,
+        baseSessionCost: parseNumber(raw.baseSessionCost, DEFAULT_BOOKING_SETTINGS.baseSessionCost, { min: 0, precision: 2 }),
+        extraStudentCost: parseNumber(raw.extraStudentCost, DEFAULT_BOOKING_SETTINGS.extraStudentCost, { min: 0, precision: 2 }),
+        sessionSummaryAddOn: parseNumber(raw.sessionSummaryAddOn, DEFAULT_BOOKING_SETTINGS.sessionSummaryAddOn, { min: 0, precision: 2 }),
+        recurringMaxAdvanceWeeks: parseNumber(raw.recurringMaxAdvanceWeeks, DEFAULT_BOOKING_SETTINGS.recurringMaxAdvanceWeeks, { min: 1, max: 52, step: 1 }),
+        courses,
+        availability,
+        calendarDisplay: {
+          startHour: calendarStartHour,
+          endHour: calendarEndHour,
+          visibleDays
+        },
+        currency: typeof raw.currency === 'string' && raw.currency.trim() ? raw.currency.trim().toUpperCase() : DEFAULT_BOOKING_SETTINGS.currency,
+        _lastUpdatedAt: raw._lastUpdatedAt ?? null,
+        _lastUpdatedBy: raw._lastUpdatedBy ?? null
+      };
+
+      return normalized;
+    }
+
+    function formatAvailabilityForInput(slots = []) {
+      if (!Array.isArray(slots) || !slots.length) {
+        return '';
+      }
+      return slots.map((slot) => `${slot.start}-${slot.end}`).join(', ');
+    }
+
+    function formatHourForTimeInput(hour) {
+      const numeric = coerceCalendarHour(hour);
+      const value = numeric != null ? numeric : 8;
+      const clamped = Math.max(0, Math.min(23, Math.floor(value)));
+      return `${String(clamped).padStart(2, '0')}:00`;
+    }
+
+    function parseHourFromTimeInput(value) {
+      return coerceCalendarHour(value);
+    }
+
+    function parseAvailabilityInputValue(value) {
+      if (typeof value !== 'string') {
+        return [];
+      }
+
+      const parts = value.split(',').map((part) => part.trim()).filter(Boolean);
+      if (!parts.length) {
+        return [];
+      }
+
+      const slots = [];
+      for (const part of parts) {
+        const [rawStart, rawEnd] = part.split('-').map((p) => p.trim());
+        const start = normalizeTimeString(rawStart);
+        const end = normalizeTimeString(rawEnd);
+
+        if (!start || !end) {
+          throw new Error(`Invalid time range "${part}". Use HH:MM-HH:MM.`);
+        }
+
+        const startMinutes = timeToMinutes(start);
+        const endMinutes = timeToMinutes(end);
+
+        if (startMinutes == null || endMinutes == null || endMinutes <= startMinutes) {
+          throw new Error(`Time range "${part}" must end after it starts.`);
+        }
+
+        slots.push({ start, end });
+      }
+
+      return slots;
+    }
+
+    function formatSettingsTimestamp(value) {
+      if (!value) {
+        return '';
+      }
+      try {
+        if (typeof value.toDate === 'function') {
+          return value.toDate().toLocaleString();
+        }
+        const date = new Date(value);
+        if (!Number.isNaN(date.getTime())) {
+          return date.toLocaleString();
+        }
+      } catch (_err) {
+        // Fallback to raw value below
+      }
+      return String(value);
+    }
+
+    const bookingSettingsForm = document.getElementById('booking-settings-form');
+    const bookingSettingsStatusEl = document.getElementById('booking-settings-status');
+    const bookingSettingsSaveBtn = document.getElementById('booking-settings-save-btn');
+    const bookingSettingsInputs = bookingSettingsForm ? {
+      maxStudents: document.getElementById('booking-max-students'),
+      maxHours: document.getElementById('booking-max-hours'),
+      minDuration: document.getElementById('booking-min-duration'),
+      baseRate: document.getElementById('booking-base-rate'),
+      extraRate: document.getElementById('booking-extra-rate'),
+      summaryAddOn: document.getElementById('booking-summary-add-on'),
+      recurringWeeks: document.getElementById('booking-recurring-weeks'),
+      courses: document.getElementById('booking-courses')
+    } : null;
+    const bookingCalendarInputs = bookingSettingsForm ? {
+      start: document.getElementById('calendar-start-time'),
+      end: document.getElementById('calendar-end-time'),
+      checkboxes: Array.from(document.querySelectorAll('#calendar-visible-days input[type="checkbox"]'))
+    } : null;
+    const bookingAvailabilityInputs = bookingSettingsForm
+      ? AVAILABILITY_DAY_CONFIG.map(({ key, id }) => ({
+        key,
+        input: document.getElementById(id)
+      }))
+      : [];
+
+    function showBookingSettingsStatus(message, tone = 'info') {
+      if (!bookingSettingsStatusEl) {
+        return;
+      }
+      bookingSettingsStatusEl.textContent = message;
+      bookingSettingsStatusEl.classList.remove('ok', 'error');
+      if (tone === 'ok') {
+        bookingSettingsStatusEl.classList.add('ok');
+      } else if (tone === 'error') {
+        bookingSettingsStatusEl.classList.add('error');
+      }
+    }
+
+    async function fetchBookingSettings(options = {}) {
+      const { force = false } = options;
+      if (bookingSettingsCache && !force) {
+        return bookingSettingsCache;
+      }
+      if (bookingSettingsLoadPromise && !force) {
+        return bookingSettingsLoadPromise;
+      }
+
+      const settingsRef = doc(db, SITE_SETTINGS_COLLECTION, BOOKING_SETTINGS_DOC_ID);
+
+      bookingSettingsLoadPromise = getDoc(settingsRef)
+        .then((snapshot) => {
+          const data = snapshot.exists() ? snapshot.data() : {};
+          bookingSettingsCache = normalizeBookingSettings(data);
+          window.bookingSettings = bookingSettingsCache;
+          return bookingSettingsCache;
+        })
+        .catch((error) => {
+          console.warn('Failed to load booking settings:', error);
+          bookingSettingsCache = normalizeBookingSettings({});
+          return bookingSettingsCache;
+        })
+        .finally(() => {
+          bookingSettingsLoadPromise = null;
+        });
+
+      return bookingSettingsLoadPromise;
+    }
+
+    function populateBookingSettingsForm(settings) {
+      if (!bookingSettingsForm || !bookingSettingsInputs) {
+        return;
+      }
+
+      bookingSettingsInputs.maxStudents.value = settings.maxStudentsPerSession;
+      bookingSettingsInputs.maxHours.value = settings.maxHoursPerSession;
+      bookingSettingsInputs.minDuration.value = settings.minSessionMinutes;
+      bookingSettingsInputs.baseRate.value = settings.baseSessionCost;
+      bookingSettingsInputs.extraRate.value = settings.extraStudentCost;
+      bookingSettingsInputs.summaryAddOn.value = settings.sessionSummaryAddOn;
+      bookingSettingsInputs.recurringWeeks.value = settings.recurringMaxAdvanceWeeks;
+      bookingSettingsInputs.courses.value = (settings.courses || []).join('\n');
+
+      bookingAvailabilityInputs.forEach(({ key, input }) => {
+        if (!input) {
+          return;
+        }
+        input.value = formatAvailabilityForInput(settings.availability[key]);
+      });
+
+      if (bookingCalendarInputs) {
+        const calendarDisplay = settings.calendarDisplay || DEFAULT_BOOKING_SETTINGS.calendarDisplay;
+        if (bookingCalendarInputs.start) {
+          bookingCalendarInputs.start.value = formatHourForTimeInput(calendarDisplay.startHour);
+        }
+        if (bookingCalendarInputs.end) {
+          bookingCalendarInputs.end.value = formatHourForTimeInput(calendarDisplay.endHour);
+        }
+        const visibleSet = new Set(
+          (calendarDisplay.visibleDays || DEFAULT_BOOKING_SETTINGS.calendarDisplay.visibleDays || [])
+            .map((day) => normalizeCalendarDayKey(day))
+            .filter((key) => key != null)
+        );
+        const checkboxList = bookingCalendarInputs.checkboxes || [];
+        let hasSelected = false;
+        checkboxList.forEach((checkbox) => {
+          if (!checkbox) {
+            return;
+          }
+          const normalizedValue = normalizeCalendarDayKey(checkbox.value);
+          const checked = normalizedValue != null && visibleSet.has(normalizedValue);
+          checkbox.checked = checked;
+          if (checked) {
+            hasSelected = true;
+          }
+        });
+        if (!hasSelected && checkboxList.length) {
+          const defaults = DEFAULT_BOOKING_SETTINGS.calendarDisplay.visibleDays
+            .map((day) => normalizeCalendarDayKey(day))
+            .filter((key) => key != null);
+          checkboxList.forEach((checkbox) => {
+            const normalizedValue = normalizeCalendarDayKey(checkbox.value);
+            checkbox.checked = normalizedValue != null && defaults.includes(normalizedValue);
+          });
+        }
+      }
+
+      const timestamp = formatSettingsTimestamp(settings._lastUpdatedAt);
+      if (timestamp) {
+        showBookingSettingsStatus(`Last updated ${timestamp}`, 'info');
+      } else {
+        showBookingSettingsStatus('Update settings and click save.', 'info');
+      }
+    }
+
+    async function loadBookingInfoSection(options = {}) {
+      if (!bookingSettingsForm) {
+        return;
+      }
+      showBookingSettingsStatus('Loading booking settings...', 'info');
+      try {
+        const settings = await fetchBookingSettings(options);
+        populateBookingSettingsForm(settings);
+      } catch (error) {
+        console.error('Unable to load booking settings:', error);
+        showBookingSettingsStatus(`Failed to load settings: ${error.message}`, 'error');
+      }
+    }
+
+    async function handleBookingSettingsSave(event) {
+      if (event) {
+        event.preventDefault();
+      }
+      if (!bookingSettingsForm || !bookingSettingsInputs) {
+        return;
+      }
+
+      const disableButton = () => {
+        if (bookingSettingsSaveBtn) {
+          bookingSettingsSaveBtn.disabled = true;
+        }
+      };
+
+      const enableButton = () => {
+        if (bookingSettingsSaveBtn) {
+          bookingSettingsSaveBtn.disabled = false;
+        }
+      };
+
+      try {
+        disableButton();
+        showBookingSettingsStatus('Saving settings...', 'info');
+
+        const maxStudents = Number(bookingSettingsInputs.maxStudents.value || DEFAULT_BOOKING_SETTINGS.maxStudentsPerSession);
+        const maxHours = Number(bookingSettingsInputs.maxHours.value || DEFAULT_BOOKING_SETTINGS.maxHoursPerSession);
+        const minSessionMinutes = Number(bookingSettingsInputs.minDuration.value || DEFAULT_BOOKING_SETTINGS.minSessionMinutes);
+        const baseRate = Number(bookingSettingsInputs.baseRate.value || DEFAULT_BOOKING_SETTINGS.baseSessionCost);
+        const extraRate = Number(bookingSettingsInputs.extraRate.value || DEFAULT_BOOKING_SETTINGS.extraStudentCost);
+        const summaryAddOn = Number(bookingSettingsInputs.summaryAddOn.value || DEFAULT_BOOKING_SETTINGS.sessionSummaryAddOn);
+        const recurringWeeks = Number(bookingSettingsInputs.recurringWeeks.value || DEFAULT_BOOKING_SETTINGS.recurringMaxAdvanceWeeks);
+
+        if (!Number.isFinite(maxStudents) || maxStudents < 1) {
+          throw new Error('Max students per session must be at least 1.');
+        }
+        if (!Number.isFinite(maxHours) || maxHours < 1) {
+          throw new Error('Max hours per session must be at least 1.');
+        }
+        if (!Number.isFinite(minSessionMinutes) || minSessionMinutes < 30) {
+          throw new Error('Minimum session length must be at least 30 minutes.');
+        }
+        if (minSessionMinutes > maxHours * 60) {
+          throw new Error('Minimum session length cannot exceed the maximum hours per session.');
+        }
+        if (!Number.isFinite(baseRate) || baseRate < 0) {
+          throw new Error('Cost per session must be zero or higher.');
+        }
+        if (!Number.isFinite(extraRate) || extraRate < 0) {
+          throw new Error('Cost per additional student must be zero or higher.');
+        }
+        if (!Number.isFinite(summaryAddOn) || summaryAddOn < 0) {
+          throw new Error('Session summary add-on must be zero or higher.');
+        }
+        if (!Number.isFinite(recurringWeeks) || recurringWeeks < 1) {
+          throw new Error('Recurring sessions must be allowed at least one week in advance.');
+        }
+
+        const calendarStartHour = parseHourFromTimeInput(bookingCalendarInputs?.start?.value ?? '');
+        const calendarEndHour = parseHourFromTimeInput(bookingCalendarInputs?.end?.value ?? '');
+        if (calendarStartHour == null || calendarEndHour == null) {
+          throw new Error('Calendar start and end times must be provided on the hour (e.g., 09:00).');
+        }
+        if (calendarEndHour <= calendarStartHour) {
+          throw new Error('Calendar end time must be later than the start time.');
+        }
+        const calendarVisibleDays = (bookingCalendarInputs?.checkboxes || [])
+          .filter((checkbox) => checkbox?.checked)
+          .map((checkbox) => normalizeCalendarDayKey(checkbox.value))
+          .filter((value) => value != null);
+        if (!calendarVisibleDays.length) {
+          throw new Error('Select at least one day to display in the calendar.');
+        }
+        calendarVisibleDays.sort((a, b) => Number(a) - Number(b));
+
+        const availabilityPayload = cloneAvailabilityTemplate();
+        for (const { key, input } of bookingAvailabilityInputs) {
+          if (!input) {
+            continue;
+          }
+          const value = input.value.trim();
+          if (!value) {
+            availabilityPayload[key] = [];
+            continue;
+          }
+          availabilityPayload[key] = parseAvailabilityInputValue(value);
+        }
+
+        const coursesList = (bookingSettingsInputs.courses.value || '')
+          .split(/\r?\n/)
+          .map((entry) => entry.trim())
+          .filter(Boolean);
+
+        const updatePayload = {
+          maxStudentsPerSession: Math.min(Math.max(Math.round(maxStudents), 1), 8),
+          maxHoursPerSession: Math.min(Math.max(Number(maxHours.toFixed(2)), 1), 6),
+          minSessionMinutes: Math.min(Math.max(Math.round(minSessionMinutes / 15) * 15, 30), Math.round(maxHours * 60)),
+          baseSessionCost: Number(baseRate.toFixed(2)),
+          extraStudentCost: Number(extraRate.toFixed(2)),
+          sessionSummaryAddOn: Number(summaryAddOn.toFixed(2)),
+          recurringMaxAdvanceWeeks: Math.min(Math.max(Math.round(recurringWeeks), 1), 52),
+          courses: coursesList,
+          availability: availabilityPayload,
+          calendarDisplay: {
+            startHour: calendarStartHour,
+            endHour: calendarEndHour,
+            visibleDays: calendarVisibleDays
+          },
+          currency: DEFAULT_BOOKING_SETTINGS.currency,
+          _lastUpdatedAt: serverTimestamp(),
+          _lastUpdatedBy: currentUser?.email || currentUser?.uid || 'admin'
+        };
+
+        const settingsRef = doc(db, SITE_SETTINGS_COLLECTION, BOOKING_SETTINGS_DOC_ID);
+        await setDoc(settingsRef, updatePayload, { merge: true });
+
+        await loadBookingInfoSection({ force: true });
+        showBookingSettingsStatus('Booking settings saved.', 'ok');
+      } catch (error) {
+        console.error('Failed to save booking settings:', error);
+        showBookingSettingsStatus(error.message || 'Unable to save settings.', 'error');
+      } finally {
+        enableButton();
+      }
+    }
+
+    window.resetBookingSettingsForm = async () => {
+      await loadBookingInfoSection({ force: false });
+    };
+
+    window.refreshBookingSettingsFromServer = async () => {
+      await loadBookingInfoSection({ force: true });
+    };
+
+    if (bookingSettingsForm) {
+      bookingSettingsForm.addEventListener('submit', handleBookingSettingsSave);
+    }
+
+    function parseCurrencyToNumber(value) {
+      if (value === null || value === undefined) {
+        return 0;
+      }
+      if (typeof value === 'number') {
+        return Number.isFinite(value) ? value : 0;
+      }
+      if (typeof value === 'string') {
+        if (!/[0-9]/.test(value)) {
+          return 0;
+        }
+        const cleaned = value.replace(/[^0-9.+-]/g, '');
+        if (!cleaned) {
+          return 0;
+        }
+        const parsed = parseFloat(cleaned);
+        return Number.isNaN(parsed) ? 0 : parsed;
+      }
+      return 0;
+    }
+
+    function parsePositiveNumber(value) {
+      if (value === null || value === undefined) {
+        return null;
+      }
+      if (typeof value === 'number') {
+        return Number.isFinite(value) && value > 0 ? value : null;
+      }
+      if (typeof value === 'string') {
+        if (!/[0-9]/.test(value)) {
+          return null;
+        }
+        const cleaned = value.replace(/[^0-9.+-]/g, '');
+        if (!cleaned) {
+          return null;
+        }
+        const parsed = parseFloat(cleaned);
+        if (!Number.isNaN(parsed) && parsed > 0) {
+          return parsed;
+        }
+      }
+      return null;
+    }
+
+    function normalizeInvoiceDurationMinutes(invoice) {
+      if (!invoice) {
+        return 0;
+      }
+
+      const minuteCandidates = [
+        invoice.durationMinutes,
+        invoice.durationInMinutes,
+        invoice.totalDurationMinutes,
+        invoice.sessionMinutes,
+        invoice.minutes
+      ];
+
+      for (const candidate of minuteCandidates) {
+        const parsed = parsePositiveNumber(candidate);
+        if (parsed != null) {
+          return parsed;
+        }
+      }
+
+      const hourCandidates = [
+        invoice.durationHours,
+        invoice.totalHours,
+        invoice.hours
+      ];
+
+      for (const candidate of hourCandidates) {
+        const parsed = parsePositiveNumber(candidate);
+        if (parsed != null) {
+          return parsed * 60;
+        }
+      }
+
+      const startMinutes = timeStringToMinutes(invoice.startTime);
+      const endMinutes = timeStringToMinutes(invoice.endTime);
+      if (startMinutes != null && endMinutes != null && endMinutes > startMinutes) {
+        return endMinutes - startMinutes;
+      }
+
+      if (startMinutes != null) {
+        const derivedEnd = deriveEndMinutes(startMinutes, invoice);
+        if (derivedEnd != null && derivedEnd > startMinutes) {
+          return derivedEnd - startMinutes;
+        }
+      }
+
+      return 0;
+    }
+
+    function computeTutorMetrics() {
+      const baseline = {
+        totalMinutesTutored: 0,
+        totalHoursTutored: 0,
+        totalSessions: 0,
+        totalStudentsBilled: 0,
+        totalRevenue: 0,
+        averageRatePerHour: 0
+      };
+
+      if (!Array.isArray(invoiceCache) || !invoiceCache.length) {
+        return baseline;
+      }
+
+      const paidInvoices = invoiceCache.filter(inv => ((inv.status || '').toLowerCase() === INVOICE_STATUS_PAID));
+      if (!paidInvoices.length) {
+        return baseline;
+      }
+
+      let minutesAccumulator = 0;
+      let amountAccumulator = 0;
+      let studentsAccumulator = 0;
+
+      paidInvoices.forEach((invoice) => {
+        minutesAccumulator += normalizeInvoiceDurationMinutes(invoice);
+
+        const amountFields = [
+          invoice.totalAmount,
+          invoice.totalAmountFormatted,
+          invoice.amountDue,
+          invoice.amount,
+          invoice.balanceDue,
+          invoice.total
+        ];
+
+        let invoiceAmount = 0;
+        for (const field of amountFields) {
+          if (field === null || field === undefined || field === '') {
+            continue;
+          }
+          const parsed = parseCurrencyToNumber(field);
+          if (!Number.isNaN(parsed)) {
+            invoiceAmount = parsed;
+            break;
+          }
+        }
+
+        amountAccumulator += invoiceAmount;
+
+        let studentCount = 0;
+        if (Array.isArray(invoice.studentIds)) {
+          studentCount = invoice.studentIds.length;
+        } else if (typeof invoice.studentNames === 'string') {
+          studentCount = invoice.studentNames
+            .split(',')
+            .map(name => name.trim())
+            .filter(Boolean)
+            .length;
+        }
+
+        if (!studentCount) {
+          studentCount = 1;
+        }
+
+        studentsAccumulator += studentCount;
+      });
+
+      const totalHours = minutesAccumulator / 60;
+      const averageRate = totalHours > 0 ? amountAccumulator / totalHours : 0;
+
+      return {
+        totalMinutesTutored: Math.round(minutesAccumulator),
+        totalHoursTutored: Number(totalHours.toFixed(2)),
+        totalSessions: paidInvoices.length,
+        totalStudentsBilled: studentsAccumulator,
+        totalRevenue: Number(amountAccumulator.toFixed(2)),
+        averageRatePerHour: Number(averageRate.toFixed(2))
+      };
+    }
+
+    function computeInvoiceStatusSummary() {
+      const summary = {
+        total: invoiceCache.length || 0,
+        ready: 0,
+        sent: 0,
+        paid: 0,
+        other: 0
+      };
+
+      if (!Array.isArray(invoiceCache) || !invoiceCache.length) {
+        return summary;
+      }
+
+      let latestPaidMillis = 0;
+      let latestSessionMillis = 0;
+
+      invoiceCache.forEach((invoice) => {
+        const status = (invoice.status || INVOICE_STATUS_READY).toLowerCase();
+        if (status === INVOICE_STATUS_READY) {
+          summary.ready += 1;
+        } else if (status === INVOICE_STATUS_SENT) {
+          summary.sent += 1;
+        } else if (status === INVOICE_STATUS_PAID) {
+          summary.paid += 1;
+          const paidMillis = getMillis(invoice.paidAt);
+          if (paidMillis > latestPaidMillis) {
+            latestPaidMillis = paidMillis;
+          }
+        } else {
+          summary.other += 1;
+        }
+
+        if (invoice.sessionDate) {
+          const parsed = parseDateValue(invoice.sessionDate);
+          if (parsed?.dateObj) {
+            const millis = parsed.dateObj.getTime();
+            if (millis > latestSessionMillis) {
+              latestSessionMillis = millis;
+            }
+          }
+        }
+      });
+
+      if (latestPaidMillis) {
+        summary.latestPaidAt = new Date(latestPaidMillis).toISOString();
+      }
+      if (latestSessionMillis) {
+        summary.latestSessionDate = new Date(latestSessionMillis).toISOString().substring(0, 10);
+      }
+
+      return summary;
+    }
+
+    async function loadTutorProfileData() {
+      if (!currentUser) {
+        return {};
+      }
+      if (tutorProfileCache) {
+        return tutorProfileCache;
+      }
+
+      try {
+        const profileRef = doc(db, 'users', currentUser.uid);
+        const profileSnap = await getDoc(profileRef);
+        tutorProfileCache = profileSnap.exists() ? profileSnap.data() : {};
+      } catch (error) {
+        console.warn('Tutor profile lookup failed:', error);
+        tutorProfileCache = {};
+      }
+
+      return tutorProfileCache;
+    }
+
+    function extractTutorPersonalInfo(profileData = {}, user = null) {
+      const info = {};
+      const fullName = profileData.fullName || profileData.name || user?.displayName || '';
+      if (fullName) {
+        info.fullName = fullName;
+      }
+
+      const firstName = profileData.firstName
+        || (fullName ? fullName.split(/\s+/)[0] : (user?.displayName ? user.displayName.split(/\s+/)[0] : ''));
+      if (firstName) {
+        info.firstName = firstName;
+      }
+
+      const lastName = profileData.lastName
+        || (fullName ? fullName.split(/\s+/).slice(1).join(' ').trim() : '');
+      if (lastName) {
+        info.lastName = lastName;
+      }
+
+      if (user?.email) {
+        info.email = user.email;
+      } else if (profileData.email) {
+        info.email = profileData.email;
+      }
+
+      if (profileData.phone) {
+        info.phone = profileData.phone;
+      }
+
+      const dobValue = profileData.dob || profileData.dateOfBirth || profileData.birthdate;
+      if (dobValue) {
+        const normalized = parseDateValue(dobValue);
+        if (normalized?.dateKey) {
+          info.dateOfBirth = normalized.dateKey;
+        }
+      }
+
+      if (profileData.gender) {
+        info.gender = profileData.gender;
+      }
+      if (profileData.pronouns) {
+        info.pronouns = profileData.pronouns;
+      }
+      if (profileData.address) {
+        info.address = profileData.address;
+      }
+      if (profileData.city) {
+        info.city = profileData.city;
+      }
+      if (profileData.province || profileData.state) {
+        info.region = profileData.province || profileData.state;
+      }
+      if (profileData.postalCode || profileData.zip) {
+        info.postalCode = profileData.postalCode || profileData.zip;
+      }
+      if (profileData.country) {
+        info.country = profileData.country;
+      }
+      if (profileData.bio || profileData.about) {
+        info.bio = profileData.bio || profileData.about;
+      }
+      if (profileData.credentials) {
+        info.credentials = profileData.credentials;
+      }
+      if (profileData.specialties) {
+        info.specialties = profileData.specialties;
+      }
+
+      return info;
+    }
+
+    function deriveTutorSlug(personal = {}, user = null) {
+      const source = personal.fullName || personal.firstName || user?.displayName || user?.email || '';
+      if (typeof source !== 'string' || !source) {
+        return user?.uid || `tutor-${Date.now()}`;
+      }
+
+      const base = source.toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 64);
+
+      return base || user?.uid || `tutor-${Date.now()}`;
+    }
+
+    function buildTutorPayload(profileData, metrics, invoiceSummary) {
+      if (!currentUser) {
+        return null;
+      }
+
+      const personal = extractTutorPersonalInfo(profileData, currentUser);
+      const billing = {
+        baseRatePerHour: TUTOR_RATE_CONFIG.baseRatePerHour,
+        baseRatePerSession: TUTOR_RATE_CONFIG.baseRatePerSession ?? TUTOR_RATE_CONFIG.baseRatePerHour,
+        additionalStudentPerHour: TUTOR_RATE_CONFIG.additionalStudentPerHour,
+        additionalStudentPerSession: TUTOR_RATE_CONFIG.additionalStudentPerSession ?? TUTOR_RATE_CONFIG.additionalStudentPerHour,
+        currency: TUTOR_RATE_CONFIG.currency
+      };
+
+      if (TUTOR_RATE_CONFIG.sessionSummaryAddOn != null) {
+        billing.sessionSummaryAddOn = TUTOR_RATE_CONFIG.sessionSummaryAddOn;
+      }
+
+      const payload = {
+        uid: currentUser.uid,
+        slug: deriveTutorSlug(personal, currentUser),
+        email: currentUser.email || personal.email || null,
+        personal,
+        billing,
+        metrics,
+        invoiceSummary: { ...invoiceSummary, currency: TUTOR_RATE_CONFIG.currency },
+        totalStudents: metrics.totalStudentsBilled,
+        lastInvoiceSyncAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      if (currentUser.displayName && !payload.personal.fullName) {
+        payload.personal.displayName = currentUser.displayName;
+      }
+
+      return payload;
+    }
+
+    async function synchronizeTutorRecord() {
+      if (!currentUser || !doc || !setDoc) {
+        return;
+      }
+
+      if (tutorUpdatePromise) {
+        return tutorUpdatePromise;
+      }
+
+      tutorUpdatePromise = (async () => {
+        const [profileData, metrics, invoiceSummary] = await Promise.all([
+          loadTutorProfileData(),
+          Promise.resolve(computeTutorMetrics()),
+          Promise.resolve(computeInvoiceStatusSummary())
+        ]);
+
+        const payload = buildTutorPayload(profileData, metrics, invoiceSummary);
+        if (!payload) {
+          return;
+        }
+
+        const tutorRef = doc(db, TUTORS_COLLECTION, currentUser.uid);
+        await setDoc(tutorRef, payload, { merge: true });
+      })()
+        .catch((error) => {
+          console.warn('Tutor record sync failed:', error);
+        })
+        .finally(() => {
+          tutorUpdatePromise = null;
+        });
+
+      return tutorUpdatePromise;
     }
 
     function base64ToUint8Array(base64) {
@@ -1306,6 +2552,7 @@
       loadDashboard();
       loadSessions();
       loadBookings();
+      loadBookingInfoSection();
       loadStudents();
       loadUsers();
       loadBlockedEmails();
@@ -1322,6 +2569,8 @@
 
       if (sectionName === 'invoices') {
         loadInvoices();
+      } else if (sectionName === 'booking-info') {
+        loadBookingInfoSection();
       }
     };
 
@@ -3469,6 +4718,8 @@ window.saveSessionChanges = async function (sessionId) {
           html += buildInvoiceTable(paidInvoices, 'Paid Invoices', 'No invoices marked as paid yet.', { showSentAt: true, showPaidBadge: true, allowResend: true, notesMode: 'view' });
 
         container.innerHTML = html;
+
+        await synchronizeTutorRecord();
       } catch (error) {
         console.error('Error loading invoices:', error);
         container.innerHTML = `<div class="empty-state"><h3>Error loading invoices</h3><p>${error.message}</p></div>`;

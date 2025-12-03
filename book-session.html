@@ -6,15 +6,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="style.css" />
 </head>
-<body data-no-auto-init="true">
+<body data-no-auto-init="true" data-page-id="book-session">
   <!-- <header> -->
     <div id="site-header"></div>
     <script src="header-loader.js"></script>
   <!-- </header> -->
 
 <main class="container">
-  <h2>Book a Tutoring Session</h2>
-  <p>
+  <h2 data-editable-block="heroTitle">Book a Tutoring Session</h2>
+  <p data-editable-block="introBlurb">
     If your <a href="edit-profile.html">email notification</a> is on, then
     you'll get a confirmation by email after I approve the request.
   </p>
@@ -48,10 +48,38 @@
           <option value="">Select student...</option>
         </select>
       </div>
+
+      <div class="field-row">
+        <label>Student 5</label>
+        <select name="student_5" id="student-5" title="Optional fifth student">
+          <option value="">Select student...</option>
+        </select>
+      </div>
+
+      <div class="field-row">
+        <label>Student 6</label>
+        <select name="student_6" id="student-6" title="Optional sixth student">
+          <option value="">Select student...</option>
+        </select>
+      </div>
+
+      <div class="field-row">
+        <label>Student 7</label>
+        <select name="student_7" id="student-7" title="Optional seventh student">
+          <option value="">Select student...</option>
+        </select>
+      </div>
+
+      <div class="field-row">
+        <label>Student 8</label>
+        <select name="student_8" id="student-8" title="Optional eighth student">
+          <option value="">Select student...</option>
+        </select>
+      </div>
     </div>
 
     <div class="field-row" style="margin-top: -0.5rem; margin-bottom: 1rem;">
-      <p class="help-text" style="margin: 0;">
+      <p class="help-text" style="margin: 0;" data-editable-block="addStudentHelp">
         Don't see your student? <a href="add-student.html" style="color: var(--primary-color); text-decoration: underline;">Add a new student</a>
       </p>
     </div>
@@ -63,7 +91,7 @@
 
     <div class="field-row">
       <label>Choose a time from the availability calendar*</label>
-      <p class="help-text">
+      <p class="help-text" data-editable-block="calendarHelp">
         Choose a timeslot (at least 1 hour) by clicking on a block of time on the calendar or using the dropdowns below.
       </p>
       <div class="week-nav">
@@ -122,7 +150,7 @@
     <div class="field-row checkbox-row">
       <label>
         <input type="checkbox" id="include-summary" name="include_summary" title="Include summary of the session and relevant homework" />
-        Include summary of the session and relevant homework (+$10)
+        Include summary of the session and relevant homework
       </label>
     </div>
 
@@ -186,11 +214,95 @@
   const query = window.firestoreQuery;
   const where = window.firestoreWhere;
 
+  const SITE_SETTINGS_COLLECTION = "siteSettings";
+  const BOOKING_SETTINGS_DOC_ID = "booking";
+  let bookingFormInitialized = false;
+
   const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec";
 
   let currentUser = null;
   let userProfile = null;
   let userStudents = [];
+  const STUDENT_DROPDOWN_IDS = [
+    "student-1",
+    "student-2",
+    "student-3",
+    "student-4",
+    "student-5",
+    "student-6",
+    "student-7",
+    "student-8"
+  ];
+  let studentDropdowns = [];
+
+  function cacheStudentDropdowns() {
+    studentDropdowns = STUDENT_DROPDOWN_IDS.map((id) => document.getElementById(id));
+    window.bookingStudentDropdowns = studentDropdowns;
+  }
+
+  function handleStudentSelectionChange() {
+    if (typeof window.recalculateBookingCost === 'function') {
+      window.recalculateBookingCost();
+    }
+  }
+
+  function attachStudentDropdownListeners() {
+    studentDropdowns.forEach((dropdown) => {
+      if (!dropdown) return;
+      dropdown.addEventListener('change', handleStudentSelectionChange);
+    });
+  }
+
+  function getConfiguredStudentLimit(settings) {
+    const fallbackMax = (typeof DEFAULT_BOOKING_SETTINGS !== 'undefined'
+      ? DEFAULT_BOOKING_SETTINGS.maxStudentsPerSession
+      : STUDENT_DROPDOWN_IDS.length);
+    const raw = Number(settings?.maxStudentsPerSession ?? fallbackMax);
+    const parsed = Number.isFinite(raw) ? raw : fallbackMax;
+    return Math.min(Math.max(Math.round(parsed) || 1, 1), STUDENT_DROPDOWN_IDS.length);
+  }
+
+  function applyBookingSettingsToStudentSelectors(settings) {
+    const limit = getConfiguredStudentLimit(settings || window.bookingSettings || {});
+    studentDropdowns.forEach((dropdown, index) => {
+      if (!dropdown) return;
+      const container = dropdown.closest('.field-row');
+      const withinLimit = index < limit;
+      if (withinLimit) {
+        dropdown.disabled = false;
+        if (container) {
+          container.classList.remove('hidden');
+        }
+      } else {
+        dropdown.value = '';
+        dropdown.disabled = true;
+        if (container) {
+          container.classList.add('hidden');
+        }
+      }
+    });
+    handleStudentSelectionChange();
+  }
+
+  window.getBookingStudentCount = () => {
+    let count = 0;
+    studentDropdowns.forEach((dropdown) => {
+      if (!dropdown || dropdown.disabled) {
+        return;
+      }
+      const container = dropdown.closest('.field-row');
+      if (container && container.classList.contains('hidden')) {
+        return;
+      }
+      if (dropdown.value) {
+        count += 1;
+      }
+    });
+    return count;
+  };
+
+  cacheStudentDropdowns();
+  attachStudentDropdownListeners();
 
   // Check authentication
   onAuth(auth, async (user) => {
@@ -206,6 +318,24 @@
     await loadUserData();
   });
 
+  async function loadBookingSettingsFromFirestore() {
+    if (!db) {
+      return null;
+    }
+    try {
+      const settingsSnapshot = await getDoc(doc(db, SITE_SETTINGS_COLLECTION, BOOKING_SETTINGS_DOC_ID));
+      if (settingsSnapshot?.exists()) {
+        const data = settingsSnapshot.data();
+        console.log("Loaded booking settings:", data);
+        window.bookingSettings = data;
+        return data;
+      }
+    } catch (error) {
+      console.warn("Unable to fetch booking settings:", error);
+    }
+    return null;
+  }
+
   async function loadUserData() {
     try {
       // Verify db is initialized
@@ -215,6 +345,7 @@
       }
       
       console.log("Loading user data for:", currentUser.uid);
+      const bookingSettingsPromise = loadBookingSettingsFromFirestore();
       
       // Load user profile
       const userDoc = await getDoc(doc(db, "users", currentUser.uid));
@@ -245,15 +376,22 @@
 
       displayStudentDropdowns();
 
-      // Initialize the booking calendar after user data is loaded
-      // Note: We call setupBookingForm() from main.js, but since book-session.html
-      // has a different form structure, some form elements may not exist
-      // The function checks for null before accessing elements, so it's safe
       if (typeof setupBookingForm === 'function') {
-        setupBookingForm();
+        const fetchedSettings = await bookingSettingsPromise;
+        setupBookingForm(fetchedSettings || {});
+        bookingFormInitialized = true;
+        applyBookingSettingsToStudentSelectors(window.bookingSettings);
+      } else {
+        applyBookingSettingsToStudentSelectors(window.bookingSettings);
       }
+
     } catch (err) {
       console.error("Error loading user data:", err);
+      if (!bookingFormInitialized && typeof setupBookingForm === 'function') {
+        setupBookingForm();
+        bookingFormInitialized = true;
+        applyBookingSettingsToStudentSelectors(window.bookingSettings);
+      }
       alert("Error loading your data: " + err.message + ". Please refresh the page.");
     }
   }
@@ -296,35 +434,35 @@
   }
 
   function displayStudentDropdowns() {
-    // Populate all 4 student dropdowns
-    const dropdowns = [
-      document.getElementById("student-1"),
-      document.getElementById("student-2"),
-      document.getElementById("student-3"),
-      document.getElementById("student-4"),
-      // have an option to go to the add student page
+    cacheStudentDropdowns();
 
-      // <a href="signup.html">New Student</a>
-    ];
-    
     if (userStudents.length === 0) {
       // Show message and disable first dropdown
-      const firstDropdown = dropdowns[0];
-      firstDropdown.innerHTML = '<option value="">No students added yet</option>';
-      firstDropdown.disabled = true;
+      const firstDropdown = studentDropdowns[0];
+      if (firstDropdown) {
+        firstDropdown.innerHTML = '<option value="">No students added yet</option>';
+        firstDropdown.disabled = true;
+      }
+      applyBookingSettingsToStudentSelectors(window.bookingSettings);
       return;
     }
 
     // Populate each dropdown with user's students
-    dropdowns.forEach((dropdown) => {
-      // Keep the placeholder option
+    studentDropdowns.forEach((dropdown) => {
+      if (!dropdown) {
+        return;
+      }
       const placeholder = dropdown.querySelector('option[value=""]');
-      
-      // Clear existing options except placeholder
       dropdown.innerHTML = '';
-      dropdown.appendChild(placeholder);
-      
-      // Add student options
+      if (placeholder) {
+        dropdown.appendChild(placeholder);
+      } else {
+        const fallbackOption = document.createElement('option');
+        fallbackOption.value = '';
+        fallbackOption.textContent = 'Select student...';
+        dropdown.appendChild(fallbackOption);
+      }
+
       userStudents.forEach((student) => {
         const option = document.createElement('option');
         option.value = student.id;
@@ -333,8 +471,13 @@
       });
     });
     
+    if (window.bookingSettings) {
+      applyBookingSettingsToStudentSelectors(window.bookingSettings);
+    }
+    handleStudentSelectionChange();
+    
     // Add change event listener to Student 1 (Primary) to auto-populate subject
-    const primaryStudentDropdown = document.getElementById("student-1");
+    const primaryStudentDropdown = studentDropdowns[0];
     const subjectInput = document.getElementById("subject");
     
     if (primaryStudentDropdown && subjectInput) {
@@ -375,18 +518,20 @@
 
     // Get selected students from dropdowns
     const selectedStudents = [];
-    const studentIds = [];
     
-    for (let i = 1; i <= 4; i++) {
-      const dropdown = document.getElementById(`student-${i}`);
-      if (dropdown && dropdown.value) {
-        const student = userStudents.find(s => s.id === dropdown.value);
-        if (student) {
-          selectedStudents.push(student.studentName);
-          studentIds.push(student.id);
-        }
+    studentDropdowns.forEach((dropdown) => {
+      if (!dropdown || dropdown.disabled || !dropdown.value) {
+        return;
       }
-    }
+      const container = dropdown.closest('.field-row');
+      if (container && container.classList.contains('hidden')) {
+        return;
+      }
+      const student = userStudents.find((s) => s.id === dropdown.value);
+      if (student) {
+        selectedStudents.push(student.studentName);
+      }
+    });
 
     if (selectedStudents.length === 0) {
       msg.textContent = "Please select at least one student.";
@@ -443,9 +588,15 @@
     const slidingScaleEnabled = obj.sliding_scale_toggle === "on";
     const discountSlider = document.getElementById("income-slider");
     
-    const baseRate = 50;
-    const additionalRate = 20;
-    const summaryFee = includeSummary ? 10 : 0;
+    const fallbackSettings = (typeof DEFAULT_BOOKING_SETTINGS !== 'undefined')
+      ? DEFAULT_BOOKING_SETTINGS
+      : { baseSessionCost: 50, extraStudentCost: 20, sessionSummaryAddOn: 10 };
+    const activeSettings = window.bookingSettings || fallbackSettings;
+    const baseRate = Number(activeSettings.baseSessionCost) || fallbackSettings.baseSessionCost;
+    const additionalRate = Number(activeSettings.extraStudentCost) || fallbackSettings.extraStudentCost;
+    const summaryFee = includeSummary
+      ? (Number(activeSettings.sessionSummaryAddOn) || fallbackSettings.sessionSummaryAddOn)
+      : 0;
     const costPerHour = baseRate + ((selectedStudents.length - 1) * additionalRate);
     const standardTotal = (costPerHour * duration) + summaryFee;
     
@@ -455,6 +606,10 @@
       const discountPerHour = discountSteps * 10;
       const discountAmount = discountPerHour * duration;
       finalCost = standardTotal - discountAmount;
+    }
+
+    if (finalCost < 0) {
+      finalCost = 0;
     }
     
     obj.final_cost = finalCost.toFixed(2);
@@ -599,5 +754,7 @@
     }
   });
 </script>
+
+<script type="module" src="page-editor.js"></script>
 </body>
 </html>
