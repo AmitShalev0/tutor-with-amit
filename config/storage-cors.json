@@ -1,0 +1,24 @@
+[
+  {
+    "origin": [
+      "http://localhost:5501",
+      "http://127.0.0.1:5501",
+      "http://localhost",
+      "http://127.0.0.1",
+      "https://amitshalev0.github.io"
+    ],
+    "method": ["GET", "POST", "PUT", "HEAD", "DELETE", "OPTIONS"],
+    "responseHeader": [
+      "Authorization",
+      "Content-Type",
+      "X-Firebase-Storage-Version",
+      "X-Goog-Upload-Command",
+      "X-Goog-Upload-File-Name",
+      "X-Goog-Upload-Offset",
+      "X-Goog-Upload-Protocol",
+      "X-Goog-Upload-Header-Content-Length",
+      "X-Goog-Upload-Header-Content-Type"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]

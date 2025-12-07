@@ -2,7 +2,7 @@
 import os
 
 files = [
-    "index.html",
+    "home/amitshalev/index.html",
     "booking.html", 
     "signup.html",
     "contact.html"

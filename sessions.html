@@ -71,6 +71,26 @@
       background: #d1fae5;
       color: #065f46;
     }
+    .status-pending_payment {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    .status-succeed_payment {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .status-failed_payment {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .status-payment_cancelled {
+      background: #ede9fe;
+      color: #5b21b6;
+    }
+    .status-payment_refunded {
+      background: #cffafe;
+      color: #0e7490;
+    }
     .empty-state {
       text-align: center;
       padding: 3rem 1rem;
@@ -118,7 +138,7 @@
       <h2 class="m-0">Sessions</h2>
       <p class="mt-0-5rem">View all your past and upcoming tutoring sessions.</p>
     </div>
-    <button class="btn primary" onclick="window.location.href='book-session.html'">Book Session</button>
+    <button class="btn primary" onclick="window.location.href='book.html'">Book Session</button>
   </div>
 
   <div class="sessions-container">
@@ -159,11 +179,11 @@
 </footer>
 
 <!-- Firebase init -->
-<script type="module" src="firebase.js"></script>
+<script type="module" src="firebase-config.js"></script>
 
 <!-- Sessions logic -->
 <script type="module">
-  // Wait for firebase.js to fully load
+  // Wait for firebase-config.js to fully load
   function waitForFirebase() {
     return new Promise((resolve) => {
       if (window.firebaseAuth && window.firebaseDb) {
@@ -285,8 +305,8 @@
         console.warn("Invoice lookup failed:", invoiceErr);
       }
 
-      // Sort by date (earliest first for better upcoming view)
-      allSessions.sort((a, b) => a.sessionDate - b.sessionDate);
+      // Sort chronologically so downstream views stay in timeline order
+      allSessions.sort(compareSessionsChronologically);
 
       displaySessions();
     } catch (err) {
@@ -332,6 +352,97 @@
     return d;
   }
 
+  function timeStringToMinutesForSort(value) {
+    if (!value || typeof value !== 'string') {
+      return Number.MAX_SAFE_INTEGER;
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return Number.MAX_SAFE_INTEGER;
+    }
+    const parts = trimmed.split(':');
+    if (!parts.length) {
+      return Number.MAX_SAFE_INTEGER;
+    }
+    const hours = Number(parts[0]);
+    const minutes = parts.length > 1 ? Number(parts[1]) : 0;
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+      return Number.MAX_SAFE_INTEGER;
+    }
+    return hours * 60 + minutes;
+  }
+
+  function compareSessionsChronologically(a, b) {
+    const dateA = getSessionDateForCompare(a.sessionDate);
+    const dateB = getSessionDateForCompare(b.sessionDate);
+    const dateMsA = dateA ? dateA.getTime() : Number.MAX_SAFE_INTEGER;
+    const dateMsB = dateB ? dateB.getTime() : Number.MAX_SAFE_INTEGER;
+    if (dateMsA !== dateMsB) {
+      return dateMsA - dateMsB;
+    }
+
+    const startA = timeStringToMinutesForSort(a.startTime);
+    const startB = timeStringToMinutesForSort(b.startTime);
+    if (startA !== startB) {
+      return startA - startB;
+    }
+
+    const fallbackA = String(a.id || a.bookingId || '');
+    const fallbackB = String(b.id || b.bookingId || '');
+    return fallbackA.localeCompare(fallbackB);
+  }
+
+  function normalizeBookingStatus(rawStatus) {
+    if (!rawStatus) {
+      return 'pending_payment';
+    }
+    const lowered = String(rawStatus).toLowerCase();
+    const aliases = {
+      pending: 'pending_payment',
+      awaiting_payment: 'pending_payment',
+      pending_payment: 'pending_payment',
+      payment_pending: 'pending_payment',
+      succeed_payment: 'succeed_payment',
+      payment_succeed: 'succeed_payment',
+      approved: 'succeed_payment',
+      paid: 'succeed_payment',
+      payment_success: 'succeed_payment',
+      payment_succeeded: 'succeed_payment',
+      failed_payment: 'failed_payment',
+      payment_failed: 'failed_payment',
+      payment_cancelled: 'payment_cancelled',
+      payment_canceled: 'payment_cancelled',
+      cancelled: 'payment_cancelled',
+      canceled: 'payment_cancelled',
+      rejected: 'payment_cancelled',
+      refunded: 'payment_refunded',
+      payment_refund: 'payment_refunded'
+    };
+    if (aliases[lowered]) {
+      return aliases[lowered];
+    }
+    return lowered.replace(/[^a-z0-9_-]/g, '_');
+  }
+
+  function normalizeApprovalStatus(rawStatus) {
+    if (!rawStatus) {
+      return 'pending';
+    }
+    return String(rawStatus).toLowerCase();
+  }
+
+  function formatBookingStatusLabel(rawStatus) {
+    const normalized = normalizeBookingStatus(rawStatus);
+    const labels = {
+      pending_payment: 'PAYMENT PENDING',
+      succeed_payment: '[PAID]',
+      failed_payment: 'Payment failed',
+      payment_cancelled: 'Payment cancelled',
+      payment_refunded: 'Payment refunded'
+    };
+    return labels[normalized] || (normalized ? normalized.replace(/_/g, ' ') : 'Unknown');
+  }
+
 
   function displaySessions() {
     const now = new Date(); // Current date and time
@@ -340,60 +451,94 @@
     
     console.log("Displaying sessions. Total:", allSessions.length);
     
-    const pending = allSessions.filter(s => (s.status || 'pending').toLowerCase() === 'pending');
-    const upcoming = allSessions.filter(s => {
-      const sessionDate = getSessionDateForCompare(s.sessionDate);
-      if (!sessionDate) return false;
-      const status = (s.status || '').toLowerCase();
-      if (status !== 'approved') return false;
-      
-      // Session is upcoming if:
-      // 1. It's on a future day, OR
-      // 2. It's today but the end time hasn't passed yet
-      if (sessionDate > today) {
-        return true; // Future day
-      } else if (sessionDate.getTime() === today.getTime()) {
-        // Same day - check if end time has passed
-        if (s.endTime) {
-          const [hours, minutes] = s.endTime.split(':').map(Number);
-          const sessionEnd = new Date();
-          sessionEnd.setHours(hours, minutes, 0, 0);
-          return now < sessionEnd; // Session hasn't ended yet
-        }
-        return true; // No end time, assume still upcoming if today
+    const pendingStatuses = new Set(['pending_payment']);
+    const successfulStatuses = new Set(['succeed_payment']);
+    const failedStatuses = new Set(['failed_payment']);
+    const completedButNotSuccessfulStatuses = new Set(['payment_cancelled', 'payment_refunded']);
+    const attentionStatuses = new Set(['failed_payment', 'payment_cancelled']);
+
+    const pending = allSessions.filter((session) => {
+      const normalizedStatus = normalizeBookingStatus(session.status);
+      const approvalStatus = normalizeApprovalStatus(session.approvalStatus);
+      if (approvalStatus === 'approved') {
+        return false;
       }
-      return false; // Past day
+      if (pendingStatuses.has(normalizedStatus)) {
+        return true;
+      }
+      if (attentionStatuses.has(normalizedStatus)) {
+        const sessionDate = getSessionDateForCompare(session.sessionDate);
+        return !sessionDate || sessionDate >= today;
+      }
+      return false;
     });
-    const past = allSessions.filter(s => {
-      const sessionDate = getSessionDateForCompare(s.sessionDate);
-      if (!sessionDate) return false;
-      const status = (s.status || '').toLowerCase();
-      if (status !== 'approved' && status !== 'rejected') return false;
-      
-      // Session is past if:
-      // 1. It's on a past day, OR
-      // 2. It's today and the end time has passed
-      if (sessionDate < today) {
-        return true; // Past day
-      } else if (sessionDate.getTime() === today.getTime()) {
-        // Same day - check if end time has passed
-        if (s.endTime) {
-          const [hours, minutes] = s.endTime.split(':').map(Number);
+
+    const upcoming = allSessions.filter((session) => {
+      const normalizedStatus = normalizeBookingStatus(session.status);
+      const approvalStatus = normalizeApprovalStatus(session.approvalStatus);
+      const treatedAsSuccessful = successfulStatuses.has(normalizedStatus) || approvalStatus === 'approved';
+      if (!treatedAsSuccessful) {
+        return false;
+      }
+      const sessionDate = getSessionDateForCompare(session.sessionDate);
+      if (!sessionDate) {
+        return false;
+      }
+      if (sessionDate > today) {
+        return true;
+      }
+      if (sessionDate.getTime() === today.getTime()) {
+        if (session.endTime) {
+          const [hours, minutes] = session.endTime.split(':').map(Number);
           const sessionEnd = new Date();
           sessionEnd.setHours(hours, minutes, 0, 0);
-          return now >= sessionEnd; // Session has ended
+          return now < sessionEnd;
         }
-        return false; // No end time, assume still upcoming if today
+        return true;
       }
-      return false; // Future day
+      return false;
+    });
+
+    const past = allSessions.filter((session) => {
+      const normalizedStatus = normalizeBookingStatus(session.status);
+      const approvalStatus = normalizeApprovalStatus(session.approvalStatus);
+      const treatedAsSuccessful = successfulStatuses.has(normalizedStatus) || approvalStatus === 'approved';
+      const treatedAsCompleted = treatedAsSuccessful
+        || failedStatuses.has(normalizedStatus)
+        || completedButNotSuccessfulStatuses.has(normalizedStatus);
+      if (!treatedAsCompleted) {
+        return false;
+      }
+      const sessionDate = getSessionDateForCompare(session.sessionDate);
+      if (!sessionDate) {
+        return false;
+      }
+      if (sessionDate < today) {
+        return true;
+      }
+      if (sessionDate.getTime() === today.getTime()) {
+        if (session.endTime) {
+          const [hours, minutes] = session.endTime.split(':').map(Number);
+          const sessionEnd = new Date();
+          sessionEnd.setHours(hours, minutes, 0, 0);
+          return now >= sessionEnd;
+        }
+        return normalizedStatus !== 'payment_succeeded';
+      }
+      return false;
     });
 
     console.log("Categorized - Upcoming:", upcoming.length, "Pending:", pending.length, "Past:", past.length);
 
+    const sortChronologically = (list) => list.sort(compareSessionsChronologically);
+    sortChronologically(upcoming);
+    sortChronologically(pending);
+    sortChronologically(past);
+
     // Display upcoming sessions
     const upcomingContent = document.getElementById("upcoming-sessions-content");
     if (upcoming.length === 0) {
-      upcomingContent.innerHTML = '<div class="empty-state">No upcoming sessions scheduled. <br> <a href="book-session.html">Book a session</a> to get started!</div>';
+      upcomingContent.innerHTML = '<div class="empty-state">No upcoming sessions scheduled. <br> <a href="book.html">Book a session</a> to get started!</div>';
     } else {
       upcomingContent.innerHTML = `
         <table class="sessions-table">
@@ -479,6 +624,32 @@
     const timeStr = session.startTime && session.endTime 
       ? `${session.startTime} - ${session.endTime}` 
       : session.startTime || 'TBD';
+    const normalizedStatus = normalizeBookingStatus(session.status);
+    const statusLabel = formatBookingStatusLabel(session.status);
+    const statusBadge = `<span class="session-status status-${normalizedStatus}">${statusLabel}</span>`;
+    let payButtonHtml = '';
+    if (normalizedStatus === 'pending_payment') {
+      const bookingIdentifier = session.id || session.bookingId;
+      const amountCentsValue = Number(session.amountCents ?? session.amount_cents ?? 0);
+      const hasValidAmount = Number.isFinite(amountCentsValue) && amountCentsValue > 0;
+      if (bookingIdentifier && hasValidAmount) {
+        const payParams = new URLSearchParams({
+          bookingId: String(bookingIdentifier),
+          amountCents: String(amountCentsValue),
+          currency: String(session.currency || 'cad').toLowerCase()
+        });
+        const tutorUid = session.tutorId || session.tutorID || session.tutorUid || session.tutorUID;
+        if (tutorUid) {
+          payParams.set('tutorUid', tutorUid);
+        }
+        payButtonHtml = `<div style="margin-top: 0.5rem;"><a class="btn primary" href="pay.html?${payParams.toString()}">Pay Now</a></div>`;
+      }
+    }
+    const timeWithStatusHtml = `
+      <div>${timeStr}</div>
+      <div style="margin-top: 0.35rem;">${statusBadge}</div>
+      ${payButtonHtml}
+    `;
     const students = session.studentName || session.studentNames || session.students || 'N/A';
     
     // Student's questions/comments from booking form
@@ -524,7 +695,7 @@
     return `
       <tr style="cursor: pointer;" onclick="toggleTutorNotes('${session.id}')" title="Click to ${hasTutorNotes ? 'view' : 'see'} tutor notes">
         <td>${dateStr}</td>
-        <td>${timeStr}</td>
+        <td>${timeWithStatusHtml}</td>
         <td>${students}</td>
         <td>${studentCommentsHtml}</td>
         ${invoiceCellHtml}

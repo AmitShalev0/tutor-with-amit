@@ -225,7 +225,7 @@
       const resultDiv = document.getElementById('calendar-result');
       resultDiv.innerHTML = '<p class="status info">Simulating calendar load...</p>';
 
-      // Simulate the exact same process as book-session.html
+      // Simulate the exact same process as book.html
       const callbackName = 'calendarTest' + Date.now();
       const url = `${APPS_SCRIPT_URL}?action=getAvailability&weekOffset=0&callback=${callbackName}`;
       

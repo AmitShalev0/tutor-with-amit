@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Booking Info – Amit Tutoring</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .booking-info-page {
+      max-width: 980px;
+      padding: 2.5rem 0 4rem;
+    }
+
+    .booking-info-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+
+    .booking-info-header h1 {
+      margin: 0;
+      font-size: 2rem;
+    }
+
+    .booking-info-header p {
+      margin: 0.35rem 0 0;
+      color: var(--muted);
+      max-width: 560px;
+    }
+
+    .booking-info-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+      flex-wrap: wrap;
+    }
+
+    .info-message {
+      margin: 1rem 0 2rem;
+      padding: 0.85rem 1rem;
+      border-radius: var(--radius-md);
+      background: rgba(79, 157, 255, 0.12);
+      color: var(--accent);
+      font-size: 0.95rem;
+    }
+
+    .info-message.error {
+      background: rgba(220, 53, 69, 0.12);
+      color: #b91c1c;
+    }
+
+    .info-message.muted {
+      background: none;
+      padding: 0;
+      color: var(--muted);
+    }
+
+    .booking-info-grid {
+      display: grid;
+      gap: 1.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+
+    .info-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .info-card h2 {
+      margin: 0;
+      font-size: 1.25rem;
+      color: var(--accent);
+    }
+
+    .info-card dl {
+      margin: 0;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+    }
+
+    .info-card dl div {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .info-card dt {
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .info-card dd {
+      margin: 0;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .availability-list,
+    .courses-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .availability-list li,
+    .courses-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      font-size: 0.95rem;
+    }
+
+    .availability-day {
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .availability-value {
+      color: var(--text);
+    }
+
+    .courses-list li {
+      position: relative;
+      padding-left: 1rem;
+    }
+
+    .courses-list li::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+    }
+
+    .info-footer {
+      margin-top: 2.5rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 640px) {
+      .info-card dl div,
+      .availability-list li {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+      }
+    }
+  </style>
+</head>
+<body data-no-auto-init="true">
+  <div id="site-header"></div>
+  <script src="header-loader.js"></script>
+
+  <main class="container booking-info-page">
+    <div class="booking-info-header">
+      <div>
+        <h1>Booking Info</h1>
+        <p>Review the current booking configuration that students see on the public booking form.</p>
+      </div>
+      <div class="booking-info-meta" id="booking-info-meta" hidden>
+        <span id="booking-info-updated"></span>
+      </div>
+    </div>
+
+    <p id="booking-info-status" class="info-message">Loading booking settings…</p>
+
+    <section id="booking-info-content" class="booking-info-grid" hidden>
+      <article class="info-card">
+        <h2>Session Pricing</h2>
+        <dl>
+          <div>
+            <dt>First student</dt>
+            <dd id="rate-base">—</dd>
+          </div>
+          <div>
+            <dt>Each additional student</dt>
+            <dd id="rate-extra">—</dd>
+          </div>
+          <div>
+            <dt>Session summary add-on</dt>
+            <dd id="rate-summary">—</dd>
+          </div>
+        </dl>
+      </article>
+
+      <article class="info-card">
+        <h2>Session Length &amp; Group Size</h2>
+        <dl>
+          <div>
+            <dt>Minimum session length</dt>
+            <dd id="session-min">—</dd>
+          </div>
+          <div>
+            <dt>Maximum session length</dt>
+            <dd id="session-max">—</dd>
+          </div>
+          <div>
+            <dt>Maximum students per session</dt>
+            <dd id="session-max-students">—</dd>
+          </div>
+          <div>
+            <dt>Recurring sessions bookable up to</dt>
+            <dd id="session-recurring">—</dd>
+          </div>
+        </dl>
+      </article>
+
+      <article class="info-card">
+        <h2>Calendar Display</h2>
+        <dl>
+          <div>
+            <dt>Visible hours</dt>
+            <dd id="calendar-hours">—</dd>
+          </div>
+          <div>
+            <dt>Visible days</dt>
+            <dd id="calendar-days">—</dd>
+          </div>
+        </dl>
+      </article>
+
+      <article class="info-card">
+        <h2>Weekly Availability</h2>
+        <ul id="booking-availability-list" class="availability-list"></ul>
+      </article>
+
+      <article class="info-card">
+        <h2>Courses Offered</h2>
+        <ul id="booking-courses-list" class="courses-list"></ul>
+      </article>
+    </section>
+
+    <p id="booking-info-footer" class="info-footer" hidden></p>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>© <span id="year"></span> Amit Tutoring · <a href="contact.html">Contact me</a></p>
+    </div>
+  </footer>
+
+  <script src="role-utils.js"></script>
+  <script type="module">
+    import { auth, db, onAuthStateChanged, doc, getDoc } from './firebase-config.js';
+
+    const SITE_SETTINGS_COLLECTION = 'siteSettings';
+    const BOOKING_SETTINGS_DOC_ID = 'booking';
+    const ADMIN_UID_ALLOWLIST = new Set(['fUXnvGI024fYp4w1AvKUcbM7p8z2']);
+    const ADMIN_EMAIL_ALLOWLIST = new Set(['amitshalev1510@gmail.com']);
+    const CALENDAR_DAY_LABELS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const DEFAULT_BOOKING_SETTINGS = {
+      maxStudentsPerSession: 4,
+      maxHoursPerSession: 2,
+      minSessionMinutes: 60,
+      baseSessionCost: 50,
+      extraStudentCost: 20,
+      sessionSummaryAddOn: 10,
+      recurringMaxAdvanceWeeks: 12,
+      availability: {
+        '0': [],
+        '1': [],
+        '2': [],
+        '3': [],
+        '4': [],
+        '5': [],
+        '6': [{ start: '11:00', end: '16:00' }]
+      },
+      calendarDisplay: {
+        startHour: 8,
+        endHour: 20,
+        visibleDays: ['0', '1', '2', '3', '4']
+      },
+      currency: 'CAD'
+    };
+
+    const statusEl = document.getElementById('booking-info-status');
+    const contentEl = document.getElementById('booking-info-content');
+    const metaEl = document.getElementById('booking-info-meta');
+    const updatedEl = document.getElementById('booking-info-updated');
+    const footerEl = document.getElementById('booking-info-footer');
+
+    const fieldEls = {
+      baseRate: document.getElementById('rate-base'),
+      extraRate: document.getElementById('rate-extra'),
+      summaryAddOn: document.getElementById('rate-summary'),
+      minDuration: document.getElementById('session-min'),
+      maxDuration: document.getElementById('session-max'),
+      maxStudents: document.getElementById('session-max-students'),
+      recurringWeeks: document.getElementById('session-recurring'),
+      calendarHours: document.getElementById('calendar-hours'),
+      calendarDays: document.getElementById('calendar-days')
+    };
+
+    const availabilityListEl = document.getElementById('booking-availability-list');
+    const coursesListEl = document.getElementById('booking-courses-list');
+
+    function normalizeEmail(value) {
+      if (typeof value !== 'string') {
+        return null;
+      }
+      const trimmed = value.trim();
+      if (!trimmed || !trimmed.includes('@')) {
+        return null;
+      }
+      return trimmed.toLowerCase();
+    }
+
+    function normalizeId(value) {
+      if (!value) {
+        return null;
+      }
+      const text = String(value).trim();
+      return text || null;
+    }
+
+    function isOwner(user, userDoc) {
+      const uidCandidates = [normalizeId(user?.uid), normalizeId(userDoc?.uid), normalizeId(userDoc?.id)];
+      if (uidCandidates.some((uid) => uid && ADMIN_UID_ALLOWLIST.has(uid))) {
+        return true;
+      }
+
+      const emailCandidates = [];
+      const pushEmail = (candidate) => {
+        const normalized = normalizeEmail(candidate);
+        if (normalized) {
+          emailCandidates.push(normalized);
+        }
+      };
+
+      pushEmail(user?.email);
+      pushEmail(userDoc?.email);
+      pushEmail(userDoc?.primaryEmail);
+      pushEmail(userDoc?.contactEmail);
+
+      if (Array.isArray(userDoc?.emails)) {
+        userDoc.emails.forEach(pushEmail);
+      }
+
+      if (userDoc?.contact && typeof userDoc.contact === 'object') {
+        Object.values(userDoc.contact).forEach(pushEmail);
+      }
+
+      return emailCandidates.some((email) => ADMIN_EMAIL_ALLOWLIST.has(email));
+    }
+
+    function hasTutorPrivileges(userDoc) {
+      if (!userDoc) {
+        return false;
+      }
+
+      if (window.RoleUtils && typeof window.RoleUtils.normalizeRoleInfo === 'function') {
+        try {
+          const roleInfo = window.RoleUtils.normalizeRoleInfo(userDoc);
+          if (roleInfo?.tutorActive) {
+            return true;
+          }
+          const allowedStates = new Set([
+            window.RoleUtils.ROLE_STATES.TUTOR_ONLY,
+            window.RoleUtils.ROLE_STATES.HYBRID_ACTIVE,
+            window.RoleUtils.ROLE_STATES.HYBRID_FREEZE_TUTOR,
+            window.RoleUtils.ROLE_STATES.HYBRID_FREEZE_STUDENT
+          ]);
+          if (roleInfo && allowedStates.has(roleInfo.state)) {
+            return true;
+          }
+        } catch (error) {
+          console.warn('Booking info: unable to read role state via RoleUtils', error);
+        }
+      }
+
+      const roles = userDoc.roles;
+      if (!roles) {
+        return false;
+      }
+
+      if (roles === true) {
+        return true;
+      }
+
+      if (typeof roles === 'string') {
+        return roles.toLowerCase().includes('tutor');
+      }
+
+      if (Array.isArray(roles)) {
+        return roles.some((role) => typeof role === 'string' && role.toLowerCase().includes('tutor'));
+      }
+
+      if (typeof roles === 'object') {
+        const tutor = roles.tutor;
+        if (tutor === true) {
+          return true;
+        }
+        if (typeof tutor === 'string') {
+          return tutor.toLowerCase().includes('active');
+        }
+        if (tutor && typeof tutor === 'object') {
+          if (tutor.active === true) {
+            return true;
+          }
+          if (tutor.status && typeof tutor.status === 'string') {
+            return tutor.status.toLowerCase().includes('active');
+          }
+        }
+      }
+
+      return false;
+    }
+
+    function coerceHour(value, fallback) {
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) {
+        return Math.min(24, Math.max(0, Math.floor(numeric)));
+      }
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) {
+          return fallback;
+        }
+        const match = trimmed.match(/^([0-1]?\d|2[0-3])(?::00)?$/);
+        if (match) {
+          return Math.min(24, Math.max(0, Number(match[1])));
+        }
+      }
+      return fallback;
+    }
+
+    function normalizeTimeString(value) {
+      if (typeof value !== 'string') {
+        return null;
+      }
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return null;
+      }
+      const match = trimmed.match(/^([0-1]?\d|2[0-3]):([0-5]\d)$/);
+      if (!match) {
+        return null;
+      }
+      const hours = match[1].padStart(2, '0');
+      const minutes = match[2];
+      return `${hours}:${minutes}`;
+    }
+
+    function normalizeAvailability(rawAvailability = {}) {
+      const template = JSON.parse(JSON.stringify(DEFAULT_BOOKING_SETTINGS.availability));
+      const result = {};
+      Object.keys(template).forEach((key) => {
+        const slots = Array.isArray(rawAvailability[key]) ? rawAvailability[key] : template[key];
+        const normalizedSlots = [];
+        slots.forEach((slot) => {
+          if (Array.isArray(slot) && slot.length === 2) {
+            const start = normalizeTimeString(slot[0]);
+            const end = normalizeTimeString(slot[1]);
+            if (start && end && start < end) {
+              normalizedSlots.push({ start, end });
+            }
+            return;
+          }
+          const start = normalizeTimeString(slot?.start ?? slot?.from ?? slot?.begin);
+          const end = normalizeTimeString(slot?.end ?? slot?.to ?? slot?.finish);
+          if (start && end && start < end) {
+            normalizedSlots.push({ start, end });
+          }
+        });
+        result[key] = normalizedSlots;
+      });
+      return result;
+    }
+
+    function normalizeVisibleDays(rawDays) {
+      const normalizeKey = (value) => {
+        if (value == null) {
+          return null;
+        }
+        const raw = String(value).trim();
+        if (!raw) {
+          return null;
+        }
+        if (/^[0-6]$/.test(raw)) {
+          return raw;
+        }
+        const lowered = raw.toLowerCase();
+        const matches = CALENDAR_DAY_LABELS.findIndex((label) => label.toLowerCase().startsWith(lowered.slice(0, 3)));
+        if (matches === -1) {
+          return null;
+        }
+        return String(matches);
+      };
+
+      const days = Array.isArray(rawDays)
+        ? rawDays
+        : typeof rawDays === 'string'
+          ? rawDays.split(',').map((item) => item.trim()).filter(Boolean)
+          : DEFAULT_BOOKING_SETTINGS.calendarDisplay.visibleDays;
+
+      const normalized = Array.from(new Set(days.map(normalizeKey).filter((value) => value != null)));
+      if (!normalized.length) {
+        return DEFAULT_BOOKING_SETTINGS.calendarDisplay.visibleDays.slice();
+      }
+      normalized.sort((a, b) => Number(a) - Number(b));
+      return normalized;
+    }
+
+    function normalizeBookingSettings(raw = {}) {
+      const normalized = JSON.parse(JSON.stringify(DEFAULT_BOOKING_SETTINGS));
+
+      const clampNumber = (value, fallback, options = {}) => {
+        const parsed = typeof value === 'number' ? value : Number(value);
+        if (!Number.isFinite(parsed)) {
+          return fallback;
+        }
+        let result = parsed;
+        if (options.min != null) {
+          result = Math.max(options.min, result);
+        }
+        if (options.max != null) {
+          result = Math.min(options.max, result);
+        }
+        if (options.roundNearest) {
+          const step = options.roundNearest;
+          result = Math.round(result / step) * step;
+        }
+        if (options.precision != null) {
+          const factor = 10 ** options.precision;
+          result = Math.round(result * factor) / factor;
+        }
+        return result;
+      };
+
+      normalized.maxStudentsPerSession = clampNumber(raw.maxStudentsPerSession, normalized.maxStudentsPerSession, { min: 1, max: 8, roundNearest: 1 });
+      normalized.maxHoursPerSession = clampNumber(raw.maxHoursPerSession, normalized.maxHoursPerSession, { min: 1, max: 6, precision: 2 });
+      normalized.minSessionMinutes = clampNumber(raw.minSessionMinutes, normalized.minSessionMinutes, { min: 30, max: Math.round(normalized.maxHoursPerSession * 60), roundNearest: 15 });
+      normalized.baseSessionCost = clampNumber(raw.baseSessionCost, normalized.baseSessionCost, { min: 0, precision: 2 });
+      normalized.extraStudentCost = clampNumber(raw.extraStudentCost, normalized.extraStudentCost, { min: 0, precision: 2 });
+      normalized.sessionSummaryAddOn = clampNumber(raw.sessionSummaryAddOn, normalized.sessionSummaryAddOn, { min: 0, precision: 2 });
+      normalized.recurringMaxAdvanceWeeks = clampNumber(raw.recurringMaxAdvanceWeeks, normalized.recurringMaxAdvanceWeeks, { min: 1, max: 52, roundNearest: 1 });
+
+      const startHour = coerceHour(raw.calendarDisplay?.startHour, normalized.calendarDisplay.startHour);
+      let endHour = coerceHour(raw.calendarDisplay?.endHour, normalized.calendarDisplay.endHour);
+      if (endHour <= startHour) {
+        endHour = Math.min(24, Math.max(startHour + 1, normalized.calendarDisplay.endHour));
+      }
+
+      normalized.calendarDisplay = {
+        startHour,
+        endHour,
+        visibleDays: normalizeVisibleDays(raw.calendarDisplay?.visibleDays)
+      };
+
+      normalized.availability = normalizeAvailability(raw.availability);
+      if (typeof raw.currency === 'string' && raw.currency.trim()) {
+        normalized.currency = raw.currency.trim().toUpperCase();
+      }
+
+      if (Array.isArray(raw.courses)) {
+        normalized.courses = raw.courses.map((course) => String(course || '').trim()).filter(Boolean);
+      } else if (typeof raw.courses === 'string') {
+        normalized.courses = raw.courses
+          .split(/\r?\n|,/)
+          .map((entry) => entry.trim())
+          .filter(Boolean);
+      } else {
+        normalized.courses = [];
+      }
+
+      normalized._lastUpdatedAt = raw._lastUpdatedAt || null;
+      normalized._lastUpdatedBy = raw._lastUpdatedBy || null;
+
+      return normalized;
+    }
+
+    function formatCurrency(amount, currency) {
+      const formatter = new Intl.NumberFormat('en-CA', {
+        style: 'currency',
+        currency: currency || 'CAD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+      return formatter.format(amount);
+    }
+
+    function formatDurationMinutes(minutes) {
+      if (!Number.isFinite(minutes) || minutes <= 0) {
+        return '—';
+      }
+      const totalMinutes = Math.round(minutes);
+      const hours = Math.floor(totalMinutes / 60);
+      const mins = totalMinutes % 60;
+      const parts = [];
+      if (hours) {
+        parts.push(`${hours} hr${hours === 1 ? '' : 's'}`);
+      }
+      if (mins) {
+        parts.push(`${mins} min`);
+      }
+      return parts.length ? parts.join(' ') : '0 min';
+    }
+
+    function formatHourRange(startHour, endHour) {
+      const toLabel = (hour) => {
+        const date = new Date();
+        date.setHours(hour, 0, 0, 0);
+        return new Intl.DateTimeFormat('en-US', {
+          hour: 'numeric',
+          minute: '2-digit'
+        }).format(date);
+      };
+      return `${toLabel(startHour)} – ${toLabel(endHour)}`;
+    }
+
+    function formatVisibleDays(visibleDays) {
+      if (!Array.isArray(visibleDays) || !visibleDays.length) {
+        return '—';
+      }
+      return visibleDays
+        .map((value) => {
+          const index = Number(value);
+          return CALENDAR_DAY_LABELS[index] || value;
+        })
+        .join(', ');
+    }
+
+    function renderAvailability(availability) {
+      availabilityListEl.innerHTML = '';
+      const entries = CALENDAR_DAY_LABELS.map((label, index) => {
+        const slots = availability[String(index)] || [];
+        if (!slots.length) {
+          return { label, text: 'Not available' };
+        }
+        const text = slots.map((slot) => `${slot.start} – ${slot.end}`).join(', ');
+        return { label, text };
+      });
+
+      entries.forEach(({ label, text }) => {
+        const li = document.createElement('li');
+        const daySpan = document.createElement('span');
+        daySpan.className = 'availability-day';
+        daySpan.textContent = label;
+        const valueSpan = document.createElement('span');
+        valueSpan.className = 'availability-value';
+        valueSpan.textContent = text;
+        li.appendChild(daySpan);
+        li.appendChild(valueSpan);
+        availabilityListEl.appendChild(li);
+      });
+    }
+
+    function renderCourses(courses) {
+      coursesListEl.innerHTML = '';
+      if (!Array.isArray(courses) || !courses.length) {
+        const li = document.createElement('li');
+        li.textContent = 'No courses listed.';
+        coursesListEl.appendChild(li);
+        return;
+      }
+      courses.forEach((course) => {
+        const li = document.createElement('li');
+        li.textContent = course;
+        coursesListEl.appendChild(li);
+      });
+    }
+
+    function toDate(value) {
+      if (!value) {
+        return null;
+      }
+      if (typeof value.toDate === 'function') {
+        try {
+          return value.toDate();
+        } catch (error) {
+          return null;
+        }
+      }
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    function renderLastUpdated(settings) {
+      const updatedAt = toDate(settings._lastUpdatedAt);
+      const updatedBy = settings._lastUpdatedBy;
+      if (!updatedAt && !updatedBy) {
+        metaEl.hidden = true;
+        footerEl.hidden = true;
+        return;
+      }
+
+      const formattedDate = updatedAt
+        ? updatedAt.toLocaleString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+          })
+        : null;
+
+      const parts = [];
+      if (formattedDate) {
+        parts.push(`Last updated ${formattedDate}`);
+      }
+      if (updatedBy) {
+        parts.push(`by ${updatedBy}`);
+      }
+
+      const message = parts.join(' ');
+      if (message) {
+        updatedEl.textContent = message;
+        metaEl.hidden = false;
+        footerEl.textContent = message;
+        footerEl.hidden = false;
+      } else {
+        metaEl.hidden = true;
+        footerEl.hidden = true;
+      }
+    }
+
+    function renderBookingSettings(settings) {
+      fieldEls.baseRate.textContent = formatCurrency(settings.baseSessionCost, settings.currency);
+      fieldEls.extraRate.textContent = formatCurrency(settings.extraStudentCost, settings.currency);
+      fieldEls.summaryAddOn.textContent = formatCurrency(settings.sessionSummaryAddOn, settings.currency);
+      fieldEls.minDuration.textContent = formatDurationMinutes(settings.minSessionMinutes);
+      fieldEls.maxDuration.textContent = formatDurationMinutes(settings.maxHoursPerSession * 60);
+      fieldEls.maxStudents.textContent = settings.maxStudentsPerSession;
+      fieldEls.recurringWeeks.textContent = `${settings.recurringMaxAdvanceWeeks} week${settings.recurringMaxAdvanceWeeks === 1 ? '' : 's'}`;
+      fieldEls.calendarHours.textContent = formatHourRange(settings.calendarDisplay.startHour, settings.calendarDisplay.endHour);
+      fieldEls.calendarDays.textContent = formatVisibleDays(settings.calendarDisplay.visibleDays);
+
+      renderAvailability(settings.availability);
+      renderCourses(settings.courses);
+      renderLastUpdated(settings);
+
+      contentEl.hidden = false;
+      statusEl.hidden = true;
+    }
+
+    async function fetchBookingSettings() {
+      const settingsRef = doc(db, SITE_SETTINGS_COLLECTION, BOOKING_SETTINGS_DOC_ID);
+      const snapshot = await getDoc(settingsRef);
+      const data = snapshot.exists() ? snapshot.data() : {};
+      return normalizeBookingSettings(data);
+    }
+
+    function showError(message) {
+      statusEl.textContent = message;
+      statusEl.classList.remove('muted');
+      statusEl.classList.add('error');
+      statusEl.hidden = false;
+      contentEl.hidden = true;
+      metaEl.hidden = true;
+      footerEl.hidden = true;
+    }
+
+    function showInfo(message) {
+      statusEl.textContent = message;
+      statusEl.classList.remove('error');
+      statusEl.classList.add('muted');
+      statusEl.hidden = false;
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      statusEl.textContent = 'Loading booking settings…';
+      statusEl.classList.remove('error', 'muted');
+
+      try {
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        const userDoc = userDocSnap.exists() ? { id: userDocSnap.id, ...userDocSnap.data() } : { id: user.uid };
+
+        if (!isOwner(user, userDoc) && !hasTutorPrivileges(userDocSnap.exists() ? userDoc : null)) {
+          showInfo('You do not have permission to view booking settings.');
+          return;
+        }
+
+        const settings = await fetchBookingSettings();
+        renderBookingSettings(settings);
+      } catch (error) {
+        console.error('Booking info: failed to load settings', error);
+        showError(error?.message ? `Unable to load booking settings: ${error.message}` : 'Unable to load booking settings.');
+      }
+    });
+  </script>
+  <script src="main.js"></script>
+</body>
+</html>

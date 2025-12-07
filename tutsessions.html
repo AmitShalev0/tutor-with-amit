@@ -1,0 +1,3258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tutor Sessions – Amit Tutoring</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    :root {
+      --sessions-gap: 1.25rem;
+    }
+
+    .sessions-page {
+      max-width: 1200px;
+      padding: 2.5rem 0 4rem;
+    }
+
+    .sessions-page .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .sessions-page .section-header h1 {
+      margin: 0;
+      font-size: 2rem;
+    }
+
+    .sessions-page .section-header p {
+      margin: 0.35rem 0 0;
+      color: var(--muted);
+      max-width: 620px;
+    }
+
+    .section-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .sessions-subsection-header {
+      margin-top: 1.5rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .sessions-subsection-header h3 {
+      margin: 0;
+      color: var(--accent);
+    }
+
+    .sessions-subsection-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .sessions-toolbar {
+      margin-top: 1.5rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sessions-toolbar .search-box {
+      flex: 1;
+      min-width: 240px;
+      max-width: 420px;
+    }
+
+    .sessions-toolbar input[type="search"] {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    .selection-pill {
+      padding: 0.5rem 0.85rem;
+      background: var(--surface-alt);
+      border-radius: 999px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .selection-pill.is-active {
+      color: var(--accent);
+      background: rgba(79, 157, 255, 0.16);
+      font-weight: 600;
+    }
+
+    .data-table {
+      width: 100%;
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      overflow-x: auto;
+    }
+
+    .data-table table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .data-table th {
+      background: var(--surface-alt);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    .data-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .data-table tr:hover {
+      background: var(--surface-alt);
+    }
+
+    .loading {
+      padding: 2rem 0;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--muted);
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      border: 1px dashed var(--border);
+    }
+
+    .btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 0.65rem 1.2rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.95rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .btn:hover {
+      opacity: 0.92;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: var(--surface-alt);
+      color: var(--text);
+    }
+
+    .btn-warning {
+      background: rgba(244, 200, 110, 0.82);
+      color: #111827;
+    }
+
+    .btn-warning:hover {
+      background: rgba(230, 176, 72, 0.88);
+    }
+
+    .btn-danger {
+      background: #dc3545;
+    }
+
+    .btn-success {
+      background: #16a34a;
+    }
+
+    .btn-success:hover {
+      background: #15803d;
+    }
+
+    .btn-sm {
+      padding: 0.35rem 0.75rem;
+      font-size: 0.85rem;
+    }
+
+    .payment-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      position: relative;
+    }
+
+    .payment-status-label {
+      min-width: 110px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    .payment-status-label.is-paid {
+      color: #16a34a;
+      font-weight: 600;
+    }
+
+    .payment-status-label.is-partial {
+      color: #facc15;
+      font-weight: 600;
+    }
+
+    .payment-status-label.is-no-show {
+      color: #ef4444;
+      font-weight: 600;
+    }
+
+    .payment-dropdown {
+      position: relative;
+    }
+
+    .payment-toggle-btn {
+      min-width: 2rem;
+      padding: 0.35rem 0.5rem;
+      font-weight: 600;
+    }
+
+    .payment-dropdown-menu {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 0.35rem);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 0.75rem;
+      min-width: 220px;
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.15);
+      z-index: 30;
+      display: none;
+    }
+
+    .payment-dropdown-menu.is-open {
+      display: block;
+    }
+
+    .payment-dropdown-menu .payment-amount-display {
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .payment-dropdown-menu label {
+      display: block;
+      font-size: 0.8rem;
+      margin-bottom: 0.3rem;
+      color: var(--muted);
+    }
+
+    .payment-dropdown-menu input[type="number"] {
+      width: 100%;
+      padding: 0.5rem 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-alt);
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+
+    .payment-dropdown-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-top: 0.75rem;
+    }
+
+    .session-row {
+      cursor: pointer;
+    }
+
+    .session-row.session-conflict {
+      background: rgba(244, 63, 94, 0.18);
+    }
+
+    .session-row.session-conflict:hover {
+      background: rgba(244, 63, 94, 0.25);
+    }
+
+    .session-row.selected-row {
+      background: rgba(79, 157, 255, 0.12);
+    }
+
+    .recurring-child {
+      background: rgba(59, 130, 246, 0.08);
+    }
+
+    .recurring-child:hover {
+      background: rgba(59, 130, 246, 0.12);
+    }
+
+    .session-select-cell {
+      position: relative;
+      padding-left: 40px;
+      white-space: nowrap;
+    }
+
+    .session-select-cell.has-toggle {
+      padding-left: 40px;
+    }
+
+    .session-select-inner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .checkbox-slot {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .checkbox-slot.small {
+      width: 16px;
+    }
+
+    .checkbox-slot.large {
+      width: 18px;
+    }
+
+    .checkbox-slot input {
+      width: 100%;
+      height: 100%;
+    }
+
+    .session-checkbox {
+      width: 16px;
+      height: 16px;
+    }
+
+    .session-checkbox.session-checkbox-multi {
+      width: 18px;
+      height: 18px;
+    }
+
+    .group-toggle-btn {
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 30px;
+      height: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      margin: 0;
+      padding: 0;
+      background: var(--surface-alt);
+    }
+
+    .session-detail-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 0.5rem 0;
+    }
+
+    .edit-session-form h4 {
+      margin: 0 0 0.75rem;
+    }
+
+    .edit-session-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .edit-field label {
+      display: block;
+      font-weight: 600;
+      font-size: 0.85rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .edit-field input,
+    .edit-field textarea {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    .edit-field textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
+
+    .edit-field-inline {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .edit-session-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .session-comment-wrapper {
+      padding: 12px;
+      background: var(--surface-alt);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+    }
+
+    .session-comment-input {
+      width: 100%;
+      min-height: 5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      color: var(--text);
+      padding: 0.75rem;
+      resize: vertical;
+      font-size: 0.95rem;
+    }
+
+    .session-comment-actions {
+      margin-top: 0.75rem;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(17, 24, 39, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1.5rem;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 1.75rem;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 20px 32px rgba(15, 23, 42, 0.25);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .modal-header h3 {
+      margin: 0;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      line-height: 1;
+      cursor: pointer;
+      color: var(--muted);
+    }
+
+    .modal-subtle-text {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .modal-action-row {
+      margin-top: 1.5rem;
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+
+    @media (max-width: 768px) {
+      .sessions-page {
+        padding-top: 2rem;
+      }
+
+      .section-actions {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .group-toggle-btn {
+        left: 4px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="site-header"></div>
+  <script src="header-loader.js"></script>
+
+  <main class="container sessions-page">
+    <div class="section-header">
+      <div>
+        <h1>Tutor Sessions</h1>
+        <p>Review, update, and annotate the tutoring sessions assigned to you. Changes sync with the shared calendar.</p>
+      </div>
+      <div class="section-actions">
+        <a class="btn btn-secondary" href="booking-info.html">Booking Info</a>
+        <button class="btn btn-danger" id="delete-selected-sessions-btn" onclick="deleteSelectedSessions()" style="display: none;">
+          Delete Selected (<span id="selected-sessions-count">0</span>)
+        </button>
+        <button class="btn btn-warning" id="bulk-edit-times-btn" onclick="openBulkEditModal()" style="display: none;">
+          Edit Selected Times
+        </button>
+        <button class="btn" type="button" onclick="loadSessions()">🔄 Refresh</button>
+      </div>
+    </div>
+
+    <div class="sessions-toolbar">
+      <div class="search-box">
+        <label class="sr-only" for="sessions-search">Search sessions</label>
+        <input type="search" id="sessions-search" placeholder="Search by student or subject" oninput="filterSessions()" />
+      </div>
+      <div class="selection-pill" data-selection-pill>
+        Selected: <span data-selection-count-pill>0</span>
+      </div>
+    </div>
+
+    <div id="sessions-container" class="loading">Loading your sessions…</div>
+  </main>
+
+  <div id="bulk-edit-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bulk-edit-modal-title">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="bulk-edit-modal-title">Edit Recurring Sessions</h3>
+        <button class="modal-close" type="button" aria-label="Close" onclick="closeBulkEditModal()">×</button>
+      </div>
+      <form id="bulk-edit-form" onsubmit="submitBulkEdit(event)">
+        <p id="bulk-edit-count" class="modal-subtle-text"></p>
+        <div class="edit-field">
+          <label for="bulk-start-time">Start time</label>
+          <input type="time" id="bulk-start-time" required />
+        </div>
+        <div class="edit-field" style="margin-top: 1rem;">
+          <label for="bulk-end-time">End time</label>
+          <input type="time" id="bulk-end-time" required />
+        </div>
+        <div class="modal-action-row">
+          <button class="btn btn-secondary" type="button" onclick="closeBulkEditModal()">Cancel</button>
+          <button class="btn btn-warning" type="submit" id="bulk-edit-submit-btn">Save changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>© <span id="year"></span> Amit Tutoring · <a href="contact.html">Contact me</a></p>
+    </div>
+  </footer>
+  <script src="main.js"></script>
+
+  <script type="module">
+    import {
+      auth,
+      db,
+      onAuthStateChanged,
+      collection,
+      getDocs,
+      getDoc,
+      query,
+      where,
+      doc,
+      updateDoc,
+      deleteDoc,
+      serverTimestamp
+    } from './firebase-config.js';
+
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec';
+
+    let currentUser = null;
+    let allSessions = [];
+    let sessionById = new Map();
+    let currentRenderedSessions = [];
+    let currentRenderedSessionIds = [];
+    let selectedSessionIds = new Set();
+    let recurringGroupSessions = new Map();
+    let expandedRecurringGroupIds = new Set();
+    let bulkEditSessionIds = [];
+    let bulkEditRecurringKey = null;
+    let sessionsSortColumn = null;
+    let sessionsSortDirection = 'asc';
+    let tableSessionIdMap = new Map();
+    let openPaymentMenuId = null;
+    const paymentProcessingIds = new Set();
+
+    const tutorIdFields = [
+      'tutorId',
+      'tutorID',
+      'tutorUid',
+      'tutorUID',
+      'tutorUserId',
+      'tutorUserID',
+      'assignedTutorId',
+      'assignedTutorID',
+      'assignedTutorUid',
+      'assignedTutorUID',
+      'primaryTutorId',
+      'primaryTutorID',
+      'primaryTutorUid',
+      'primaryTutorUID',
+      'tutorProfileId',
+      'tutorProfileID',
+      'leadTutorId',
+      'leadTutorUid',
+      'tutorAccountId',
+      'tutorAccountID',
+      'tutorAccountUid',
+      'primaryInstructorId',
+      'primaryInstructorUid'
+    ];
+    const tutorEmailFields = [
+      'tutorEmail',
+      'tutor_email',
+      'tutorContactEmail',
+      'tutor_contact_email',
+      'assignedTutorEmail',
+      'primaryTutorEmail',
+      'tutorEmailAddress',
+      'tutorEmailPrimary',
+      'leadTutorEmail',
+      'instructorEmail'
+    ];
+    const tutorIdArrayFields = [
+      'tutorIds',
+      'tutorUIDs',
+      'tutorUserIds',
+      'tutorUserUIDs',
+      'assignedTutorIds',
+      'assignedTutorUIDs',
+      'primaryTutorIds',
+      'primaryTutorUIDs',
+      'tutorTeam',
+      'tutorMembers',
+      'leadTutorIds',
+      'leadTutorUIDs'
+    ];
+    const tutorEmailArrayFields = [
+      'tutorEmails',
+      'tutorContactEmails',
+      'assignedTutorEmails',
+      'primaryTutorEmails',
+      'tutorEmailAddresses',
+      'instructorEmails'
+    ];
+    const tutorKeyFragments = ['tutor', 'coach', 'mentor', 'instructor', 'teacher', 'assign', 'staff'];
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      currentUser = user;
+      try {
+        await loadSessions();
+      } catch (error) {
+        console.error('Failed to load sessions:', error);
+        const container = document.getElementById('sessions-container');
+        if (container) {
+          container.innerHTML = `<div class="empty-state"><h3>Unable to load sessions</h3><p>${error.message || 'Please try again later.'}</p></div>`;
+        }
+      }
+    });
+
+    function normalizeId(value) {
+      if (value == null) {
+        return null;
+      }
+      const text = String(value).trim();
+      return text || null;
+    }
+
+    function normalizeEmail(value) {
+      const text = normalizeId(value);
+      return text ? text.toLowerCase() : null;
+    }
+
+    function collectValuesByKeyFragments(root, fragments, maxDepth = 4) {
+      const results = [];
+      if (!root) {
+        return results;
+      }
+
+      const visited = new WeakSet();
+
+      const traverse = (value, depth) => {
+        if (value == null || depth > maxDepth) {
+          return;
+        }
+
+        if (value && typeof value === 'object') {
+          if (visited.has(value)) {
+            return;
+          }
+          visited.add(value);
+        }
+
+        if (Array.isArray(value)) {
+          value.forEach((entry) => traverse(entry, depth + 1));
+          return;
+        }
+
+        if (value && typeof value === 'object') {
+          Object.entries(value).forEach(([key, val]) => {
+            const keyLower = key.toLowerCase();
+            if (fragments.some((fragment) => keyLower.includes(fragment))) {
+              results.push(val);
+            }
+            if (keyLower === 'role' && typeof val === 'string' && val.toLowerCase().includes('tutor')) {
+              results.push(value);
+            }
+            traverse(val, depth + 1);
+          });
+        }
+      };
+
+      traverse(root, 0);
+      return results;
+    }
+
+    function belongsToTutor(session, uid, emailLower) {
+      const normalizedUid = normalizeId(uid);
+      if (!session || !normalizedUid) {
+        return false;
+      }
+
+      const normalizedEmail = emailLower ? emailLower.toLowerCase() : null;
+
+      const userIdMatches = normalizeId(session.userId) === normalizedUid;
+      if (userIdMatches) {
+        return true;
+      }
+
+      for (const field of tutorIdFields) {
+        if (normalizeId(session[field]) === normalizedUid) {
+          return true;
+        }
+      }
+
+      if (normalizedEmail) {
+        for (const field of tutorEmailFields) {
+          if (normalizeEmail(session[field]) === normalizedEmail) {
+            return true;
+          }
+        }
+      }
+
+      const matchesUidValue = (value, depth = 0, visited = new WeakSet()) => {
+        if (value == null || depth > 4) {
+          return false;
+        }
+
+        if (typeof value === 'string' || typeof value === 'number') {
+          return normalizeId(value) === normalizedUid;
+        }
+
+        if (value && typeof value === 'object') {
+          if (visited.has(value)) {
+            return false;
+          }
+          visited.add(value);
+        }
+
+        if (Array.isArray(value)) {
+          return value.some((entry) => matchesUidValue(entry, depth + 1, visited));
+        }
+
+        if (value && typeof value === 'object') {
+          const candidateKeys = [
+            'uid',
+            'userId',
+            'userid',
+            'userID',
+            'tutorUid',
+            'tutorUID',
+            'tutorId',
+            'tutorID',
+            'assignedUid',
+            'assignedID',
+            'assignedId',
+            'assignedUserId',
+            'assignedTutorUid',
+            'assignedTutorId',
+            'id',
+            'profileId',
+            'profileID',
+            'accountId',
+            'accountID',
+            'memberUid',
+            'memberId',
+            'leadTutorUid',
+            'leadTutorId',
+            'primaryTutorUid',
+            'primaryTutorId'
+          ];
+
+          for (const key of candidateKeys) {
+            if (matchesUidValue(value[key], depth + 1, visited)) {
+              return true;
+            }
+          }
+
+          if (depth < 4) {
+            return Object.entries(value).some(([key, val]) => {
+              const keyLower = key.toLowerCase();
+              if (
+                keyLower.includes('uid') ||
+                keyLower.includes('tutor') ||
+                keyLower.includes('coach') ||
+                keyLower.includes('mentor') ||
+                keyLower.includes('instructor') ||
+                keyLower.includes('assign') ||
+                keyLower.includes('staff')
+              ) {
+                return matchesUidValue(val, depth + 1, visited);
+              }
+              return false;
+            });
+          }
+        }
+
+        return false;
+      };
+
+      const matchesEmailValue = (value, depth = 0, visited = new WeakSet()) => {
+        if (!normalizedEmail || value == null || depth > 4) {
+          return false;
+        }
+
+        if (typeof value === 'string') {
+          return normalizeEmail(value) === normalizedEmail;
+        }
+
+        if (value && typeof value === 'object') {
+          if (visited.has(value)) {
+            return false;
+          }
+          visited.add(value);
+        }
+
+        if (Array.isArray(value)) {
+          return value.some((entry) => matchesEmailValue(entry, depth + 1, visited));
+        }
+
+        if (value && typeof value === 'object') {
+          const candidateKeys = [
+            'email',
+            'emailAddress',
+            'contactEmail',
+            'tutorEmail',
+            'assignedEmail',
+            'primaryEmail',
+            'guardianEmail'
+          ];
+
+          for (const key of candidateKeys) {
+            if (matchesEmailValue(value[key], depth + 1, visited)) {
+              return true;
+            }
+          }
+
+          if (depth < 4) {
+            return Object.entries(value).some(([key, val]) => {
+              const keyLower = key.toLowerCase();
+              if (
+                keyLower.includes('email') ||
+                keyLower.includes('tutor') ||
+                keyLower.includes('coach') ||
+                keyLower.includes('mentor') ||
+                keyLower.includes('instructor') ||
+                keyLower.includes('assign') ||
+                keyLower.includes('staff')
+              ) {
+                return matchesEmailValue(val, depth + 1, visited);
+              }
+              return false;
+            });
+          }
+        }
+
+        return false;
+      };
+
+      for (const field of tutorIdArrayFields) {
+        if (matchesUidValue(session[field])) {
+          return true;
+        }
+      }
+
+      if (normalizedEmail) {
+        for (const field of tutorEmailArrayFields) {
+          if (matchesEmailValue(session[field])) {
+            return true;
+          }
+        }
+      }
+
+      if (Array.isArray(session.tutorAssignments)) {
+        if (session.tutorAssignments.some((assignment) => matchesUidValue(assignment) || matchesEmailValue(assignment))) {
+          return true;
+        }
+      }
+
+      const tutorRelatedValues = collectValuesByKeyFragments(session, tutorKeyFragments);
+      for (const entry of tutorRelatedValues) {
+        if (matchesUidValue(entry) || matchesEmailValue(entry)) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    async function fetchTutorSessions(user) {
+      const uid = normalizeId(user.uid);
+      const emailLower = normalizeEmail(user.email);
+      const sessionsMap = new Map();
+      const bookingsRef = collection(db, 'bookings');
+
+      if (!uid) {
+        return [];
+      }
+
+      const candidateFilters = tutorIdFields
+        .map((field) => ({ field, value: uid }))
+        .concat(emailLower ? tutorEmailFields.map((field) => ({ field, value: emailLower })) : []);
+
+      for (const { field, value } of candidateFilters) {
+        if (!value) {
+          continue;
+        }
+        try {
+          const snapshot = await getDocs(query(bookingsRef, where(field, '==', value)));
+          snapshot.forEach((docSnap) => {
+            if (!sessionsMap.has(docSnap.id)) {
+              sessionsMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() });
+            }
+          });
+        } catch (error) {
+          if (error.code === 'failed-precondition' || (error.message && error.message.includes('requires an index'))) {
+            console.warn(`Tutor sessions query for ${field} requires index; falling back to client filter.`, error);
+            continue;
+          }
+          throw error;
+        }
+      }
+
+      const snapshot = await getDocs(bookingsRef);
+      snapshot.forEach((docSnap) => {
+        if (sessionsMap.has(docSnap.id)) {
+          return;
+        }
+        const data = docSnap.data();
+        if (belongsToTutor(data, uid, emailLower)) {
+          sessionsMap.set(docSnap.id, { id: docSnap.id, ...data });
+        }
+      });
+
+      return Array.from(sessionsMap.values());
+    }
+
+    function timeStringToMinutes(timeStr) {
+      if (!timeStr || typeof timeStr !== 'string') {
+        return null;
+      }
+
+      let trimmed = timeStr.trim();
+      if (!trimmed) {
+        return null;
+      }
+
+      let period = null;
+      const periodMatch = trimmed.match(/(AM|PM)$/i);
+      if (periodMatch) {
+        period = periodMatch[1].toUpperCase();
+        trimmed = trimmed.slice(0, -periodMatch[0].length).trim();
+      }
+
+      const parts = trimmed.split(':');
+      if (!parts.length) {
+        return null;
+      }
+
+      let hours = parseInt(parts[0], 10);
+      let minutes = parts.length > 1 ? parseInt(parts[1], 10) : 0;
+
+      if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+        return null;
+      }
+
+      if (period) {
+        if (period === 'AM' && hours === 12) {
+          hours = 0;
+        } else if (period === 'PM' && hours < 12) {
+          hours += 12;
+        }
+      }
+
+      return hours * 60 + minutes;
+    }
+
+    function minutesToTimeValue(minutes) {
+      if (minutes == null || Number.isNaN(minutes)) {
+        return '';
+      }
+
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    }
+
+    function normalizeTimeForInput(rawValue) {
+      if (!rawValue) {
+        return '';
+      }
+
+      const trimmed = rawValue.trim();
+      if (!trimmed) {
+        return '';
+      }
+
+      if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+        const [h, m] = trimmed.split(':');
+        return `${String(parseInt(h, 10)).padStart(2, '0')}:${m}`;
+      }
+
+      const minutes = timeStringToMinutes(trimmed);
+      if (minutes == null) {
+        return '';
+      }
+
+      return minutesToTimeValue(minutes);
+    }
+
+    function getISODateString(value) {
+      if (!value) {
+        return '';
+      }
+
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) {
+          return '';
+        }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+          return trimmed;
+        }
+        const parsed = new Date(trimmed);
+        if (Number.isNaN(parsed.valueOf())) {
+          return '';
+        }
+        return parsed.toISOString().substring(0, 10);
+      }
+
+      if (value instanceof Date) {
+        return value.toISOString().substring(0, 10);
+      }
+
+      if (value && typeof value.toDate === 'function') {
+        const date = value.toDate();
+        return date.toISOString().substring(0, 10);
+      }
+
+      const fallback = new Date(value);
+      if (Number.isNaN(fallback.valueOf())) {
+        return '';
+      }
+
+      return fallback.toISOString().substring(0, 10);
+    }
+
+    function sessionDateMsForSort(entry) {
+      const iso = getISODateString(entry.sessionDate || entry.date || entry.createdAt);
+      if (!iso) {
+        return Number.MAX_SAFE_INTEGER;
+      }
+      const parts = iso.split('-').map(Number);
+      if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) {
+        return Number.MAX_SAFE_INTEGER;
+      }
+      const date = new Date(parts[0], parts[1] - 1, parts[2]);
+      return date.getTime();
+    }
+
+    function compareSessionsChronologically(a, b) {
+      const dateMsA = sessionDateMsForSort(a);
+      const dateMsB = sessionDateMsForSort(b);
+      if (dateMsA !== dateMsB) {
+        return dateMsA - dateMsB;
+      }
+
+      const startA = timeStringToMinutes(a.startTime);
+      const startB = timeStringToMinutes(b.startTime);
+      if (startA != null && startB != null && startA !== startB) {
+        return startA - startB;
+      }
+
+      return String(a.id || '').localeCompare(String(b.id || ''));
+    }
+
+    function normalizeBookingStatus(rawStatus) {
+      if (!rawStatus) {
+        return 'pending_payment';
+      }
+      const lowered = String(rawStatus).toLowerCase();
+      const aliases = {
+        pending: 'pending_payment',
+        awaiting_payment: 'pending_payment',
+        pending_payment: 'pending_payment',
+        payment_pending: 'pending_payment',
+        succeed_payment: 'succeed_payment',
+        payment_succeed: 'succeed_payment',
+        approved: 'succeed_payment',
+        paid: 'succeed_payment',
+        payment_success: 'succeed_payment',
+        payment_succeeded: 'succeed_payment',
+        partial_payment: 'partial_payment',
+        partial: 'partial_payment',
+        partial_paid: 'partial_payment',
+        failed_payment: 'failed_payment',
+        payment_failed: 'failed_payment',
+        payment_cancelled: 'payment_cancelled',
+        payment_canceled: 'payment_cancelled',
+        cancelled: 'payment_cancelled',
+        canceled: 'payment_cancelled',
+        rejected: 'payment_cancelled',
+        refunded: 'payment_refunded',
+        payment_refund: 'payment_refunded',
+        no_show: 'no_show'
+      };
+      if (aliases[lowered]) {
+        return aliases[lowered];
+      }
+      return lowered.replace(/[^a-z0-9_-]/g, '_');
+    }
+
+    function normalizeApprovalStatus(rawStatus) {
+      if (!rawStatus) {
+        return 'pending';
+      }
+      return String(rawStatus).toLowerCase();
+    }
+
+    function deriveEndMinutes(startMinutes, entry) {
+      if (startMinutes == null) {
+        return null;
+      }
+
+      const explicitEnd = timeStringToMinutes(entry.endTime);
+      if (explicitEnd != null) {
+        return explicitEnd;
+      }
+
+      const durationCandidates = [entry.durationHours, entry.duration, entry.hours];
+      for (const candidate of durationCandidates) {
+        if (candidate == null) {
+          continue;
+        }
+        const duration = parseFloat(candidate);
+        if (!Number.isNaN(duration) && duration > 0) {
+          return startMinutes + Math.round(duration * 60);
+        }
+      }
+
+      return startMinutes + 60;
+    }
+
+    function updateSelectionIndicator(count) {
+      const pill = document.querySelector('[data-selection-pill]');
+      const valueEl = document.querySelector('[data-selection-count-pill]');
+      if (valueEl) {
+        valueEl.textContent = String(count);
+      }
+      if (pill) {
+        pill.classList.toggle('is-active', count > 0);
+      }
+    }
+
+    function getSessionCurrency(session) {
+      const raw = session && (session.currency || session.currencyCode || session.currency_name);
+      if (!raw || typeof raw !== 'string') {
+        return 'CAD';
+      }
+      const upper = raw.trim().toUpperCase();
+      return upper || 'CAD';
+    }
+
+    function formatCurrency(amount, currency = 'CAD') {
+      if (amount == null || Number.isNaN(amount)) {
+        return '$0.00';
+      }
+      try {
+        return new Intl.NumberFormat('en-CA', {
+          style: 'currency',
+          currency,
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }).format(amount);
+      } catch (_err) {
+        return `$${amount.toFixed(2)}`;
+      }
+    }
+
+    function getSessionAmountInfo(session) {
+      if (!session) {
+        return {
+          currency: 'CAD',
+          amountDue: 0,
+          amountDueCents: 0,
+          formatted: '$0.00',
+          amountPaid: null,
+          amountPaidCents: null,
+          formattedPaid: null
+        };
+      }
+
+      const currency = getSessionCurrency(session);
+      const numericCandidates = [
+        session.amountCents,
+        session.amountInCents,
+        session.totalAmountCents,
+        session.totalCents,
+        session.invoiceTotalCents
+      ];
+
+      let amountDueCents = null;
+      for (const candidate of numericCandidates) {
+        if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+          amountDueCents = Math.round(candidate);
+          break;
+        }
+      }
+
+      if (amountDueCents == null && session.final_cost != null) {
+        const value = parseFloat(session.final_cost);
+        if (!Number.isNaN(value)) {
+          amountDueCents = Math.round(value * 100);
+        }
+      }
+
+      if (amountDueCents == null && session.cost != null) {
+        const value = parseFloat(session.cost);
+        if (!Number.isNaN(value)) {
+          amountDueCents = Math.round(value * 100);
+        }
+      }
+
+      if (amountDueCents == null && session.amount != null) {
+        const value = parseFloat(session.amount);
+        if (!Number.isNaN(value)) {
+          amountDueCents = Math.round(value * 100);
+        }
+      }
+
+      if (amountDueCents == null) {
+        amountDueCents = 0;
+      }
+
+      const amountDue = amountDueCents / 100;
+      let amountPaidCents = null;
+
+      if (typeof session.amountPaidCents === 'number' && Number.isFinite(session.amountPaidCents)) {
+        amountPaidCents = Math.round(session.amountPaidCents);
+      } else if (typeof session.amountPaid === 'number' && Number.isFinite(session.amountPaid)) {
+        amountPaidCents = Math.round(session.amountPaid * 100);
+      } else if (typeof session.paidAmount === 'number' && Number.isFinite(session.paidAmount)) {
+        amountPaidCents = Math.round(session.paidAmount * 100);
+      }
+
+      const amountPaid = amountPaidCents != null ? amountPaidCents / 100 : null;
+      const remainingBalanceCents = (session && typeof session.remainingBalanceCents === 'number')
+        ? Math.round(session.remainingBalanceCents)
+        : null;
+      const remainingBalance = remainingBalanceCents != null ? remainingBalanceCents / 100 : null;
+
+      return {
+        currency,
+        amountDue,
+        amountDueCents,
+        formatted: formatCurrency(amountDue, currency),
+        amountPaid,
+        amountPaidCents,
+        formattedPaid: amountPaid != null ? formatCurrency(amountPaid, currency) : null,
+        remainingBalance,
+        remainingBalanceCents
+      };
+    }
+
+    function getPaymentStatusDisplay(session, paymentInfo) {
+      if (!session) {
+        return { text: '', className: '' };
+      }
+
+      const normalizedStatus = session._normalizedStatus || normalizeBookingStatus(session.status);
+
+      if (normalizedStatus === 'no_show' || session.noShow) {
+        return { text: 'No Show', className: 'is-no-show' };
+      }
+
+      if (paymentInfo.amountPaidCents != null) {
+        if (paymentInfo.amountDueCents != null && paymentInfo.amountPaidCents >= paymentInfo.amountDueCents) {
+          return { text: paymentInfo.formattedPaid || '', className: 'is-paid' };
+        }
+        if (paymentInfo.amountPaidCents > 0) {
+          const label = paymentInfo.formattedPaid ? `${paymentInfo.formattedPaid} paid` : '';
+          return { text: label, className: 'is-partial' };
+        }
+      }
+
+      return { text: '', className: '' };
+    }
+
+    function getPaymentDropdownLabel(session, paymentInfo) {
+      if (!session) {
+        return '';
+      }
+      const normalizedStatus = session._normalizedStatus || normalizeBookingStatus(session.status);
+
+      if (normalizedStatus === 'no_show' || session.noShow) {
+        return 'Marked as no-show.';
+      }
+
+      if (paymentInfo.amountPaid != null && paymentInfo.formattedPaid) {
+        return `Last recorded: ${paymentInfo.formattedPaid}`;
+      }
+
+      return `Amount due: ${paymentInfo.formatted}`;
+    }
+
+    function getDefaultPaymentInputValue(session, paymentInfo) {
+      const normalizedStatus = session ? (session._normalizedStatus || normalizeBookingStatus(session.status)) : null;
+
+      if (normalizedStatus === 'no_show' || session?.noShow) {
+        return '0.00';
+      }
+
+      if (paymentInfo.remainingBalanceCents != null && Number.isFinite(paymentInfo.remainingBalanceCents) && paymentInfo.remainingBalanceCents > 0) {
+        return (paymentInfo.remainingBalanceCents / 100).toFixed(2);
+      }
+
+      if (paymentInfo.amountPaidCents != null && paymentInfo.amountDueCents != null) {
+        if (paymentInfo.amountPaidCents < paymentInfo.amountDueCents) {
+          const remaining = Math.max(paymentInfo.amountDueCents - paymentInfo.amountPaidCents, 0);
+          return (remaining / 100).toFixed(2);
+        }
+      }
+
+      if (Number.isFinite(paymentInfo.amountDue)) {
+        return paymentInfo.amountDue.toFixed(2);
+      }
+
+      return '0.00';
+    }
+
+    window.loadSessions = async () => {
+      const container = document.getElementById('sessions-container');
+      if (container) {
+        container.innerHTML = '<div class="loading">Loading your sessions…</div>';
+      }
+
+      if (!currentUser) {
+        return;
+      }
+
+      try {
+        const sessions = await fetchTutorSessions(currentUser);
+
+        sessions.sort(compareSessionsChronologically);
+
+        allSessions = sessions;
+        sessionById = new Map();
+        sessions.forEach((session) => {
+          if (session && session.id) {
+            sessionById.set(session.id, session);
+          }
+        });
+        selectedSessionIds.clear();
+        expandedRecurringGroupIds.clear();
+        recurringGroupSessions = new Map();
+        bulkEditSessionIds = [];
+        bulkEditRecurringKey = null;
+        updateSessionSelectionUI();
+        renderSessions(allSessions);
+      } catch (error) {
+        console.error('Error loading tutor sessions:', error);
+        if (container) {
+          container.innerHTML = `<div class="empty-state"><h3>Error loading sessions</h3><p>${error.message || 'Please try again later.'}</p></div>`;
+        }
+      }
+    };
+
+    window.toggleSessionSelection = (sessionId) => {
+      if (selectedSessionIds.has(sessionId)) {
+        selectedSessionIds.delete(sessionId);
+      } else {
+        selectedSessionIds.add(sessionId);
+      }
+      updateSessionSelectionUI();
+      renderSessions(currentRenderedSessions);
+    };
+
+    window.toggleTableSessions = (tableKey) => {
+      if (!tableKey) {
+        return;
+      }
+
+      const ids = tableSessionIdMap.get(tableKey) || [];
+      if (!ids.length) {
+        return;
+      }
+
+      const allSelected = ids.every((id) => selectedSessionIds.has(id));
+
+      if (allSelected) {
+        ids.forEach((id) => selectedSessionIds.delete(id));
+      } else {
+        ids.forEach((id) => selectedSessionIds.add(id));
+      }
+
+      updateSessionSelectionUI();
+      renderSessions(currentRenderedSessions);
+    };
+
+    window.toggleGroupSelection = (groupId) => {
+      const sessionIds = recurringGroupSessions.get(groupId) || [];
+      if (!sessionIds.length) {
+        return;
+      }
+
+      const allSelected = sessionIds.every((id) => selectedSessionIds.has(id));
+
+      if (allSelected) {
+        sessionIds.forEach((id) => selectedSessionIds.delete(id));
+      } else {
+        sessionIds.forEach((id) => selectedSessionIds.add(id));
+      }
+
+      updateSessionSelectionUI();
+      renderSessions(currentRenderedSessions);
+    };
+
+    window.toggleRecurringGroup = (groupId) => {
+      if (expandedRecurringGroupIds.has(groupId)) {
+        expandedRecurringGroupIds.delete(groupId);
+      } else {
+        expandedRecurringGroupIds.add(groupId);
+      }
+
+      renderSessions(currentRenderedSessions);
+    };
+
+    function updateSessionSelectionUI() {
+      const count = selectedSessionIds.size;
+      const deleteBtn = document.getElementById('delete-selected-sessions-btn');
+      const countSpan = document.getElementById('selected-sessions-count');
+      const bulkEditBtn = document.getElementById('bulk-edit-times-btn');
+
+      if (deleteBtn) {
+        if (count > 0) {
+          deleteBtn.style.display = 'flex';
+          if (countSpan) {
+            countSpan.textContent = count;
+          }
+        } else {
+          deleteBtn.style.display = 'none';
+          if (countSpan) {
+            countSpan.textContent = '0';
+          }
+        }
+      } else if (countSpan) {
+        countSpan.textContent = count;
+      }
+
+      let canBulkEdit = false;
+      let eligibleIds = [];
+      let recurringKey = null;
+
+      if (count >= 2) {
+        const ids = Array.from(selectedSessionIds);
+        for (const sessionId of ids) {
+          const session = allSessions.find((s) => s.id === sessionId);
+          if (!session || !session._recurringKey) {
+            canBulkEdit = false;
+            recurringKey = null;
+            eligibleIds = [];
+            break;
+          }
+
+          if (!recurringKey) {
+            recurringKey = session._recurringKey;
+            canBulkEdit = true;
+            eligibleIds.push(sessionId);
+            continue;
+          }
+
+          if (session._recurringKey !== recurringKey) {
+            canBulkEdit = false;
+            recurringKey = null;
+            eligibleIds = [];
+            break;
+          }
+
+          eligibleIds.push(sessionId);
+        }
+      }
+
+      if (bulkEditBtn) {
+        if (canBulkEdit && recurringKey) {
+          bulkEditBtn.style.display = 'flex';
+          bulkEditBtn.textContent = `Edit Times (${eligibleIds.length})`;
+        } else {
+          bulkEditBtn.style.display = 'none';
+        }
+      }
+
+      bulkEditSessionIds = canBulkEdit && recurringKey ? eligibleIds : [];
+      bulkEditRecurringKey = canBulkEdit && recurringKey ? recurringKey : null;
+
+      const pendingCount = getPendingSelectionCount();
+      const approveBtn = document.getElementById('approve-selected-pending-btn');
+      const pendingCountSpan = document.querySelector('[data-pending-selection-count]');
+      if (approveBtn) {
+        approveBtn.disabled = pendingCount === 0;
+      }
+      if (pendingCountSpan) {
+        pendingCountSpan.textContent = String(pendingCount);
+      }
+      updateSelectionIndicator(count);
+    }
+
+    function getPendingSelectionCount() {
+      let pendingCount = 0;
+      selectedSessionIds.forEach((id) => {
+        const session = sessionById.get(id);
+        if (session && session._category === 'pending') {
+          pendingCount += 1;
+        }
+      });
+      return pendingCount;
+    }
+
+    window.sortSessions = (column) => {
+      if (sessionsSortColumn === column) {
+        sessionsSortDirection = sessionsSortDirection === 'asc' ? 'desc' : 'asc';
+      } else {
+        sessionsSortColumn = column;
+        sessionsSortDirection = 'asc';
+      }
+      renderSessions(currentRenderedSessions);
+    };
+
+    function collectDisplayItemSessionIds(displayItems) {
+      const ids = [];
+      const seen = new Set();
+
+      displayItems.forEach((item) => {
+        if (!item) {
+          return;
+        }
+
+        if (item.type === 'group' && Array.isArray(item.sessions)) {
+          item.sessions.forEach((session) => {
+            if (session && session.id && !seen.has(session.id)) {
+              ids.push(session.id);
+              seen.add(session.id);
+            }
+          });
+        } else if (item.id && !seen.has(item.id)) {
+          ids.push(item.id);
+          seen.add(item.id);
+        }
+      });
+
+      return ids;
+    }
+
+    function renderSessions(sessions) {
+      currentRenderedSessions = sessions;
+      currentRenderedSessionIds = [];
+      recurringGroupSessions = new Map();
+      const validRecurringGroupIds = new Set();
+      const container = document.getElementById('sessions-container');
+
+      if (!container) {
+        return;
+      }
+
+      if (sessions.length === 0) {
+        container.innerHTML = '<div class="empty-state"><h3>No sessions assigned</h3><p>Once sessions are booked with you they will appear here.</p></div>';
+        return;
+      }
+
+      const now = new Date();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const pendingSessions = [];
+      const upcomingSessions = [];
+      const pastSessions = [];
+
+      const pendingStatuses = new Set(['pending_payment']);
+      const successfulStatuses = new Set(['succeed_payment']);
+      const failedStatuses = new Set(['failed_payment']);
+      const completedButNotSuccessfulStatuses = new Set(['payment_cancelled', 'payment_refunded', 'partial_payment', 'no_show']);
+      const attentionStatuses = new Set(['failed_payment', 'payment_cancelled', 'partial_payment']);
+
+      const parseSessionDate = (dateValue) => {
+        if (!dateValue) return null;
+
+        if (dateValue.toDate) {
+          const d = dateValue.toDate();
+          d.setHours(0, 0, 0, 0);
+          return d;
+        }
+
+        if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+          const [y, m, d] = dateValue.split('-').map(Number);
+          return new Date(y, m - 1, d);
+        }
+
+        const d = new Date(dateValue);
+        d.setHours(0, 0, 0, 0);
+        return d;
+      };
+
+      const normalizeStudentKey = (session) => {
+        const raw = session.studentNames || session.studentName || session.students || '';
+        if (!raw) return '';
+        return raw
+          .split(',')
+          .map((name) => name.trim().toLowerCase())
+          .filter(Boolean)
+          .sort()
+          .join('|');
+      };
+
+      sessions.forEach((session) => {
+        const sessionDate = parseSessionDate(session.sessionDate || session.date);
+        if (!sessionDate) return;
+
+        const dateKey = `${sessionDate.getFullYear()}-${String(sessionDate.getMonth() + 1).padStart(2, '0')}-${String(sessionDate.getDate()).padStart(2, '0')}`;
+        const startMinutes = timeStringToMinutes(session.startTime);
+        const endMinutes = deriveEndMinutes(startMinutes, session);
+
+        session._dateKey = dateKey;
+        session._startMinutes = startMinutes;
+        session._endMinutes = endMinutes;
+        session._hasConflict = false;
+        session._dayOfWeek = sessionDate.getDay();
+        session._studentKey = normalizeStudentKey(session);
+        session._sortDate = sessionDate.getTime();
+        session._normalizedStatus = normalizeBookingStatus(session.status);
+        session._normalizedApproval = normalizeApprovalStatus(session.approvalStatus);
+
+        const startKey = (session.startTime || '').trim();
+        const endKey = (session.endTime || '').trim();
+        if (session._dayOfWeek != null) {
+          session._recurringKey = `${session._dayOfWeek}|${startKey}|${endKey}|${session._studentKey}`;
+        } else {
+          session._recurringKey = null;
+        }
+
+        const normalizedStatus = session._normalizedStatus;
+        const approvalStatus = session._normalizedApproval;
+        const isApproved = approvalStatus === 'approved';
+        const treatedAsSuccessful = successfulStatuses.has(normalizedStatus) || isApproved;
+        const treatedAsCompleted = treatedAsSuccessful || failedStatuses.has(normalizedStatus) || completedButNotSuccessfulStatuses.has(normalizedStatus);
+
+        let placed = false;
+
+        if (!isApproved) {
+          let isPending = false;
+          if (pendingStatuses.has(normalizedStatus)) {
+            isPending = true;
+          } else if (attentionStatuses.has(normalizedStatus)) {
+            if (!sessionDate || sessionDate >= today) {
+              isPending = true;
+            }
+          }
+
+          if (isPending) {
+            session._category = 'pending';
+            pendingSessions.push(session);
+            currentRenderedSessionIds.push(session.id);
+            placed = true;
+          }
+        }
+
+        if (!placed) {
+          if (sessionDate < today) {
+            session._category = 'past';
+            pastSessions.push(session);
+            currentRenderedSessionIds.push(session.id);
+            placed = true;
+          } else if (sessionDate.getTime() === today.getTime()) {
+            if (session.endTime) {
+              const [hours, minutes] = session.endTime.split(':').map(Number);
+              const sessionEnd = new Date();
+              sessionEnd.setHours(hours, minutes, 0, 0);
+              if (now >= sessionEnd) {
+                session._category = 'past';
+                pastSessions.push(session);
+                currentRenderedSessionIds.push(session.id);
+                placed = true;
+              }
+            }
+
+            if (!placed) {
+              session._category = 'upcoming';
+              upcomingSessions.push(session);
+              currentRenderedSessionIds.push(session.id);
+              placed = true;
+            }
+          } else {
+            session._category = 'upcoming';
+            upcomingSessions.push(session);
+            currentRenderedSessionIds.push(session.id);
+            placed = true;
+          }
+        }
+
+        if (!placed) {
+          if (treatedAsCompleted) {
+            session._category = 'upcoming';
+            upcomingSessions.push(session);
+          } else {
+            session._category = 'pending';
+            pendingSessions.push(session);
+          }
+          currentRenderedSessionIds.push(session.id);
+        }
+      });
+
+      const compareChronologically = (a, b) => {
+        if (a._sortDate !== b._sortDate) {
+          return a._sortDate - b._sortDate;
+        }
+        if (a._startMinutes != null && b._startMinutes != null && a._startMinutes !== b._startMinutes) {
+          return a._startMinutes - b._startMinutes;
+        }
+        return String(a.id).localeCompare(String(b.id));
+      };
+
+      pendingSessions.sort(compareChronologically);
+      upcomingSessions.sort(compareChronologically);
+      pastSessions.sort(compareChronologically);
+
+      const markConflicts = (list) => {
+        const byDate = new Map();
+
+        list.forEach((session) => {
+          session._hasConflict = false;
+          if (!session._dateKey || session._startMinutes == null || session._endMinutes == null) {
+            return;
+          }
+          if (!byDate.has(session._dateKey)) {
+            byDate.set(session._dateKey, []);
+          }
+          byDate.get(session._dateKey).push(session);
+        });
+
+        byDate.forEach((sameDaySessions) => {
+          if (sameDaySessions.length < 2) {
+            return;
+          }
+          sameDaySessions.sort((a, b) => a._startMinutes - b._startMinutes);
+          for (let i = 0; i < sameDaySessions.length; i += 1) {
+            for (let j = i + 1; j < sameDaySessions.length; j += 1) {
+              const first = sameDaySessions[i];
+              const second = sameDaySessions[j];
+              if (first._startMinutes < second._endMinutes && first._endMinutes > second._startMinutes) {
+                first._hasConflict = true;
+                second._hasConflict = true;
+              }
+            }
+          }
+        });
+      };
+
+      markConflicts(pendingSessions);
+      markConflicts(upcomingSessions);
+      markConflicts(pastSessions);
+
+      const buildRecurringDisplay = (list, tableType) => {
+        const groupsByKey = new Map();
+
+        list.forEach((session) => {
+          if (session._dayOfWeek == null) return;
+          const studentKey = session._studentKey || '';
+          const startKey = (session.startTime || '').trim();
+          const endKey = (session.endTime || '').trim();
+          const groupKey = `${session._dayOfWeek}|${startKey}|${endKey}|${studentKey}`;
+
+          if (!groupsByKey.has(groupKey)) {
+            groupsByKey.set(groupKey, []);
+          }
+          session._recurringKey = groupKey;
+          groupsByKey.get(groupKey).push(session);
+        });
+
+        const seenKeys = new Set();
+        const displayItems = [];
+
+        list.forEach((session) => {
+          const studentKey = session._studentKey || '';
+          const startKey = session.startTime || '';
+          const endKey = session.endTime || '';
+          const groupKey = `${session._dayOfWeek}|${startKey}|${endKey}|${studentKey}`;
+          const groupedSessions = groupsByKey.get(groupKey);
+
+          if (!groupedSessions || groupedSessions.length <= 1) {
+            displayItems.push(session);
+            return;
+          }
+
+          if (seenKeys.has(groupKey)) {
+            return;
+          }
+          seenKeys.add(groupKey);
+
+          let sortedGroup = [...groupedSessions].sort((a, b) => {
+            if (a._sortDate !== b._sortDate) return a._sortDate - b._sortDate;
+            if (a._startMinutes != null && b._startMinutes != null && a._startMinutes !== b._startMinutes) {
+              return a._startMinutes - b._startMinutes;
+            }
+            return a.id > b.id ? 1 : -1;
+          });
+
+          let primarySession;
+          if (tableType === 'past') {
+            primarySession = sortedGroup[sortedGroup.length - 1];
+            sortedGroup = [primarySession, ...sortedGroup.filter((s) => s.id !== primarySession.id)];
+          } else {
+            primarySession = sortedGroup[0];
+          }
+
+          const safeKey = groupKey.replace(/[^a-z0-9]/gi, '_');
+          const groupId = `${tableType}-grp-${safeKey}`;
+
+          recurringGroupSessions.set(groupId, sortedGroup.map((s) => s.id));
+          validRecurringGroupIds.add(groupId);
+
+          displayItems.push({
+            type: 'group',
+            groupId,
+            sessions: sortedGroup,
+            primarySession,
+            hasConflict: sortedGroup.some((s) => s._hasConflict)
+          });
+        });
+
+        return displayItems;
+      };
+
+      const pendingDisplayItems = buildRecurringDisplay(pendingSessions, 'pending');
+      const upcomingDisplayItems = buildRecurringDisplay(upcomingSessions, 'upcoming');
+      const pastDisplayItems = buildRecurringDisplay(pastSessions, 'past');
+
+      expandedRecurringGroupIds = new Set([
+        ...expandedRecurringGroupIds
+      ].filter((id) => validRecurringGroupIds.has(id)));
+
+      const pendingSessionIds = collectDisplayItemSessionIds(pendingDisplayItems);
+      const upcomingSessionIds = collectDisplayItemSessionIds(upcomingDisplayItems);
+      const pastSessionIds = collectDisplayItemSessionIds(pastDisplayItems);
+
+      tableSessionIdMap = new Map([
+        ['pending', pendingSessionIds],
+        ['upcoming', upcomingSessionIds],
+        ['past', pastSessionIds]
+      ]);
+
+      const sortSessionsList = (list) => {
+        if (!sessionsSortColumn) return list;
+
+        return [...list].sort((a, b) => {
+          const sourceA = a.type === 'group' ? a.primarySession : a;
+          const sourceB = b.type === 'group' ? b.primarySession : b;
+          let aVal;
+          let bVal;
+
+          switch (sessionsSortColumn) {
+            case 'date':
+              aVal = sourceA.sessionDate || '';
+              bVal = sourceB.sessionDate || '';
+              break;
+            case 'time':
+              aVal = sourceA.startTime || '';
+              bVal = sourceB.startTime || '';
+              break;
+            case 'student':
+              aVal = (sourceA.studentName || sourceA.studentNames || '').toLowerCase();
+              bVal = (sourceB.studentName || sourceB.studentNames || '').toLowerCase();
+              break;
+            case 'subject':
+              aVal = (sourceA.subject || '').toLowerCase();
+              bVal = (sourceB.subject || '').toLowerCase();
+              break;
+            default:
+              return 0;
+          }
+
+          if (aVal < bVal) return sessionsSortDirection === 'asc' ? -1 : 1;
+          if (aVal > bVal) return sessionsSortDirection === 'asc' ? 1 : -1;
+          return 0;
+        });
+      };
+
+      const getSortIcon = (column) => {
+        if (sessionsSortColumn !== column) return '⇅';
+        return sessionsSortDirection === 'asc' ? '↑' : '↓';
+      };
+
+      const renderTable = (sessionsList, title, options = {}) => {
+        if (sessionsList.length === 0) return '';
+
+        const sortedList = sortSessionsList(sessionsList);
+        const headerActions = options.headerActions || '';
+        const tableKey = options.tableKey || '';
+        const tableSessionIds = Array.isArray(options.sessionIds) ? options.sessionIds : [];
+        const allVisibleSelected = tableSessionIds.length > 0 && tableSessionIds.every((id) => selectedSessionIds.has(id));
+
+        let html = '<div class="sessions-subsection">';
+        html += '<div class="sessions-subsection-header">';
+        html += `<h3>${title}</h3>`;
+        if (headerActions) {
+          html += `<div class="sessions-subsection-actions">${headerActions}</div>`;
+        }
+        html += '</div>';
+        html += '<div class="data-table"><table><thead><tr>';
+
+        html += `
+          <th class="session-select-header">
+            <div class="session-select-inner">
+              <span class="checkbox-slot small"></span>
+              <span class="checkbox-slot large">
+                <input type="checkbox"
+                  class="session-checkbox session-checkbox-multi session-select-all-checkbox"
+                  ${allVisibleSelected ? 'checked' : ''}
+                  onchange="toggleTableSessions('${tableKey}')"
+                  title="Select all visible sessions">
+              </span>
+            </div>
+          </th>
+          <th style="cursor: pointer;" onclick="sortSessions('date')">
+            Date ${getSortIcon('date')}
+          </th>
+          <th style="cursor: pointer;" onclick="sortSessions('time')">
+            Time ${getSortIcon('time')}
+          </th>
+          <th style="cursor: pointer;" onclick="sortSessions('student')">
+            Student ${getSortIcon('student')}
+          </th>
+          <th style="cursor: pointer;" onclick="sortSessions('subject')">
+            Subject ${getSortIcon('subject')}
+          </th>
+          <th>Actions</th>`;
+        html += '</tr></thead><tbody>';
+
+        const formatSessionDate = (session) => {
+          const dateValue = session.sessionDate || session.date;
+          let date = 'Invalid date';
+
+          if (dateValue) {
+            if (dateValue.toDate) {
+              date = dateValue.toDate().toLocaleDateString();
+            } else if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+              const d = new Date(`${dateValue}T00:00:00`);
+              date = d.toLocaleDateString();
+            } else {
+              date = new Date(dateValue).toLocaleDateString();
+            }
+          }
+
+          return date;
+        };
+
+        const buildDetailRow = (session) => `
+        <tr id="comment-row-${session.id}" class="session-comment-row" style="display: none;">
+          <td colspan="6">
+            <div class="session-detail-wrapper">
+              <div class="edit-session-form" id="edit-form-${session.id}" style="display: none;">
+                <h4>Edit session</h4>
+
+                <div class="edit-session-grid">
+                  <div class="edit-field">
+                    <label for="edit-date-${session.id}">Date</label>
+                    <input
+                      type="date"
+                      id="edit-date-${session.id}"
+                      value="${(session.sessionDate && session.sessionDate.toDate)
+                        ? session.sessionDate.toDate().toISOString().substring(0, 10)
+                        : (session.sessionDate || session.date || '')}"
+                    />
+                  </div>
+
+                  <div class="edit-field">
+                    <label for="edit-start-${session.id}">Start time</label>
+                    <input
+                      type="time"
+                      id="edit-start-${session.id}"
+                      value="${session.startTime || ''}"
+                    />
+                  </div>
+
+                  <div class="edit-field">
+                    <label for="edit-end-${session.id}">End time</label>
+                    <input
+                      type="time"
+                      id="edit-end-${session.id}"
+                      value="${session.endTime || ''}"
+                    />
+                  </div>
+
+                  <div class="edit-field">
+                    <label for="edit-students-${session.id}">Student(s)</label>
+                    <input
+                      type="text"
+                      id="edit-students-${session.id}"
+                      value="${session.studentNames || session.students || session.studentName || ''}"
+                    />
+                  </div>
+
+                  <div class="edit-field">
+                    <label for="edit-subject-${session.id}">Subject</label>
+                    <input
+                      type="text"
+                      id="edit-subject-${session.id}"
+                      value="${session.subject || ''}"
+                    />
+                  </div>
+
+                  <div class="edit-field edit-field-inline">
+                    <label for="edit-includeSummary-${session.id}">
+                      <input
+                        type="checkbox"
+                        id="edit-includeSummary-${session.id}"
+                        ${session.includeSummary ? 'checked' : ''}
+                      />
+                      Include summary for guardian
+                    </label>
+                  </div>
+
+                  <div class="edit-field">
+                    <label for="edit-cost-${session.id}">Cost</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      id="edit-cost-${session.id}"
+                      value="${session.cost || ''}"
+                    />
+                  </div>
+
+                  <div class="edit-field">
+                    <label for="edit-notes-${session.id}">Guardian questions / notes</label>
+                    <textarea id="edit-notes-${session.id}" rows="2">${session.notes || ''}</textarea>
+                  </div>
+                </div>
+
+                <div class="edit-session-actions">
+                  <button class="btn btn-warning btn-sm"
+                          onclick="event.stopPropagation(); saveSessionChanges('${session.id}')">
+                    Save changes
+                  </button>
+                  <button class="btn btn-secondary btn-sm"
+                          onclick="event.stopPropagation(); cancelSessionEdit('${session.id}')">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+
+              <div class="session-comment-wrapper">
+                <textarea
+                  id="comment-input-${session.id}"
+                  class="session-comment-input"
+                  placeholder="Use this space to write your session summary, key wins, and homework for the guardian."
+                >${session.sessionSummary || ''}</textarea>
+
+                <div class="session-comment-actions">
+                  <button class="btn btn-sm" onclick="event.stopPropagation(); saveComment('${session.id}')">Save Comment</button>
+                  <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); cancelComment('${session.id}')">Cancel</button>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>`;
+
+        const buildSessionRows = (session, options = {}) => {
+          const {
+            isGroupParent = false,
+            isGroupChild = false,
+            group = null,
+            isExpanded = false,
+            forceConflict = false
+          } = options;
+
+          const isSelected = selectedSessionIds.has(session.id);
+          const rowClasses = ['session-row'];
+          if (forceConflict || session._hasConflict) {
+            rowClasses.push('session-conflict');
+          }
+          if (isSelected) {
+            rowClasses.push('selected-row');
+          }
+          if (isGroupChild) {
+            rowClasses.push('recurring-child');
+          }
+
+          const attrParts = [`class="${rowClasses.join(' ')}"`];
+          if (isGroupChild && !isExpanded) {
+            attrParts.push('style="display: none;"');
+          }
+          if (group) {
+            attrParts.push(`data-recurring-group="${group.groupId}"`);
+          }
+
+          const singleCheckbox = `
+            <span class="checkbox-slot small">
+              <input type="checkbox" class="session-checkbox" ${isSelected ? 'checked' : ''} onchange="toggleSessionSelection('${session.id}')">
+            </span>`;
+
+          let multiCheckbox = '<span class="checkbox-slot large"></span>';
+          if (isGroupParent && group) {
+            const sessionIds = recurringGroupSessions.get(group.groupId) || [];
+            const groupSelected = sessionIds.length > 0 && sessionIds.every((id) => selectedSessionIds.has(id));
+            multiCheckbox = `
+              <span class="checkbox-slot large">
+                <input type="checkbox" class="session-checkbox session-checkbox-multi group-select-all" title="Select all in series" ${groupSelected ? 'checked' : ''} onchange="toggleGroupSelection('${group.groupId}')">
+              </span>`;
+          }
+
+          const paymentInfo = getSessionAmountInfo(session);
+          const dropdownId = `payment-menu-${session.id}`;
+          const inputId = `payment-amount-${session.id}`;
+          const amountLabel = getPaymentDropdownLabel(session, paymentInfo);
+          const defaultInputValue = getDefaultPaymentInputValue(session, paymentInfo);
+          const paymentStatus = getPaymentStatusDisplay(session, paymentInfo);
+
+          let actionCellContent = '';
+          if (session._category === 'past') {
+            actionCellContent = `
+              <div class="payment-actions">
+                <span class="payment-status-label ${paymentStatus.className}" data-payment-status="${session.id}">${paymentStatus.text}</span>
+                <button class="btn btn-success btn-sm" onclick="event.stopPropagation(); quickMarkSessionPaid('${session.id}')">
+                  Paid
+                </button>
+                <div class="payment-dropdown">
+                  <button class="btn btn-secondary btn-sm payment-toggle-btn" data-payment-menu-toggle="${session.id}" aria-haspopup="true" aria-expanded="false" onclick="event.stopPropagation(); togglePaymentMenu('${session.id}')">&#9662;</button>
+                  <div class="payment-dropdown-menu" id="${dropdownId}" data-payment-menu="${session.id}">
+                    <div class="payment-amount-display" data-payment-amount-label="${session.id}">${amountLabel}</div>
+                    <label for="${inputId}">Custom amount</label>
+                    <input type="number" min="0" step="0.01" id="${inputId}" data-payment-input="${session.id}" value="${defaultInputValue}">
+                    <div class="payment-dropdown-actions">
+                      <button class="btn btn-success btn-sm" onclick="event.stopPropagation(); saveCustomPayment('${session.id}')">Save</button>
+                      <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); markSessionNoShow('${session.id}')">No show</button>
+                    </div>
+                  </div>
+                </div>
+              </div>`;
+          } else {
+            const actionButtons = [];
+            actionButtons.push(
+              `<button class="btn btn-warning btn-sm" onclick="event.stopPropagation(); openEditSession('${session.id}')">
+                Edit
+              </button>`
+            );
+            actionButtons.push(
+              `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); deleteSession('${session.id}')">
+                Delete
+              </button>`
+            );
+            actionCellContent = `<div class="action-buttons">${actionButtons.join(' ')}</div>`;
+          }
+
+          const selectCellClasses = ['session-select-cell'];
+          if (isGroupParent && group) {
+            selectCellClasses.push('has-toggle');
+          }
+
+          const toggleButton = (isGroupParent && group)
+            ? `<button class="btn btn-secondary btn-sm group-toggle-btn" onclick="event.stopPropagation(); toggleRecurringGroup('${group.groupId}')" title="${isExpanded ? 'Hide sessions' : 'Show sessions'}">${isExpanded ? '&#9650;' : '&#9660;'}</button>`
+            : '';
+
+          const mainRow = `<tr ${attrParts.join(' ')} onclick="toggleSessionComment('${session.id}')">
+          <td class="${selectCellClasses.join(' ')}" onclick="event.stopPropagation()">
+            ${toggleButton}
+            <div class="session-select-inner">
+              ${singleCheckbox}${multiCheckbox}
+            </div>
+          </td>
+          <td>${formatSessionDate(session)}</td>
+          <td>${session.startTime || '-'}${session.endTime ? ` - ${session.endTime}` : ''}</td>
+          <td>${session.studentName || session.studentNames || 'Unknown'}</td>
+          <td>${session.subject || '-'}</td>
+          <td onclick="event.stopPropagation()">
+            ${actionCellContent}
+          </td>
+        </tr>`;
+
+          return mainRow + buildDetailRow(session);
+        };
+
+        sortedList.forEach((item) => {
+          if (item && item.type === 'group') {
+            const group = item;
+            const isExpanded = expandedRecurringGroupIds.has(group.groupId);
+            const primarySession = group.primarySession;
+
+            html += buildSessionRows(primarySession, {
+              isGroupParent: true,
+              group,
+              isExpanded,
+              forceConflict: group.hasConflict
+            });
+
+            group.sessions.forEach((session) => {
+              if (session.id === primarySession.id) return;
+              html += buildSessionRows(session, {
+                isGroupChild: true,
+                group,
+                isExpanded
+              });
+            });
+          } else {
+            html += buildSessionRows(item);
+          }
+        });
+
+        html += '</tbody></table></div>';
+        html += '</div>';
+        return html;
+      };
+
+      let finalHtml = '';
+
+      if (pendingDisplayItems.length > 0) {
+        const pendingCount = getPendingSelectionCount();
+        const headerActions = `
+          <button
+            class="btn btn-success btn-sm"
+            type="button"
+            id="approve-selected-pending-btn"
+            onclick="approveSelectedSessions()"
+            ${pendingCount === 0 ? 'disabled' : ''}
+          >
+            Approve Selected (<span data-pending-selection-count>${pendingCount}</span>)
+          </button>`;
+        finalHtml += renderTable(pendingDisplayItems, '⏳ Pending Sessions', {
+          headerActions,
+          tableKey: 'pending',
+          sessionIds: pendingSessionIds
+        });
+      }
+
+      if (upcomingDisplayItems.length > 0) {
+        finalHtml += renderTable(upcomingDisplayItems, '📅 Upcoming Sessions', {
+          tableKey: 'upcoming',
+          sessionIds: upcomingSessionIds
+        });
+      } else {
+        finalHtml += `
+          <div class="data-table" style="margin-top: 1.5rem;">
+            <div class="empty-state" style="margin: 0; border-style: solid;">
+              <h3 style="margin-bottom: 0.5rem;">📅 Upcoming Sessions</h3>
+              <p style="margin: 0;">No upcoming sessions assigned yet.</p>
+            </div>
+          </div>`;
+      }
+
+      if (pastDisplayItems.length > 0) {
+        finalHtml += renderTable(pastDisplayItems, '📚 Past Sessions', {
+          tableKey: 'past',
+          sessionIds: pastSessionIds
+        });
+      } else {
+        finalHtml += `
+          <div class="data-table" style="margin-top: 2rem;">
+            <div class="empty-state" style="margin: 0; border-style: solid;">
+              <h3 style="margin-bottom: 0.5rem;">📚 Past Sessions</h3>
+              <p style="margin: 0;">No past sessions recorded.</p>
+            </div>
+          </div>`;
+      }
+
+      if (pendingDisplayItems.length === 0 && upcomingDisplayItems.length === 0 && pastDisplayItems.length === 0) {
+        finalHtml = '<div class="empty-state"><h3>No sessions found</h3></div>';
+      }
+
+      container.innerHTML = finalHtml;
+      updateSessionSelectionUI();
+      closePaymentMenu();
+    }
+
+    async function shouldSuppressApprovalEmail(booking) {
+      try {
+        if (!booking || !booking.userId) {
+          return false;
+        }
+
+        const userRef = doc(db, 'users', booking.userId);
+        const userSnap = await getDoc(userRef);
+
+        if (!userSnap.exists()) {
+          return false;
+        }
+
+        const userData = userSnap.data();
+        return userData.notifyBookingApproved === false;
+      } catch (error) {
+        console.warn('Email preference lookup failed:', error);
+        return false;
+      }
+    }
+
+    window.approveSelectedSessions = async () => {
+      const pendingIds = Array.from(selectedSessionIds).filter((id) => {
+        const session = sessionById.get(id);
+        return session && session._category === 'pending';
+      });
+
+      if (pendingIds.length === 0) {
+        alert('Select at least one pending session to approve.');
+        return;
+      }
+
+      if (!confirm(`Approve ${pendingIds.length} pending session(s)? This will notify guardians.`)) {
+        return;
+      }
+
+      const approveBtn = document.getElementById('approve-selected-pending-btn');
+      if (approveBtn) {
+        approveBtn.disabled = true;
+      }
+
+      const results = { success: [], failed: [] };
+
+      try {
+        const groups = new Map();
+
+        for (const sessionId of pendingIds) {
+          try {
+            const bookingRef = doc(db, 'bookings', sessionId);
+            const snapshot = await getDoc(bookingRef);
+
+            let booking;
+            if (snapshot.exists()) {
+              booking = { id: sessionId, ...snapshot.data() };
+              const cached = sessionById.get(sessionId);
+              if (cached) {
+                Object.assign(cached, snapshot.data());
+              }
+            } else {
+              const cached = sessionById.get(sessionId);
+              if (cached) {
+                booking = { id: sessionId, ...cached };
+              } else {
+                results.failed.push({ id: sessionId, error: 'Booking not found' });
+                continue;
+              }
+            }
+
+            const rawEmail = (booking.guardianEmail || booking.email || '').trim();
+            const normalizedEmail = rawEmail.toLowerCase() || booking.id;
+            const safeEmail = rawEmail;
+
+            if (!groups.has(normalizedEmail)) {
+              groups.set(normalizedEmail, {
+                bookings: [],
+                suppressEmail: false,
+                guardianEmail: safeEmail
+              });
+            }
+
+            const group = groups.get(normalizedEmail);
+            group.bookings.push(booking);
+
+            const suppress = await shouldSuppressApprovalEmail(booking);
+            if (suppress) {
+              group.suppressEmail = true;
+            }
+          } catch (error) {
+            console.error(`Fetch error for session ${sessionId}:`, error);
+            results.failed.push({ id: sessionId, error: error.message });
+          }
+        }
+
+        for (const [normalizedEmail, group] of groups.entries()) {
+          const bookings = group.bookings;
+          if (!bookings.length) {
+            continue;
+          }
+
+          try {
+            for (const booking of bookings) {
+              const bookingRef = doc(db, 'bookings', booking.id);
+              const existingHistory = Array.isArray(booking.paymentStatusHistory) ? [...booking.paymentStatusHistory] : [];
+              existingHistory.push({
+                status: 'pending_payment',
+                changedAt: new Date().toISOString(),
+                changedBy: 'tutor:approve',
+                source: 'tutor:approve'
+              });
+
+              await updateDoc(bookingRef, {
+                status: 'pending_payment',
+                approvedAt: serverTimestamp(),
+                bookingId: booking.bookingId || booking.id,
+                approvalStatus: 'approved',
+                paymentStatusHistory: existingHistory
+              });
+
+              const cached = sessionById.get(booking.id);
+              if (cached) {
+                cached.status = 'pending_payment';
+                cached.approvalStatus = 'approved';
+                cached.paymentStatusHistory = existingHistory;
+              }
+            }
+
+            const guardianEmail = group.guardianEmail || (bookings[0].guardianEmail || bookings[0].email || '').trim();
+            const payload = {
+              action: 'bulkApprove',
+              guardianEmail,
+              guardianName: bookings[0].guardianName || '',
+              suppressEmail: group.suppressEmail === true,
+              sessions: bookings.map((b) => ({
+                bookingId: b.id,
+                sessionDate: b.sessionDate,
+                startTime: b.startTime,
+                endTime: b.endTime,
+                studentNames: b.studentNames || b.studentName || '',
+                subject: b.subject || '',
+                comments: b.comments || b.notes || ''
+              }))
+            };
+
+            const formData = new URLSearchParams();
+            formData.append('payload', JSON.stringify(payload));
+
+            const res = await fetch(APPS_SCRIPT_URL, {
+              method: 'POST',
+              body: formData
+            });
+
+            const json = await res.json();
+            if (!json.success) {
+              throw new Error(json.message || 'Bulk approve failed');
+            }
+
+            bookings.forEach((booking) => results.success.push(booking.id));
+          } catch (error) {
+            console.error(`Bulk approve error for ${normalizedEmail}:`, error);
+            bookings.forEach((booking) => results.failed.push({ id: booking.id, error: error.message }));
+          }
+        }
+
+        pendingIds.forEach((id) => selectedSessionIds.delete(id));
+        updateSessionSelectionUI();
+
+        let message = `✅ Approved ${results.success.length} session(s)`;
+        if (results.failed.length > 0) {
+          message += `\n⚠️ Failed: ${results.failed.length}`;
+        }
+        alert(message);
+
+        await loadSessions();
+      } catch (error) {
+        console.error('Bulk approval error:', error);
+        alert('Bulk approval failed: ' + error.message);
+      } finally {
+        if (approveBtn) {
+          approveBtn.disabled = false;
+        }
+      }
+    };
+
+    window.filterSessions = () => {
+      const input = document.getElementById('sessions-search');
+      const search = input ? input.value.toLowerCase() : '';
+      const filtered = allSessions.filter((s) =>
+        (s.studentName || '').toLowerCase().includes(search) ||
+        (s.studentNames || '').toLowerCase().includes(search) ||
+        (s.subject || '').toLowerCase().includes(search)
+      );
+      renderSessions(filtered);
+    };
+
+    window.openEditSession = function (sessionId) {
+      const row = document.getElementById(`comment-row-${sessionId}`);
+      const editForm = document.getElementById(`edit-form-${sessionId}`);
+
+      if (!row || !editForm) {
+        return;
+      }
+
+      row.style.display = 'table-row';
+      editForm.style.display = 'block';
+
+      const notesSection = row.querySelector('.session-comment-wrapper');
+      if (notesSection) {
+        notesSection.style.display = 'none';
+      }
+
+      editForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    window.cancelSessionEdit = function (sessionId) {
+      const row = document.getElementById(`comment-row-${sessionId}`);
+      const editForm = document.getElementById(`edit-form-${sessionId}`);
+
+      if (!row || !editForm) {
+        return;
+      }
+
+      editForm.style.display = 'none';
+      const notesSection = row.querySelector('.session-comment-wrapper');
+      if (notesSection) {
+        notesSection.style.display = 'block';
+      }
+    };
+
+    window.saveSessionChanges = async function (sessionId) {
+      try {
+        const session = allSessions.find((s) => s.id === sessionId);
+        if (!session) {
+          alert('Session not found. Please refresh.');
+          return;
+        }
+
+        const dateEl = document.getElementById(`edit-date-${sessionId}`);
+        const startEl = document.getElementById(`edit-start-${sessionId}`);
+        const endEl = document.getElementById(`edit-end-${sessionId}`);
+        const studentsEl = document.getElementById(`edit-students-${sessionId}`);
+        const subjectEl = document.getElementById(`edit-subject-${sessionId}`);
+        const includeEl = document.getElementById(`edit-includeSummary-${sessionId}`);
+        const costEl = document.getElementById(`edit-cost-${sessionId}`);
+        const notesEl = document.getElementById(`edit-notes-${sessionId}`);
+
+        const sessionDate = dateEl?.value;
+        const startTime = startEl?.value;
+        const endTime = endEl?.value;
+        const studentNames = studentsEl?.value || '';
+        const subject = subjectEl?.value || '';
+        const includeSummary = !!(includeEl && includeEl.checked);
+        const cost = costEl?.value || '';
+        const notes = notesEl?.value || '';
+
+        if (!sessionDate || !startTime || !endTime) {
+          alert('Please provide date, start time, and end time.');
+          return;
+        }
+
+        const bookingRef = doc(db, 'bookings', sessionId);
+        await updateDoc(bookingRef, {
+          sessionDate,
+          startTime,
+          endTime,
+          studentNames,
+          subject,
+          includeSummary,
+          notes,
+          cost
+        });
+
+        const payload = {
+          action: 'updateCalendarEvent',
+          bookingId: session.bookingId || sessionId,
+          eventId: session.eventId || null,
+          sessionDate,
+          startTime,
+          endTime,
+          studentNames,
+          subject,
+          includeSummary,
+          notes,
+          cost,
+          guardianName: session.guardianName || '',
+          guardianEmail: session.guardianEmail || '',
+          suppressEmail: true
+        };
+
+        const formData = new URLSearchParams();
+        formData.append('payload', JSON.stringify(payload));
+
+        const res = await fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          body: formData
+        });
+
+        const result = await res.json();
+
+        if (result.success && result.data && result.data.eventId) {
+          await updateDoc(bookingRef, { eventId: result.data.eventId });
+        }
+
+        if (!result.success) {
+          console.warn('Calendar update failed:', result);
+          alert('Session saved, but calendar update failed: ' + (result.message || 'Unknown error'));
+        } else {
+          if (result.data && result.data.eventId) {
+            session.eventId = result.data.eventId;
+          }
+          alert('Session updated and calendar synced.');
+        }
+
+        await loadSessions();
+      } catch (err) {
+        console.error('Error saving session changes:', err);
+        alert('Error saving changes: ' + err.message);
+      } finally {
+        cancelSessionEdit(sessionId);
+      }
+    };
+
+    window.openBulkEditModal = () => {
+      if (!bulkEditSessionIds.length) {
+        alert('Select at least two sessions from the same series.');
+        return;
+      }
+
+      const modal = document.getElementById('bulk-edit-modal');
+      const countEl = document.getElementById('bulk-edit-count');
+      const startInput = document.getElementById('bulk-start-time');
+      const endInput = document.getElementById('bulk-end-time');
+
+      const firstSession = allSessions.find((s) => s.id === (bulkEditSessionIds[0] || ''));
+      if (firstSession) {
+        startInput.value = normalizeTimeForInput(firstSession.startTime || '');
+        endInput.value = normalizeTimeForInput(firstSession.endTime || '');
+      } else {
+        startInput.value = '';
+        endInput.value = '';
+      }
+
+      if (countEl) {
+        countEl.textContent = `Editing ${bulkEditSessionIds.length} session(s)`;
+      }
+
+      if (modal) {
+        modal.classList.add('active');
+      }
+    };
+
+    window.closeBulkEditModal = () => {
+      const modal = document.getElementById('bulk-edit-modal');
+      const form = document.getElementById('bulk-edit-form');
+
+      if (modal) {
+        modal.classList.remove('active');
+      }
+
+      if (form) {
+        form.reset();
+      }
+    };
+
+    window.submitBulkEdit = async (event) => {
+      event.preventDefault();
+
+      if (!bulkEditSessionIds.length) {
+        alert('Select at least two sessions in the same recurring series.');
+        return;
+      }
+
+      const startInput = document.getElementById('bulk-start-time');
+      const endInput = document.getElementById('bulk-end-time');
+      const submitBtn = document.getElementById('bulk-edit-submit-btn');
+
+      const startTime = normalizeTimeForInput(startInput?.value || '');
+      const endTime = normalizeTimeForInput(endInput?.value || '');
+
+      if (!startTime || !endTime) {
+        alert('Please provide both start and end times.');
+        return;
+      }
+
+      const startMinutes = timeStringToMinutes(startTime);
+      const endMinutes = timeStringToMinutes(endTime);
+
+      if (startMinutes == null || endMinutes == null) {
+        alert('Please enter valid times in HH:MM format.');
+        return;
+      }
+
+      if (endMinutes <= startMinutes) {
+        alert('End time must be later than start time.');
+        return;
+      }
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+      }
+
+      const results = { success: [], failed: [] };
+
+      try {
+        for (const sessionId of bulkEditSessionIds) {
+          try {
+            const session = allSessions.find((s) => s.id === sessionId);
+            if (!session) {
+              throw new Error('Session not found.');
+            }
+
+            const bookingRef = doc(db, 'bookings', sessionId);
+            await updateDoc(bookingRef, {
+              startTime,
+              endTime
+            });
+
+            session.startTime = startTime;
+            session.endTime = endTime;
+
+            const payload = {
+              action: 'updateCalendarEvent',
+              bookingId: session.bookingId || sessionId,
+              eventId: session.eventId || null,
+              sessionDate: getISODateString(session.sessionDate || session.date),
+              startTime,
+              endTime,
+              studentNames: session.studentNames || session.studentName || '',
+              subject: session.subject || '',
+              includeSummary: session.includeSummary || false,
+              notes: session.notes || session.sessionSummary || '',
+              cost: session.cost || '',
+              guardianName: session.guardianName || '',
+              guardianEmail: session.guardianEmail || '',
+              suppressEmail: true
+            };
+
+            const formData = new URLSearchParams();
+            formData.append('payload', JSON.stringify(payload));
+
+            const res = await fetch(APPS_SCRIPT_URL, {
+              method: 'POST',
+              body: formData
+            });
+
+            const result = await res.json();
+
+            if (!result.success) {
+              throw new Error(result.message || 'Calendar update failed');
+            }
+
+            if (result.data && result.data.eventId) {
+              await updateDoc(bookingRef, { eventId: result.data.eventId });
+              session.eventId = result.data.eventId;
+            }
+
+            results.success.push(sessionId);
+          } catch (err) {
+            console.error('Bulk edit failure for session', sessionId, err);
+            results.failed.push({ sessionId, error: err });
+          }
+        }
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+        }
+      }
+
+      closeBulkEditModal();
+      selectedSessionIds.clear();
+      bulkEditSessionIds = [];
+      bulkEditRecurringKey = null;
+      updateSessionSelectionUI();
+
+      let message = '';
+      if (results.success.length) {
+        message = `✅ Updated ${results.success.length} session(s).`;
+      }
+      if (results.failed.length) {
+        message += `${message ? '\n' : ''}⚠️ Failed to update ${results.failed.length} session(s). Check console for details.`;
+      }
+      if (!message) {
+        message = 'No sessions were updated.';
+      }
+      alert(message);
+
+      loadSessions();
+    };
+
+    function closePaymentMenu() {
+      if (!openPaymentMenuId) {
+        return;
+      }
+
+      const menu = document.getElementById(`payment-menu-${openPaymentMenuId}`);
+      if (menu) {
+        menu.classList.remove('is-open');
+      }
+
+      const toggleBtn = document.querySelector(`[data-payment-menu-toggle="${openPaymentMenuId}"]`);
+      if (toggleBtn) {
+        toggleBtn.setAttribute('aria-expanded', 'false');
+      }
+
+      openPaymentMenuId = null;
+    }
+
+    window.togglePaymentMenu = (sessionId) => {
+      if (!sessionId) {
+        return;
+      }
+
+      const menu = document.getElementById(`payment-menu-${sessionId}`);
+      const toggleBtn = document.querySelector(`[data-payment-menu-toggle="${sessionId}"]`);
+
+      if (!menu || !toggleBtn) {
+        return;
+      }
+
+      const isOpen = menu.classList.contains('is-open');
+      closePaymentMenu();
+
+      if (!isOpen) {
+        menu.classList.add('is-open');
+        toggleBtn.setAttribute('aria-expanded', 'true');
+        openPaymentMenuId = sessionId;
+      }
+    };
+
+    document.addEventListener('click', (event) => {
+      if (!openPaymentMenuId) {
+        return;
+      }
+
+      const menu = document.getElementById(`payment-menu-${openPaymentMenuId}`);
+      if (!menu) {
+        openPaymentMenuId = null;
+        return;
+      }
+
+      const toggleBtn = document.querySelector(`[data-payment-menu-toggle="${openPaymentMenuId}"]`);
+      const clickInsideMenu = menu.contains(event.target);
+      const clickOnToggle = toggleBtn ? toggleBtn.contains(event.target) : false;
+
+      if (!clickInsideMenu && !clickOnToggle) {
+        closePaymentMenu();
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closePaymentMenu();
+      }
+    });
+
+    function updatePaymentUI(sessionId) {
+      const session = sessionById.get(sessionId);
+      if (!session) {
+        return;
+      }
+
+      const paymentInfo = getSessionAmountInfo(session);
+      const status = getPaymentStatusDisplay(session, paymentInfo);
+      const labelEl = document.querySelector(`[data-payment-status="${sessionId}"]`);
+
+      if (labelEl) {
+        labelEl.textContent = status.text;
+        labelEl.classList.remove('is-paid', 'is-partial', 'is-no-show');
+        if (status.className) {
+          labelEl.classList.add(status.className);
+        }
+      }
+
+      const dropdownLabel = document.querySelector(`[data-payment-amount-label="${sessionId}"]`);
+      if (dropdownLabel) {
+        dropdownLabel.textContent = getPaymentDropdownLabel(session, paymentInfo);
+      }
+
+      const inputEl = document.getElementById(`payment-amount-${sessionId}`);
+      if (inputEl) {
+        inputEl.value = getDefaultPaymentInputValue(session, paymentInfo);
+      }
+    }
+
+    async function recordSessionPayment(sessionId, { amountCents = null, status, note = null } = {}) {
+      if (!sessionId || !status) {
+        alert('Missing session details.');
+        return;
+      }
+
+      if (paymentProcessingIds.has(sessionId)) {
+        return;
+      }
+
+      paymentProcessingIds.add(sessionId);
+
+      try {
+        const bookingRef = doc(db, 'bookings', sessionId);
+        const bookingSnap = await getDoc(bookingRef);
+
+        if (!bookingSnap.exists()) {
+          alert('Session record not found.');
+          return;
+        }
+
+        const booking = bookingSnap.data();
+        const amountInfoBefore = getSessionAmountInfo(booking);
+        const history = Array.isArray(booking.paymentStatusHistory) ? [...booking.paymentStatusHistory] : [];
+        history.push({
+          status,
+          changedAt: new Date().toISOString(),
+          changedBy: currentUser?.uid || 'tutor',
+          source: 'tutor:payments',
+          amountPaid: amountCents != null ? amountCents / 100 : null,
+          note: note || null
+        });
+
+        const updates = {
+          status,
+          paymentStatusHistory: history,
+          updatedAt: serverTimestamp(),
+          noShow: status === 'no_show'
+        };
+
+        if (status === 'succeed_payment') {
+          updates.paidAt = serverTimestamp();
+        } else if (status !== 'no_show') {
+          updates.paidAt = null;
+        }
+
+        if (status === 'partial_payment') {
+          updates.partialPaymentRecordedAt = serverTimestamp();
+        }
+
+        if (amountCents != null) {
+          updates.amountPaidCents = amountCents;
+          updates.amountPaid = amountCents / 100;
+          if (Number.isFinite(amountInfoBefore.amountDueCents)) {
+            const remaining = Math.max(amountInfoBefore.amountDueCents - amountCents, 0);
+            updates.remainingBalanceCents = remaining;
+            updates.remainingBalance = remaining / 100;
+          }
+        }
+
+        await updateDoc(bookingRef, updates);
+
+        const session = sessionById.get(sessionId);
+        if (session) {
+          session.status = status;
+          session._normalizedStatus = normalizeBookingStatus(status);
+          session.amountPaidCents = amountCents;
+          session.amountPaid = amountCents != null ? amountCents / 100 : null;
+          session.remainingBalanceCents = updates.remainingBalanceCents ?? session.remainingBalanceCents;
+          session.remainingBalance = updates.remainingBalance ?? session.remainingBalance;
+          session.noShow = status === 'no_show';
+          session.paymentStatusHistory = history;
+          sessionById.set(sessionId, session);
+          const allIdx = allSessions.findIndex((item) => item && item.id === sessionId);
+          if (allIdx !== -1) {
+            allSessions[allIdx] = session;
+          }
+          const renderedIdx = currentRenderedSessions.findIndex((item) => item && item.id === sessionId);
+          if (renderedIdx !== -1) {
+            currentRenderedSessions[renderedIdx] = session;
+          }
+        }
+
+        closePaymentMenu();
+        updatePaymentUI(sessionId);
+      } catch (error) {
+        console.error('Error recording payment:', error);
+        alert('Error recording payment: ' + error.message);
+      } finally {
+        paymentProcessingIds.delete(sessionId);
+      }
+    }
+
+    window.quickMarkSessionPaid = async (sessionId) => {
+      const session = sessionById.get(sessionId);
+      if (!session) {
+        alert('Session not found.');
+        return;
+      }
+
+      const info = getSessionAmountInfo(session);
+      await recordSessionPayment(sessionId, {
+        amountCents: info.amountDueCents,
+        status: 'succeed_payment'
+      });
+    };
+
+    window.saveCustomPayment = async (sessionId) => {
+      const input = document.getElementById(`payment-amount-${sessionId}`);
+      const session = sessionById.get(sessionId);
+
+      if (!input || !session) {
+        alert('Unable to record payment.');
+        return;
+      }
+
+      const rawValue = input.value != null ? input.value.trim() : '';
+      const amount = parseFloat(rawValue);
+
+      if (Number.isNaN(amount) || amount < 0) {
+        alert('Enter a valid amount.');
+        return;
+      }
+
+      const amountCents = Math.round(amount * 100);
+      const info = getSessionAmountInfo(session);
+      const nextStatus = amountCents >= info.amountDueCents ? 'succeed_payment' : 'partial_payment';
+
+      await recordSessionPayment(sessionId, {
+        amountCents,
+        status: nextStatus,
+        note: nextStatus === 'partial_payment'
+          ? `Partial payment recorded (${formatCurrency(amount, info.currency)} of ${info.formatted}).`
+          : null
+      });
+    };
+
+    window.markSessionNoShow = async (sessionId) => {
+      if (!sessionId) {
+        return;
+      }
+
+      await recordSessionPayment(sessionId, {
+        amountCents: 0,
+        status: 'no_show',
+        note: 'Marked as no-show by tutor.'
+      });
+    };
+
+    window.deleteSelectedSessions = async () => {
+      if (selectedSessionIds.size === 0) {
+        alert('Please select at least one session to delete.');
+        return;
+      }
+
+      if (!confirm(`Delete ${selectedSessionIds.size} selected session(s)? This will also remove them from Google Calendar. This cannot be undone.`)) {
+        return;
+      }
+
+      const results = {
+        success: [],
+        failed: []
+      };
+
+      try {
+        for (const sessionId of selectedSessionIds) {
+          try {
+            const bookingRef = doc(db, 'bookings', sessionId);
+            const bookingSnap = await getDoc(bookingRef);
+
+            if (bookingSnap.exists()) {
+              const booking = bookingSnap.data();
+
+              const deletePayload = {
+                action: 'deleteCalendarEvent',
+                bookingId: booking.bookingId || sessionId,
+                sessionDate: booking.sessionDate
+              };
+
+              try {
+                const formData = new URLSearchParams();
+                formData.append('payload', JSON.stringify(deletePayload));
+
+                const res = await fetch(APPS_SCRIPT_URL, {
+                  method: 'POST',
+                  body: formData
+                });
+
+                const json = await res.json();
+                if (json.success) {
+                  console.log(`Deleted ${json.data.deleted} calendar event(s) for session ${sessionId}`);
+                }
+              } catch (calError) {
+                console.warn(`Calendar delete failed for session ${sessionId}:`, calError);
+              }
+            }
+
+            await deleteDoc(bookingRef);
+            results.success.push(sessionId);
+          } catch (error) {
+            console.error(`Error deleting session ${sessionId}:`, error);
+            results.failed.push({ id: sessionId, error: error.message });
+          }
+        }
+
+        selectedSessionIds.clear();
+        updateSessionSelectionUI();
+
+        let message = `✅ Successfully deleted ${results.success.length} session(s)`;
+        if (results.failed.length > 0) {
+          message += `\n⚠️ Failed to delete ${results.failed.length} session(s)`;
+        }
+
+        alert(message);
+        loadSessions();
+      } catch (error) {
+        console.error('Error in bulk deletion:', error);
+        alert('Error during bulk deletion: ' + error.message);
+      }
+    };
+
+    window.deleteSession = async (sessionId) => {
+      if (!confirm('Delete this session? This cannot be undone.')) return;
+
+      try {
+        const bookingRef = doc(db, 'bookings', sessionId);
+        const bookingSnap = await getDoc(bookingRef);
+
+        if (bookingSnap.exists()) {
+          const booking = bookingSnap.data();
+
+          const deletePayload = {
+            action: 'deleteCalendarEvent',
+            bookingId: booking.bookingId || sessionId,
+            sessionDate: booking.sessionDate
+          };
+
+          try {
+            const formData = new URLSearchParams();
+            formData.append('payload', JSON.stringify(deletePayload));
+
+            const res = await fetch(APPS_SCRIPT_URL, {
+              method: 'POST',
+              body: formData
+            });
+
+            const json = await res.json();
+            if (json.success) {
+              console.log('Successfully removed calendar event(s).');
+            } else {
+              console.warn('Calendar delete returned:', json.message);
+            }
+          } catch (calErr) {
+            console.error('Calendar delete error:', calErr);
+          }
+        }
+
+        await deleteDoc(bookingRef);
+        alert('✅ Session deleted.');
+        loadSessions();
+      } catch (error) {
+        console.error('Error deleting session:', error);
+        alert('Error deleting session: ' + error.message);
+      }
+    };
+
+    window.toggleSessionComment = (sessionId) => {
+      const row = document.getElementById(`comment-row-${sessionId}`);
+      if (!row) {
+        return;
+      }
+
+      const isHidden = row.style.display === 'none' || row.style.display === '';
+      row.style.display = isHidden ? 'table-row' : 'none';
+
+      const notesSection = row.querySelector('.session-comment-wrapper');
+      const editForm = document.getElementById(`edit-form-${sessionId}`);
+
+      if (isHidden) {
+        if (notesSection) {
+          notesSection.style.display = 'block';
+        }
+        if (editForm) {
+          editForm.style.display = 'none';
+        }
+      }
+    };
+
+    window.cancelComment = (sessionId) => {
+      const row = document.getElementById(`comment-row-${sessionId}`);
+      if (!row) {
+        return;
+      }
+
+      const textarea = document.getElementById(`comment-input-${sessionId}`);
+      const session = allSessions.find((s) => s.id === sessionId);
+      if (session && textarea) {
+        textarea.value = session.sessionSummary || '';
+      }
+
+      row.style.display = 'none';
+    };
+
+    window.saveComment = async (sessionId) => {
+      const textarea = document.getElementById(`comment-input-${sessionId}`);
+      const comment = textarea ? textarea.value.trim() : '';
+
+      try {
+        await updateDoc(doc(db, 'bookings', sessionId), {
+          sessionSummary: comment,
+          updatedAt: serverTimestamp()
+        });
+
+        if (textarea) {
+          textarea.value = comment;
+        }
+
+        const session = allSessions.find((s) => s.id === sessionId);
+        if (session) {
+          session.sessionSummary = comment;
+        }
+
+        alert('Session notes saved.');
+        loadSessions();
+      } catch (error) {
+        console.error('Error saving comment:', error);
+        alert('Error saving comment: ' + error.message);
+      }
+    };
+  </script>
+</body>
+</html>

@@ -127,6 +127,23 @@
     .password-toggle:hover {
         opacity: 0.8;
     }
+    .checkbox-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.6rem;
+        margin-top: 1rem;
+    }
+    .checkbox-row input[type="checkbox"] {
+        margin-top: 0.15rem;
+        width: 1rem;
+        height: 1rem;
+        cursor: pointer;
+    }
+    .checkbox-row label {
+        margin: 0;
+        cursor: pointer;
+        line-height: 1.3;
+    }
     </style>
 </head>
 <body>
@@ -164,6 +181,12 @@
             <button type="button" class="password-toggle" aria-label="Toggle password visibility" data-target="confirm-password">🙈</button>
         </div>
 
+        <div class="checkbox-row">
+            <input id="become-tutor" type="checkbox" />
+            <label for="become-tutor"><strong>Become a tutor too</strong><br />We'll auto-create a tutor dashboard so you can list subjects and meeting preferences later.</label>
+        </div>
+        <p class="help-text">Leave unchecked if you're only booking sessions as a family.</p>
+
         <button type="submit" id="register-btn">Create Account</button>
         <div class="error" id="error"></div>
         <div class="success" id="success"></div>
@@ -175,7 +198,7 @@
     </div>
 
     <!-- Firebase init -->
-    <script type="module" src="firebase.js"></script>
+    <script type="module" src="firebase-config.js"></script>
 
     <!-- Registration logic -->
     <script type="module">
@@ -193,6 +216,9 @@
     const collection = window.firestoreCollection;
     const doc = window.firestoreDoc;
     const serverTimestamp = window.firestoreServerTimestamp;
+    const query = window.firestoreQuery;
+    const where = window.firestoreWhere;
+    const getDocs = window.firestoreGetDocs;
 
     // Password visibility toggle
     document.querySelectorAll('.password-toggle').forEach(button => {
@@ -221,6 +247,7 @@
         const phone = document.getElementById("phone").value.trim();
         const password = document.getElementById("password").value;
         const confirmPassword = document.getElementById("confirm-password").value;
+        const wantsTutorProfile = document.getElementById("become-tutor").checked;
 
         // Validate passwords match
         if (password !== confirmPassword) {
@@ -230,6 +257,29 @@
         }
 
         try {
+            const normalizeNameForSlug = (name) => {
+                const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+                return base.slice(0, 60) || `tutor-${Date.now()}`;
+            };
+
+            const reserveUniqueTutorSlug = async (rawName) => {
+                const baseSlug = normalizeNameForSlug(rawName);
+                let candidate = baseSlug;
+                let attempts = 0;
+
+                // Ensure slug is unique in the tutors collection to avoid profile URL collisions.
+                while (attempts < 5) {
+                    const slugQuery = query(collection(db, "tutorProfiles"), where("slug", "==", candidate));
+                    const slugSnapshot = await getDocs(slugQuery);
+                    if (slugSnapshot.empty) {
+                        return candidate;
+                    }
+                    attempts += 1;
+                    candidate = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
+                }
+                return `${baseSlug}-${Date.now().toString(36)}`;
+            };
+
             // Create Firebase Auth user
             const userCredential = await signUp(auth, email, password);
             const user = userCredential.user;
@@ -239,14 +289,51 @@
                 displayName: fullName
             });
 
+            const createdAt = serverTimestamp();
             // Create user profile document in Firestore
-            await setDoc(doc(db, "users", user.uid), {
+            const userDocData = {
                 fullName: fullName,
                 email: email,
                 phone: phone,
-                createdAt: serverTimestamp(),
-                students: [] // Array to store student IDs
-            });
+                createdAt: createdAt,
+                roles: {
+                    student: true,
+                    tutor: wantsTutorProfile
+                },
+                students: [],
+                onboarding: {
+                    tutorProfileStatus: wantsTutorProfile ? "draft" : "not_requested"
+                }
+            };
+
+            if (wantsTutorProfile) {
+                const tutorSlug = await reserveUniqueTutorSlug(fullName);
+                const tutorProfileDoc = await addDoc(collection(db, "tutorProfiles"), {
+                    userId: user.uid,
+                    fullName,
+                    slug: tutorSlug,
+                    status: "draft",
+                    headline: "",
+                    bio: "",
+                    subjectsOffered: [],
+                    gradeLevels: [],
+                    meetingModes: {
+                        online: true,
+                        inPerson: false,
+                        hybrid: false
+                    },
+                    placesSettings: {
+                        enabled: false,
+                        placeId: null,
+                        displayAddress: null
+                    },
+                    createdAt,
+                    updatedAt: createdAt
+                });
+                userDocData.tutorProfileId = tutorProfileDoc.id;
+            }
+
+            await setDoc(doc(db, "users", user.uid), userDocData);
 
             // Automatically create a student profile for the user (themselves)
             await addDoc(collection(db, "students"), {

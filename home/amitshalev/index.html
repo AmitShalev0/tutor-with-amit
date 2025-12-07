@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Amit Tutoring – Calgary Math & Science Tutor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Calgary-based STEM tutoring that builds confidence in math, science, and engineering from elementary to university. Book personalized sessions with Amit." />
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .tutor-summary-card {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 1.5rem;
+      align-items: center;
+      margin-bottom: 2rem;
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 1.1rem;
+      padding: 1.75rem;
+    }
+    .tutor-summary-photo {
+      width: 130px;
+      height: 130px;
+      border-radius: 999px;
+      border: 2px solid rgba(96, 165, 250, 0.35);
+      background: rgba(15, 23, 42, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .tutor-summary-photo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .tutor-summary-initials {
+      font-size: 1.8rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: #bfdbfe;
+    }
+    .tutor-summary-details {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .summary-name {
+      font-size: 2.25rem;
+      margin: 0;
+    }
+    .summary-mode-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .summary-mode-tags,
+    .summary-course-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+    }
+    .summary-location {
+      color: #94a3b8;
+      font-size: 0.95rem;
+    }
+    .summary-location.has-tags::before {
+      content: ' - ';
+      color: #475569;
+    }
+    .summary-course-tags .tag {
+      text-transform: none;
+      letter-spacing: 0.01em;
+      font-size: 0.78rem;
+    }
+    .summary-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.85rem;
+      margin-top: 0.5rem;
+    }
+    .summary-actions .btn {
+      flex-shrink: 0;
+    }
+    .favorite-btn {
+      background: rgba(59, 130, 246, 0.18);
+      color: #bfdbfe;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+    }
+    .favorite-btn.is-favourite {
+      background: rgba(251, 191, 36, 0.22);
+      color: #facc15;
+      border-color: rgba(250, 204, 21, 0.45);
+    }
+    .favorite-btn:disabled {
+      opacity: 0.7;
+      cursor: wait;
+    }
+    @media (max-width: 720px) {
+      .tutor-summary-card {
+        grid-template-columns: 1fr;
+        text-align: center;
+      }
+      .summary-actions {
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body data-page-id="home" data-home-slug="amitshalev" data-profile-slug="amit-shalev">
+<div id="site-header"></div>
+<script src="/header-loader.js"></script>
+
+  <main class="container">
+    <section class="hero">
+      <div class="tutor-summary-card" id="tutor-summary-card">
+        <div class="tutor-summary-photo" id="summary-photo">
+          <span class="tutor-summary-initials" id="summary-initials" aria-hidden="true">AS</span>
+          <img id="summary-photo-img" alt="Tutor profile photo" hidden />
+        </div>
+        <div class="tutor-summary-details">
+          <h1 class="summary-name" id="summary-name">Amit Shalev</h1>
+          <div class="summary-mode-row">
+            <div class="summary-mode-tags" id="summary-mode-tags"></div>
+            <span class="summary-location" id="summary-location" hidden></span>
+          </div>
+          <div class="summary-course-tags" id="summary-course-tags"></div>
+          <p class="hero-lede" data-editable-block="heroLede" id="summary-bio">Hi, I’m Amit — a big-hair science nerd, and mentor who helps students truly understand STEM.</p>
+          <div class="summary-actions">
+            <button class="btn secondary favorite-btn" id="summary-favorite-btn" type="button">Add me to Favourite</button>
+            <a class="btn primary" id="summary-book-btn" href="/book.html">Book with me</a>
+            <button class="btn tertiary" id="summary-rate-btn" type="button">Rate me</button>
+          </div>
+        </div>
+      </div>
+      <div class="hero-header">
+        <h2 class="hero-title" data-editable-block="heroTitle">Calgary Math & Science Tutoring that Sparks Confidence</h2>
+        <button id="auth-action-btn" class="btn primary nowrap">Create Account</button>
+      </div>
+      <p data-editable-block="heroIntro">I design hands-on lessons that connect theory to real life, whether we are graphing polynomial functions, exploring real-life chemistry scenarios, or prepping for IB physics.</p>
+      <div class="hero-actions" id="hero-actions">
+        <a class="btn primary" href="/register.html">Create Account</a>
+        <a class="btn secondary" href="/book.html">Book a Session</a>
+        <a class="btn tertiary" href="/login.html" data-login-link>Existing User? Login</a>
+      </div>
+      <ul class="trust-bullets">
+        <li>Personalized support from elementary through university</li>
+        <li>STEM specialties: mathematics, physics, chemistry, biology</li>
+        <li>Flexible scheduling for in-person or virtual sessions</li>
+      </ul>
+    </section>
+
+    <section class="home-section">
+      <div class="home-grid">
+        <article class="feature-card" data-editable-block="whyFamilies">
+          <h2>Why Families Choose Amit Tutoring</h2>
+          <p>I combine deep subject expertise with a playful, visual teaching style. We sketch on whiteboards, build intuition with analogies, and break big problems into friendly steps. My goal is to grow each student’s independence so they can tackle new topics without fear.</p>
+          <ul class="feature-list">
+            <li><strong>Confidence-first coaching.</strong> We celebrate wins and turn mistakes into learning moments.</li>
+            <li><strong>Curriculum alignment.</strong> Alberta curriculum, AP, IB, SAT, and university coursework.</li>
+            <li><strong>Progress updates.</strong> Guardians receive session summaries outlining focus areas and next steps.</li>
+          </ul>
+        </article>
+        <aside class="feature-card highlight-card" data-editable-block="quickFacts">
+          <h3>Quick Facts</h3>
+          <ul class="fact-list">
+            <li><span>9+</span> years tutoring STEM</li>
+            <li><span>150+</span> students mentored</li>
+            <li><span>1:1</span> customized lesson plans</li>
+          </ul>
+          <p class="small-note">Curious parents are welcome to sit in or request progress reports at any time.</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="home-section approach">
+      <div class="home-grid">
+        <article class="feature-card" data-editable-block="approachBody">
+          <h2>My Approach</h2>
+          <p>
+            <strong>Concepts:</strong> <a href="https://www.youtube.com/watch?v=ySeVe4stNzA" target="_blank" rel="noopener noreferrer">Put it all together (one big idea)</a> and <a href="https://www.scotthyoung.com/blog/Programs/HolisticLearningEBook.pdf" target="_blank" rel="noopener noreferrer">holistic approach</a><br>
+            <strong>Memorization:</strong> <a href="https://www.youtube.com/watch?v=cVf38y07cfk" target="_blank" rel="noopener noreferrer">Spaced Repetition</a><br>
+            <strong>Logic puzzles:</strong> <a href="https://www.youtube.com/watch?v=_nWMP68DqHE" target="_blank" rel="noopener noreferrer">Practice</a>, <a href="https://www.youtube.com/watch?v=IyvlgRf7u3Y" target="_blank" rel="noopener noreferrer">practice</a>, <a href="https://www.youtube.com/watch?v=1-sjUoGO250" target="_blank" rel="noopener noreferrer">practice!</a> Also <a href="https://www.youtube.com/watch?v=7snnRaC4t5c" target="_blank" rel="noopener noreferrer">believe in yourself</a>
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section class="home-section">
+      <div class="home-grid">
+        <article class="feature-card" data-editable-block="subjectsCard">
+          <h2>Subjects I Love Teaching</h2>
+          <div class="tag-grid">
+            <span class="tag">Math 7–12 &amp; Diploma</span>
+            <span class="tag">Calculus &amp; Linear Algebra</span>
+            <span class="tag">AP &amp; IB Physics</span>
+            <span class="tag">University Engineering</span>
+            <span class="tag">Chemistry &amp; Biology Foundations</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="home-section cta-section">
+      <h2 class="section-title">Ready to Start?</h2>
+      <p>Book a trial session or schedule a quick call so we can map out a plan that fits your goals.</p>
+      <div class="hero-actions">
+        <a class="btn primary" href="/book.html">Book a Session</a>
+        <a class="btn secondary" href="/contact.html">Ask a Question</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>
+        © <span id="year"></span> Amit Tutoring ·
+        <a href="/contact.html">Contact me</a>
+      </p>
+    </div>
+    <script src="/main.js"></script>
+  </footer>
+
+  <!-- Firebase init -->
+  <script type="module" src="/firebase-config.js"></script>
+
+  <!-- Home page auth logic + tutor summary -->
+  <script type="module">
+    const db = window.firebaseDb;
+    const collection = window.firestoreCollection;
+    const query = window.firestoreQuery;
+    const where = window.firestoreWhere;
+    const getDocs = window.firestoreGetDocs;
+    const docFn = window.firestoreDoc;
+    const getDocFn = window.firestoreGetDoc;
+    const updateDocFn = window.firestoreUpdateDoc;
+    const arrayUnion = window.firestoreArrayUnion;
+    const arrayRemove = window.firestoreArrayRemove;
+    const auth = window.firebaseAuth;
+    const onAuth = window.firebaseOnAuth;
+    const signOut = window.firebaseSignOut;
+
+    const summaryCard = document.getElementById("tutor-summary-card");
+    const summaryNameEl = document.getElementById("summary-name");
+    const summaryLocationEl = document.getElementById("summary-location");
+    const summaryModeTagsEl = document.getElementById("summary-mode-tags");
+    const summaryCourseTagsEl = document.getElementById("summary-course-tags");
+    const summaryPhotoImg = document.getElementById("summary-photo-img");
+    const summaryInitialsEl = document.getElementById("summary-initials");
+    const summaryFavoriteBtn = document.getElementById("summary-favorite-btn");
+    const summaryBookBtn = document.getElementById("summary-book-btn");
+    const summaryRateBtn = document.getElementById("summary-rate-btn");
+    const summaryBioEl = document.getElementById("summary-bio");
+
+    const authBtn = document.getElementById("auth-action-btn");
+    const heroActions = document.getElementById("hero-actions");
+    const loginLink = document.querySelector('[data-login-link]');
+
+    const slugMatch = window.location.pathname.match(/\/home\/([^/]+)/i);
+    if (slugMatch) {
+      document.body.dataset.homeSlug = decodeURIComponent(slugMatch[1]);
+    }
+    const profileSlug = document.body.dataset.profileSlug || document.body.dataset.homeSlug || null;
+
+    let currentUser = null;
+    let currentTutorId = null;
+    let favoriteTutorIds = new Set();
+    let favoriteMutationPending = false;
+
+    function getInitials(text) {
+      const source = (text || "").replace(/[^a-zA-Z\s]/g, " ").trim();
+      if (!source) {
+        return "TU";
+      }
+      const parts = source.split(/\s+/).filter(Boolean);
+      return parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("") || "TU";
+    }
+
+    function renderSummaryPhoto(name, photoUrl) {
+      if (summaryInitialsEl) {
+        summaryInitialsEl.textContent = getInitials(name);
+        summaryInitialsEl.hidden = !!photoUrl;
+      }
+      if (summaryPhotoImg) {
+        if (photoUrl) {
+          summaryPhotoImg.src = photoUrl;
+          summaryPhotoImg.alt = `${name || "Tutor"} profile photo`;
+          summaryPhotoImg.loading = "lazy";
+          summaryPhotoImg.hidden = false;
+        } else {
+          summaryPhotoImg.removeAttribute("src");
+          summaryPhotoImg.alt = "";
+          summaryPhotoImg.hidden = true;
+        }
+      }
+    }
+
+    function renderSummaryModes(modes) {
+      if (!summaryModeTagsEl) {
+        return;
+      }
+      summaryModeTagsEl.innerHTML = "";
+      const supportsOnline = Boolean(modes?.online || modes?.hybrid);
+      const supportsInPerson = Boolean(modes?.inPerson || modes?.hybrid);
+      const labels = [];
+      if (supportsOnline && supportsInPerson) {
+        labels.push("Online & In person");
+      } else if (supportsOnline) {
+        labels.push("Online");
+      } else if (supportsInPerson) {
+        labels.push("In person");
+      }
+      labels.forEach((label) => {
+        const tag = document.createElement("span");
+        tag.className = "tag";
+        tag.textContent = label;
+        summaryModeTagsEl.appendChild(tag);
+      });
+      if (summaryLocationEl) {
+        const hasTags = summaryModeTagsEl.children.length > 0;
+        summaryLocationEl.classList.toggle("has-tags", hasTags);
+      }
+    }
+
+    function renderSummaryCourses(subjects) {
+      if (!summaryCourseTagsEl) {
+        return;
+      }
+      summaryCourseTagsEl.innerHTML = "";
+      if (!Array.isArray(subjects) || subjects.length === 0) {
+        summaryCourseTagsEl.hidden = true;
+        return;
+      }
+      summaryCourseTagsEl.hidden = false;
+      subjects.slice(0, 15).forEach((subject) => {
+        const tag = document.createElement("span");
+        tag.className = "tag";
+        tag.textContent = subject;
+        summaryCourseTagsEl.appendChild(tag);
+      });
+    }
+
+    function pickRegion(profile, travelData) {
+      const province = (profile?.province || profile?.state || profile?.region || "").trim();
+      if (province) {
+        return province;
+      }
+      const travelProvince = (travelData?.province || travelData?.state || travelData?.region || "").trim();
+      if (travelProvince) {
+        return travelProvince;
+      }
+      return "";
+    }
+
+    function resolveLocation(profile, travelData) {
+      const city = (profile?.city || "").trim();
+      const travelCity = (travelData?.city || "").trim();
+      const locationCity = city || travelCity;
+      const locationRegion = pickRegion(profile, travelData);
+      const combinedFromFields = [locationCity, locationRegion].filter(Boolean).join(", ");
+      if (combinedFromFields) {
+        return combinedFromFields;
+      }
+      const displayAddress = (profile?.placesSettings?.displayAddress || "").trim();
+      if (displayAddress) {
+        return displayAddress;
+      }
+      const travelAddress = (travelData?.formattedAddress || travelData?.postalCode || "").trim();
+      if (travelAddress) {
+        return travelAddress;
+      }
+      return "";
+    }
+
+    function extractShortBio(text) {
+      if (!text) {
+        return "";
+      }
+      const paragraphs = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+      if (paragraphs.length === 0) {
+        return "";
+      }
+      const first = paragraphs[0];
+      if (first.length <= 260) {
+        return first;
+      }
+      const truncated = first.slice(0, 257);
+      const lastSpace = truncated.lastIndexOf(" ");
+      const safeSlice = lastSpace > 200 ? truncated.slice(0, lastSpace) : truncated;
+      return `${safeSlice.trim()}...`;
+    }
+
+    function renderSummaryBio(bioText, fallbackText) {
+      if (!summaryBioEl) {
+        return;
+      }
+      const computed = extractShortBio(bioText) || fallbackText || "";
+      if (computed) {
+        summaryBioEl.textContent = computed;
+        summaryBioEl.hidden = false;
+      } else {
+        summaryBioEl.textContent = "";
+        summaryBioEl.hidden = true;
+      }
+    }
+
+    function renderSummaryLocation(text) {
+      if (!summaryLocationEl) {
+        return;
+      }
+      if (text) {
+        summaryLocationEl.textContent = text;
+        summaryLocationEl.hidden = false;
+      } else {
+        summaryLocationEl.textContent = "";
+        summaryLocationEl.hidden = true;
+        summaryLocationEl.classList.remove("has-tags");
+      }
+    }
+
+    function updateFavoriteButtonState() {
+      if (!summaryFavoriteBtn) {
+        return;
+      }
+      if (!currentTutorId) {
+        summaryFavoriteBtn.disabled = true;
+        summaryFavoriteBtn.textContent = "Add me to Favourite";
+        summaryFavoriteBtn.title = "Tutor details are still loading";
+        summaryFavoriteBtn.classList.remove("is-favourite");
+        return;
+      }
+      const isFavourite = favoriteTutorIds.has(currentTutorId);
+      summaryFavoriteBtn.disabled = favoriteMutationPending;
+      summaryFavoriteBtn.textContent = isFavourite ? "★ In your favourites" : "☆ Add me to Favourite";
+      summaryFavoriteBtn.classList.toggle("is-favourite", isFavourite);
+      if (!currentUser) {
+        summaryFavoriteBtn.title = "Sign in to manage favourites";
+      } else {
+        summaryFavoriteBtn.title = isFavourite ? "Remove from favourites" : "Add to favourites";
+      }
+    }
+
+    async function loadUserFavorites(uid) {
+      if (!uid || !docFn || !getDocFn) {
+        favoriteTutorIds = new Set();
+        updateFavoriteButtonState();
+        return;
+      }
+      try {
+        const userSnap = await getDocFn(docFn(db, "users", uid));
+        if (userSnap.exists()) {
+          const data = userSnap.data() || {};
+          const ids = Array.isArray(data.favoriteTutorIds) ? data.favoriteTutorIds.filter(Boolean) : [];
+          favoriteTutorIds = new Set(ids);
+        } else {
+          favoriteTutorIds = new Set();
+        }
+      } catch (error) {
+        console.warn("Failed to load favourite tutors", error);
+        favoriteTutorIds = new Set();
+      }
+      updateFavoriteButtonState();
+    }
+
+    async function toggleFavorite() {
+      if (!currentTutorId) {
+        return;
+      }
+      if (!currentUser) {
+        window.location.href = "/login.html";
+        return;
+      }
+      if (!docFn || !updateDocFn || !arrayUnion || !arrayRemove) {
+        alert("Favourites are unavailable right now. Please try again later.");
+        return;
+      }
+      if (favoriteMutationPending) {
+        return;
+      }
+
+      favoriteMutationPending = true;
+      updateFavoriteButtonState();
+
+      try {
+        const userRef = docFn(db, "users", currentUser.uid);
+        const currentlyFavourite = favoriteTutorIds.has(currentTutorId);
+        const payload = currentlyFavourite
+          ? { favoriteTutorIds: arrayRemove(currentTutorId) }
+          : { favoriteTutorIds: arrayUnion(currentTutorId) };
+        await updateDocFn(userRef, payload);
+        if (currentlyFavourite) {
+          favoriteTutorIds.delete(currentTutorId);
+        } else {
+          favoriteTutorIds.add(currentTutorId);
+        }
+      } catch (error) {
+        console.error("Unable to update favourite tutors", error);
+        alert("Sorry, we could not update your favourites. Please try again.");
+      } finally {
+        favoriteMutationPending = false;
+        updateFavoriteButtonState();
+      }
+    }
+
+    if (summaryFavoriteBtn) {
+      summaryFavoriteBtn.addEventListener("click", () => {
+        void toggleFavorite();
+      });
+    }
+
+    if (summaryRateBtn) {
+      summaryRateBtn.onclick = () => {
+        alert("Rating form coming soon!");
+      };
+    }
+
+    async function loadTutorProfile() {
+      if (!db || !profileSlug) {
+        updateFavoriteButtonState();
+        return;
+      }
+      try {
+        const snapshot = await getDocs(
+          query(collection(db, "tutorProfiles"), where("slug", "==", profileSlug))
+        );
+
+        if (snapshot.empty) {
+          updateFavoriteButtonState();
+          return;
+        }
+
+        const docSnap = snapshot.docs[0];
+        const profile = docSnap.data();
+        currentTutorId = docSnap.id;
+
+        if (profile.fullName && summaryNameEl) {
+          summaryNameEl.textContent = profile.fullName;
+        }
+
+        renderSummaryPhoto(profile.fullName, profile.photoURL);
+        renderSummaryModes(profile.meetingModes);
+        renderSummaryCourses(profile.subjectsOffered);
+
+        let travelData = null;
+        try {
+          if (docFn && getDocFn && currentTutorId) {
+            const travelSnap = await getDocFn(docFn(db, "tutors", currentTutorId));
+            travelData = travelSnap.exists() ? travelSnap.data() || {} : null;
+          }
+        } catch (travelError) {
+          console.warn("Failed to load travel info", travelError);
+        }
+
+        const locationDisplay = resolveLocation(profile, travelData);
+        renderSummaryLocation(locationDisplay);
+        const existingBioText = summaryBioEl ? summaryBioEl.textContent : "";
+        renderSummaryBio(profile.bio, profile.headline || existingBioText);
+
+        if (summaryBookBtn) {
+          summaryBookBtn.href = currentTutorId
+            ? `/book.html?tutor=${encodeURIComponent(currentTutorId)}`
+            : "/book.html";
+        }
+
+        updateFavoriteButtonState();
+      } catch (error) {
+        console.error("Tutor summary load error", error);
+        updateFavoriteButtonState();
+      }
+    }
+
+    async function handleAuthChange(user) {
+      currentUser = user || null;
+
+      if (authBtn) {
+        if (user && typeof signOut === "function") {
+          authBtn.textContent = "Log Out";
+          authBtn.onclick = async () => {
+            try {
+              await signOut(auth);
+              window.location.reload();
+            } catch (err) {
+              console.error("Logout error:", err);
+              alert("Failed to log out. Please try again.");
+            }
+          };
+        } else {
+          authBtn.textContent = "Create Account";
+          authBtn.onclick = () => {
+            window.location.href = "/register.html";
+          };
+        }
+      }
+
+      if (heroActions) {
+        heroActions.style.display = user ? "none" : "flex";
+      }
+      if (loginLink) {
+        loginLink.style.display = user ? "none" : "inline";
+      }
+
+      await loadUserFavorites(currentUser ? currentUser.uid : null);
+      updateFavoriteButtonState();
+    }
+
+    if (typeof onAuth === "function" && auth) {
+      onAuth(auth, (user) => {
+        void handleAuthChange(user);
+      });
+    } else {
+      void handleAuthChange(null);
+    }
+
+    loadTutorProfile();
+  </script>
+
+  <!-- Admin page editor -->
+  <script type="module" src="/page-editor.js"></script>
+</body>
+</html>

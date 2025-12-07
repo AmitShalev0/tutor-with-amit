@@ -22,7 +22,7 @@ Your tutoring website now has Firebase authentication and database integration. 
 - **Edit/Delete Students**: Manage student profiles from dashboard
 
 ### 3. Simplified Booking
-- **Book Session** (`book-session.html`): 
+- **Book Session** (`book.html`): 
   - Select students from a list (no re-entering names)
   - Guardian info auto-filled from profile
   - Same calendar and time selection as before
@@ -73,6 +73,7 @@ If you want to allow photo uploads:
 1. Click "Storage" in Firebase Console
 2. Click "Get Started"
 3. Use default security rules for now
+4. (Recommended) Upload the CORS configuration in `config/storage-cors.json` so local development and the live site can talk to Firebase Storage. Use `firebase storage:bucket` (CLI) or the Firebase console to confirm your bucket name, then run `gsutil cors set config/storage-cors.json gs://<your-bucket-name>` (or `gcloud storage buckets update gs://<your-bucket-name> --cors-file=config/storage-cors.json`).
 
 ### Step 4: Set Storage Security Rules (Optional)
 ```javascript
@@ -166,4 +167,4 @@ Your existing `signup.html` and `booking.html` still work for users who don't wa
 
 - Firestore rules ensure users only see their own data
 - Passwords are handled securely by Firebase Auth
-- API keys in `firebase.js` are safe to be public (they're restricted by Firebase Console settings)
+- API keys in `firebase-config.js` are safe to be public (they're restricted by Firebase Console settings)

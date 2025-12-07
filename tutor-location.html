@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Set Tutor Location – Amit Tutoring</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2.5rem 0 4rem;
+    }
+    .location-card {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 1rem;
+      padding: 2rem;
+      display: grid;
+      gap: 1.5rem;
+    }
+    .map-shell {
+      position: relative;
+      border-radius: 1rem;
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+    }
+    #map {
+      width: 100%;
+      height: 420px;
+    }
+    .form-grid {
+      display: grid;
+      gap: 1.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+    .form-grid label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    .form-grid input[type="text"],
+    .form-grid input[type="range"],
+    .form-grid output {
+      width: 100%;
+    }
+    .form-grid input[type="text"] {
+      border-radius: 0.6rem;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.9);
+      padding: 0.65rem 0.75rem;
+      color: #f8fafc;
+      box-sizing: border-box;
+    }
+    .range-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .range-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      color: #cbd5f5;
+    }
+    .actions-row {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .status-message {
+      font-size: 0.95rem;
+    }
+    .status-message.error {
+      color: #fca5a5;
+    }
+    .status-message.success {
+      color: #86efac;
+    }
+    .empty-note {
+      background: rgba(59, 130, 246, 0.1);
+      color: #bfdbfe;
+      padding: 1rem;
+      border-radius: 0.75rem;
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="site-header"></div>
+  <script src="header-loader.js"></script>
+
+  <main class="container">
+    <h1>Set Your Tutoring Location</h1>
+    <p class="detail-text" style="max-width: 720px;">
+      Choose the area where you meet students in person. This helps families know if you can travel to them.
+      Enter an address or postal code, adjust your travel radius, and save your location. You can update it at any time.
+    </p>
+
+    <div class="location-card">
+      <div class="form-grid">
+        <div>
+          <label for="address-input">Search by address or postal code</label>
+          <input id="address-input" type="text" placeholder="Start typing your preferred meeting location" autocomplete="off" />
+          <p id="selected-address" class="empty-note" hidden></p>
+        </div>
+        <div class="range-row">
+          <label for="travel-radius">Travel radius</label>
+          <input id="travel-radius" type="range" min="1" max="30" value="10" step="1" />
+          <div class="range-meta">
+            <span>1 km</span>
+            <span><output id="travel-radius-value">10</output> km</span>
+            <span>30 km</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="map-shell">
+        <div id="map" aria-label="Tutor travel area map"></div>
+      </div>
+
+      <div class="actions-row">
+        <button id="save-button" class="btn primary">Save location</button>
+        <button id="reset-button" class="btn tertiary" type="button">Reset selection</button>
+        <span id="status-text" class="status-message" role="status"></span>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>© <span id="year"></span> Amit Tutoring · <a href="contact.html">Contact me</a></p>
+    </div>
+    <script src="main.js"></script>
+  </footer>
+
+  <script type="module" src="firebase-config.js"></script>
+  <script type="module">
+    import { loadGoogleMapsApi } from './maps-utils.js';
+
+    const auth = window.firebaseAuth;
+    const onAuthStateChanged = window.firebaseOnAuth;
+    const db = window.firebaseDb;
+    const doc = window.firestoreDoc;
+    const getDoc = window.firestoreGetDoc;
+    const setDoc = window.firestoreSetDoc;
+    const serverTimestamp = window.firestoreServerTimestamp;
+
+    const addressInput = document.getElementById('address-input');
+    const selectedAddressEl = document.getElementById('selected-address');
+    const travelRadiusInput = document.getElementById('travel-radius');
+    const travelRadiusValue = document.getElementById('travel-radius-value');
+    const saveButton = document.getElementById('save-button');
+    const resetButton = document.getElementById('reset-button');
+    const statusText = document.getElementById('status-text');
+
+    let mapsApi = null;
+    let map = null;
+    let marker = null;
+    let radiusCircle = null;
+    let autocomplete = null;
+    let currentUser = null;
+    let selectedLocation = null;
+
+    const defaultCenter = { lat: 51.0447, lng: -114.0719 }; // Calgary core reference
+
+    function setStatus(message, type = '') {
+      statusText.textContent = message || '';
+      statusText.className = `status-message${type ? ` ${type}` : ''}`;
+    }
+
+    function extractPostalCode(place) {
+      if (!place || !Array.isArray(place.address_components)) {
+        return null;
+      }
+      const component = place.address_components.find((part) => Array.isArray(part.types) && part.types.includes('postal_code'));
+      return component?.long_name || component?.short_name || null;
+    }
+
+    function updateSelectedAddressDisplay(address) {
+      if (!address) {
+        selectedAddressEl.hidden = true;
+        selectedAddressEl.textContent = '';
+        return;
+      }
+      selectedAddressEl.hidden = false;
+      selectedAddressEl.textContent = address;
+    }
+
+    function ensureMarker(position) {
+      if (!marker) {
+        marker = new mapsApi.Marker({
+          map,
+          position,
+          icon: {
+            path: mapsApi.SymbolPath.CIRCLE,
+            scale: 8,
+            fillColor: '#38bdf8',
+            fillOpacity: 1,
+            strokeOpacity: 0.9,
+            strokeColor: '#0f172a',
+            strokeWeight: 2
+          }
+        });
+      } else {
+        marker.setPosition(position);
+      }
+    }
+
+    function ensureCircle(position) {
+      const radiusKm = Number(travelRadiusInput.value) || 10;
+      const radiusMeters = radiusKm * 1000;
+      if (!radiusCircle) {
+        radiusCircle = new mapsApi.Circle({
+          map,
+          center: position,
+          radius: radiusMeters,
+          strokeColor: '#3b82f6',
+          strokeOpacity: 0.45,
+          strokeWeight: 2,
+          fillColor: '#3b82f6',
+          fillOpacity: 0.15
+        });
+      } else {
+        radiusCircle.setCenter(position);
+        radiusCircle.setRadius(radiusMeters);
+      }
+    }
+
+    function updateRadiusDisplay() {
+      const value = Number(travelRadiusInput.value) || 10;
+      travelRadiusValue.value = value;
+      if (radiusCircle) {
+        radiusCircle.setRadius(value * 1000);
+      }
+    }
+
+    function handlePlaceSelection(place) {
+      if (!place || !place.geometry || !place.geometry.location) {
+        setStatus('Please choose a location from the suggestions list.', 'error');
+        return;
+      }
+      setStatus('');
+      const position = {
+        lat: place.geometry.location.lat(),
+        lng: place.geometry.location.lng()
+      };
+      selectedLocation = {
+        position,
+        formattedAddress: place.formatted_address || place.name || addressInput.value,
+        postalCode: extractPostalCode(place)
+      };
+      updateSelectedAddressDisplay(selectedLocation.formattedAddress);
+      ensureMarker(position);
+      ensureCircle(position);
+      map.panTo(position);
+      map.setZoom(Math.max(map.getZoom(), 12));
+    }
+
+    function resetSelection() {
+      selectedLocation = null;
+      updateSelectedAddressDisplay('');
+      if (marker) {
+        marker.setMap(null);
+        marker = null;
+      }
+      if (radiusCircle) {
+        radiusCircle.setMap(null);
+        radiusCircle = null;
+      }
+      map.panTo(defaultCenter);
+      map.setZoom(11);
+      addressInput.value = '';
+      setStatus('Selection cleared. Choose a new location.');
+    }
+
+    async function saveLocation() {
+      if (!currentUser) {
+        setStatus('You must be signed in to save your location.', 'error');
+        return;
+      }
+      if (!selectedLocation?.position) {
+        setStatus('Pick a location on the map first.', 'error');
+        return;
+      }
+      const travelRadiusKm = Number(travelRadiusInput.value) || 10;
+
+      saveButton.disabled = true;
+      setStatus('Saving location…');
+
+      try {
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const tutorProfileRef = doc(db, 'tutorProfiles', currentUser.uid);
+        const [userDocSnap, tutorProfileSnap] = await Promise.all([
+          getDoc(userDocRef),
+          getDoc(tutorProfileRef)
+        ]);
+
+        const tutorName = userDocSnap?.exists() ? (userDocSnap.data().fullName || userDocSnap.data().displayName || currentUser.displayName) : (currentUser.displayName || null);
+        const subjects = tutorProfileSnap?.exists() ? (tutorProfileSnap.data().subjectsOffered || null) : null;
+
+        const payload = {
+          location: {
+            lat: selectedLocation.position.lat,
+            lng: selectedLocation.position.lng
+          },
+          formattedAddress: selectedLocation.formattedAddress || null,
+          postalCode: selectedLocation.postalCode || null,
+          travelRadiusKm,
+          tutorName: tutorName || null,
+          subjects: Array.isArray(subjects) ? subjects : null,
+          updatedAt: serverTimestamp()
+        };
+
+        await setDoc(doc(db, 'tutors', currentUser.uid), payload, { merge: true });
+        setStatus('Location saved successfully!', 'success');
+      } catch (error) {
+        console.error('Failed to save tutor location', error);
+        setStatus('Unable to save your location. Please retry.', 'error');
+      } finally {
+        saveButton.disabled = false;
+      }
+    }
+
+    async function populateExistingLocation(uid) {
+      try {
+        const tutorDoc = await getDoc(doc(db, 'tutors', uid));
+        if (!tutorDoc.exists()) {
+          return;
+        }
+        const data = tutorDoc.data();
+        const lat = data?.location?.lat;
+        const lng = data?.location?.lng;
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          selectedLocation = {
+            position: { lat, lng },
+            formattedAddress: data.formattedAddress || data.postalCode || '',
+            postalCode: data.postalCode || null
+          };
+          ensureMarker(selectedLocation.position);
+          ensureCircle(selectedLocation.position);
+          map.panTo(selectedLocation.position);
+          map.setZoom(12);
+          updateSelectedAddressDisplay(selectedLocation.formattedAddress);
+        }
+        if (Number.isFinite(data?.travelRadiusKm)) {
+          travelRadiusInput.value = Math.min(30, Math.max(1, data.travelRadiusKm));
+          updateRadiusDisplay();
+        }
+      } catch (error) {
+        console.warn('Unable to load saved tutor location', error);
+      }
+    }
+
+    async function initialize(uid) {
+      try {
+        mapsApi = await loadGoogleMapsApi({ libraries: 'places' });
+      } catch (error) {
+        console.error('Google Maps failed to load', error);
+        setStatus('Map failed to load. Check your Google Maps API key configuration.', 'error');
+        return;
+      }
+
+      map = new mapsApi.Map(document.getElementById('map'), {
+        center: defaultCenter,
+        zoom: 11,
+        mapTypeControl: false,
+        fullscreenControl: false,
+        streetViewControl: false
+      });
+
+      autocomplete = new mapsApi.places.Autocomplete(addressInput, {
+        fields: ['geometry', 'formatted_address', 'address_components', 'name']
+      });
+      autocomplete.addListener('place_changed', () => {
+        handlePlaceSelection(autocomplete.getPlace());
+      });
+
+      travelRadiusInput.addEventListener('input', updateRadiusDisplay);
+      updateRadiusDisplay();
+
+      saveButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        saveLocation();
+      });
+
+      resetButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        resetSelection();
+      });
+
+      await populateExistingLocation(uid);
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.href = `login.html?redirect=${encodeURIComponent(window.location.pathname)}`;
+        return;
+      }
+      currentUser = user;
+      await initialize(user.uid);
+    });
+  </script>
+</body>
+</html>

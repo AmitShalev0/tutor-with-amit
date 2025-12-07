@@ -165,7 +165,7 @@
 
     .admin-content {
       padding: 32px;
-      max-width: 1200px;
+      max-width: 1400px;
     }
 
     .admin-section {
@@ -358,8 +358,8 @@
       width: 100%;
       background: var(--surface);
       border-radius: var(--radius-lg);
-      overflow: hidden;
       border: 1px solid var(--border);
+      overflow-x: auto;
     }
 
     .data-table table {
@@ -396,6 +396,39 @@
 
     .data-table tr.conflict-row:hover {
       background: rgba(244, 63, 94, 0.25);
+    }
+
+    .role-select {
+      width: 100%;
+      min-width: 160px;
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+
+    .role-select:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    .role-meta-note {
+      margin-top: 6px;
+      font-size: 0.75rem;
+      color: var(--muted);
+      max-width: 220px;
+    }
+
+    .users-section-card {
+      margin-top: 28px;
+    }
+
+    .section-subheading {
+      margin: 0 0 12px;
+      font-size: 1.2rem;
+      color: var(--accent);
     }
 
     .data-table tr.selected-row {
@@ -445,6 +478,26 @@
     .status-rejected {
       background: #dc3545;
       color: white;
+    }
+    .status-pending_payment {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    .status-succeed_payment {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .status-failed_payment {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .status-payment_cancelled {
+      background: #ede9fe;
+      color: #5b21b6;
+    }
+    .status-payment_refunded {
+      background: #cffafe;
+      color: #0e7490;
     }
 
     .search-box {
@@ -728,6 +781,10 @@
       color: #dc3545;
     }
 
+    .form-message:empty {
+      display: none;
+    }
+
     .session-row {
       cursor: pointer;
     }
@@ -754,18 +811,8 @@
   </style>
 </head>
 <body>
-  <!-- Header -->
-  <header class="site-header">
-    <div class="container">
-      <div class="header-inner">
-        <a href="index.html" class="logo">TutorDesk Admin</a>
-        <nav style="display: flex; gap: 20px; align-items: center;">
-          <span id="adminEmail" style="color: var(--muted); font-size: 0.9rem;"></span>
-          <button onclick="handleSignOut()" class="btn btn-secondary btn-sm">Sign Out</button>
-        </nav>
-      </div>
-    </div>
-  </header>
+  <div id="site-header"></div>
+  <script src="header-loader.js"></script>
 
   <!-- Admin Layout -->
   <div class="admin-layout">
@@ -977,8 +1024,9 @@
       <section id="users-section" class="admin-section">
         <div class="section-header">
           <h2>Registered Users</h2>
-          <button class="btn" onclick="loadUsers()">🔄 Refresh</button>
+          <button class="btn" onclick="loadUsers({ showStatus: true })">🔄 Refresh</button>
         </div>
+        <p id="users-status" class="form-message" role="status" aria-live="polite"></p>
         <div id="users-container" class="loading">Loading users...</div>
       </section>
 
@@ -1104,7 +1152,8 @@
   </div>
 
   <script type="module">
-    import { auth, db, storage, ref, uploadBytes, getDownloadURL, onAuthStateChanged, signOut, collection, getDocs, getDoc, query, where, orderBy, deleteDoc, doc, updateDoc, setDoc, serverTimestamp } from './firebase.js';
+    import { auth, db, storage, ref, uploadBytes, getDownloadURL, onAuthStateChanged, signOut, collection, getDocs, getDoc, query, where, orderBy, deleteDoc, doc, updateDoc, setDoc, serverTimestamp } from './firebase-config.js';
+    import './role-utils.js';
 
     const ADMIN_UID = 'fUXnvGI024fYp4w1AvKUcbM7p8z2';
     let currentUser = null;
@@ -1199,6 +1248,19 @@
       return map;
     })();
 
+    const ACCOUNT_TYPE_OPTIONS = [
+      { value: 'student', label: 'Student Account' },
+      { value: 'tutor', label: 'Tutor Account' },
+      { value: 'hybrid', label: 'Hybrid Account' }
+    ];
+
+    const ACCOUNT_TYPE_LABELS = ACCOUNT_TYPE_OPTIONS.reduce((acc, option) => {
+      acc[option.value] = option.label;
+      return acc;
+    }, {});
+
+    const userDataCache = new Map();
+
     let bookingSettingsCache = null;
     let bookingSettingsLoadPromise = null;
 
@@ -1215,6 +1277,288 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+    }
+
+    function escapeForInlineScript(value) {
+      if (value == null) {
+        return '';
+      }
+      return String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    function setUsersStatus(message, tone) {
+      const statusEl = document.getElementById('users-status');
+      if (!statusEl) {
+        return;
+      }
+
+      statusEl.textContent = message || '';
+      statusEl.classList.remove('ok', 'error');
+
+      if (!message) {
+        return;
+      }
+
+      if (tone === 'success' || tone === 'ok') {
+        statusEl.classList.add('ok');
+      } else if (tone === 'error') {
+        statusEl.classList.add('error');
+      }
+    }
+
+    function describeRoleState(label) {
+      switch (label) {
+        case 'tutor_pending':
+          return 'Tutor access pending approval';
+        case 'hybrid_freeze_tutor':
+          return 'Tutor access paused';
+        case 'hybrid_freeze_student':
+          return 'Student access paused';
+        default:
+          return '';
+      }
+    }
+
+    function analyzeUserRoles(userDoc = {}) {
+      let stateLabel = 'student';
+
+      if (window.RoleUtils && typeof window.RoleUtils.normalizeRoleInfo === 'function') {
+        try {
+          const info = window.RoleUtils.normalizeRoleInfo(userDoc) || {};
+          if (typeof window.RoleUtils.getRoleStateLabel === 'function') {
+            stateLabel = window.RoleUtils.getRoleStateLabel(info) || stateLabel;
+          } else if (info.state) {
+            stateLabel = info.state;
+          }
+        } catch (err) {
+          console.warn('Failed to normalize role info for user', err);
+        }
+      } else {
+        const fallbackValue = (userDoc.accountType || userDoc.primaryRole || userDoc.role || '').toLowerCase();
+        if (fallbackValue === 'tutor') {
+          stateLabel = 'tutor';
+        } else if (fallbackValue === 'hybrid' || fallbackValue === 'student_tutor') {
+          stateLabel = 'hybrid';
+        }
+      }
+
+      let accountType;
+      switch (stateLabel) {
+        case 'tutor':
+        case 'tutor_pending':
+          accountType = 'tutor';
+          break;
+        case 'hybrid':
+        case 'hybrid_freeze_tutor':
+        case 'hybrid_freeze_student':
+          accountType = 'hybrid';
+          break;
+        default: {
+          const fallback = (userDoc.accountType || userDoc.primaryRole || userDoc.role || '').toLowerCase();
+          if (fallback === 'tutor') {
+            accountType = 'tutor';
+          } else if (fallback === 'hybrid' || fallback === 'student_tutor') {
+            accountType = 'hybrid';
+          } else if (userDoc.tutorProfileId || userDoc.tutorProfileSlug || userDoc.tutorStatus === 'approved') {
+            accountType = 'tutor';
+          } else if (userDoc.roles && userDoc.roles.tutor === true) {
+            accountType = 'tutor';
+          } else {
+            accountType = 'student';
+          }
+        }
+      }
+
+      return {
+        accountType,
+        stateLabel,
+        note: describeRoleState(stateLabel)
+      };
+    }
+
+    function normalizeRoleRecordForAdmin(rawValue) {
+      const base = {
+        active: false,
+        frozen: false,
+        pending: false,
+        approvedAt: null,
+        frozenAt: null,
+        pendingAt: null,
+        lastUpdatedAt: null
+      };
+
+      if (rawValue && typeof rawValue === 'object' && !Array.isArray(rawValue)) {
+        const result = { ...base, ...rawValue };
+        result.active = Boolean(rawValue.active ?? rawValue.enabled ?? rawValue === true);
+        result.frozen = Boolean(rawValue.frozen ?? rawValue.paused ?? rawValue.suspended ?? false);
+        result.pending = Boolean(rawValue.pending);
+        return result;
+      }
+
+      if (typeof rawValue === 'string') {
+        const normalized = rawValue.toLowerCase();
+        if (['active', 'enabled', 'true', 'yes'].includes(normalized)) {
+          return { ...base, active: true };
+        }
+        if (normalized === 'pending') {
+          return { ...base, pending: true };
+        }
+        if (['frozen', 'paused', 'disabled'].includes(normalized)) {
+          return { ...base, frozen: true };
+        }
+      }
+
+      if (rawValue === true) {
+        return { ...base, active: true };
+      }
+
+      if (rawValue === false) {
+        return { ...base, frozen: true };
+      }
+
+      return { ...base };
+    }
+
+    function applyRoleActivation(record, shouldBeActive, nowIso) {
+      record.active = shouldBeActive;
+      record.pending = false;
+      record.frozen = !shouldBeActive;
+      record.lastUpdatedAt = nowIso;
+
+      if (shouldBeActive) {
+        if (!record.approvedAt) {
+          record.approvedAt = nowIso;
+        }
+        record.frozenAt = null;
+      } else if (!record.frozenAt) {
+        record.frozenAt = nowIso;
+      }
+
+      if ('pendingAt' in record) {
+        record.pendingAt = null;
+      }
+
+      return record;
+    }
+
+    function buildRolesForAccountType(userDoc, targetType) {
+      const nowIso = new Date().toISOString();
+      const rawRoles = (userDoc && userDoc.roles && typeof userDoc.roles === 'object' && !Array.isArray(userDoc.roles))
+        ? userDoc.roles
+        : {};
+
+      const student = normalizeRoleRecordForAdmin(rawRoles.student);
+      const tutor = normalizeRoleRecordForAdmin(rawRoles.tutor);
+
+      const otherRoles = {};
+      if (rawRoles && typeof rawRoles === 'object') {
+        Object.keys(rawRoles).forEach((key) => {
+          if (key !== 'student' && key !== 'tutor') {
+            otherRoles[key] = rawRoles[key];
+          }
+        });
+      }
+
+      const enableStudent = targetType === 'student' || targetType === 'hybrid';
+      const enableTutor = targetType === 'tutor' || targetType === 'hybrid';
+
+      applyRoleActivation(student, enableStudent, nowIso);
+      applyRoleActivation(tutor, enableTutor, nowIso);
+
+      return {
+        ...otherRoles,
+        student,
+        tutor
+      };
+    }
+
+    function renderAccountTypeCell(meta) {
+      const currentValue = meta.accountType || 'student';
+      const jsSafeId = meta.jsSafeId || escapeForInlineScript(meta.id);
+      const ariaLabelName = meta.displayName || meta.displayEmail || meta.id;
+
+      let html = `<select class="role-select" data-current="${currentValue}" onchange="window.handleAccountTypeChange('${jsSafeId}', this)" aria-label="Account type for ${escapeHtml(ariaLabelName || 'user')}">`;
+      ACCOUNT_TYPE_OPTIONS.forEach((option) => {
+        const selected = option.value === currentValue ? ' selected' : '';
+        html += `<option value="${option.value}"${selected}>${option.label}</option>`;
+      });
+      html += '</select>';
+
+      if (meta.stateNote) {
+        html += `<div class="role-meta-note">${escapeHtml(meta.stateNote)}</div>`;
+      }
+
+      return html;
+    }
+
+    function formatTutorStatus(meta) {
+      switch (meta.stateLabel) {
+        case 'tutor':
+          return 'Tutor active';
+        case 'tutor_pending':
+          return 'Tutor pending approval';
+        case 'hybrid':
+          return 'Tutor & student active';
+        case 'hybrid_freeze_tutor':
+          return 'Tutor access paused';
+        case 'hybrid_freeze_student':
+          return 'Student access paused';
+        default:
+          return 'Active';
+      }
+    }
+
+    function buildTutorSummary(tutors) {
+      let html = '<div class="users-section-card">';
+      html += '<h3 class="section-subheading">Tutor Accounts</h3>';
+
+      if (!tutors || !tutors.length) {
+        html += '<div class="empty-state"><p>No tutor accounts yet. Promote a user to tutor to see them listed here.</p></div>';
+        html += '</div>';
+        return html;
+      }
+
+      html += '<div class="data-table"><table><thead><tr>';
+      html += '<th>Name</th><th>Email</th><th>Account Type</th><th>Status</th><th>Joined</th>';
+      html += '</tr></thead><tbody>';
+
+      tutors.forEach((meta) => {
+        const label = ACCOUNT_TYPE_LABELS[meta.accountType] || meta.accountType;
+        const status = formatTutorStatus(meta);
+        html += `<tr>
+          <td>${escapeHtml(meta.displayName || '-')}</td>
+          <td>${escapeHtml(meta.displayEmail || '-')}</td>
+          <td>${escapeHtml(label)}</td>
+          <td>${escapeHtml(status)}</td>
+          <td>${escapeHtml(meta.joinedDisplay || '-')}</td>
+        </tr>`;
+      });
+
+      html += '</tbody></table></div></div>';
+      return html;
+    }
+
+    async function ensureUserRecord(userId) {
+      if (!userId) {
+        return null;
+      }
+
+      if (userDataCache.has(userId)) {
+        return userDataCache.get(userId);
+      }
+
+      try {
+        const userSnap = await getDoc(doc(db, 'users', userId));
+        if (userSnap.exists()) {
+          const data = { id: userId, ...userSnap.data() };
+          userDataCache.set(userId, data);
+          return data;
+        }
+      } catch (error) {
+        console.error('Failed to fetch user record:', error);
+      }
+
+      return null;
     }
 
     function formatDurationFromMinutes(minutes) {
@@ -2541,13 +2885,11 @@
 
       if (user.uid !== ADMIN_UID) {
         alert('Access denied. Admin privileges required.');
-        window.location.href = 'index.html';
+        window.location.href = '/home/amitshalev/';
         return;
       }
 
       currentUser = user;
-      document.getElementById('adminEmail').textContent = user.email;
-      
       // Load all data
       loadDashboard();
       loadSessions();
@@ -2888,6 +3230,19 @@
           currentRenderedSessionIds.push(session.id);
         }
       });
+
+      const compareChronologically = (a, b) => {
+        if (a._sortDate !== b._sortDate) {
+          return a._sortDate - b._sortDate;
+        }
+        if (a._startMinutes != null && b._startMinutes != null && a._startMinutes !== b._startMinutes) {
+          return a._startMinutes - b._startMinutes;
+        }
+        return String(a.id).localeCompare(String(b.id));
+      };
+
+      upcomingSessions.sort(compareChronologically);
+      pastSessions.sort(compareChronologically);
 
       const markConflicts = (list) => {
         const byDate = new Map();
@@ -4020,8 +4375,8 @@ window.saveSessionChanges = async function (sessionId) {
       container.innerHTML = '<div class="loading">Loading bookings...</div>';
 
       try {
-        const pendingQuery = query(collection(db, 'bookings'), where('status', '==', 'pending'));
-        const approvedQuery = query(collection(db, 'bookings'), where('status', '==', 'approved'));
+        const pendingQuery = query(collection(db, 'bookings'), where('approvalStatus', '==', 'pending'));
+        const approvedQuery = query(collection(db, 'bookings'), where('approvalStatus', '==', 'approved'));
 
         const [pendingSnapshot, approvedSnapshot] = await Promise.all([
           getDocs(pendingQuery),
@@ -4065,6 +4420,9 @@ window.saveSessionChanges = async function (sessionId) {
 
         pendingSnapshot.forEach(doc => {
           const booking = doc.data();
+          if ((booking.approvalStatus && booking.approvalStatus !== 'pending') || booking.approvedAt) {
+            return;
+          }
           const dateInfo = parseDateValue(booking.sessionDate || booking.date);
           const startMinutes = timeStringToMinutes(booking.startTime);
           const endMinutes = deriveEndMinutes(startMinutes, booking);
@@ -4147,6 +4505,52 @@ window.saveSessionChanges = async function (sessionId) {
       }
       renderBookingsTable();
     };
+
+    function normalizeAdminBookingStatus(rawStatus) {
+      if (!rawStatus) {
+        return 'pending_payment';
+      }
+      const lowered = String(rawStatus).toLowerCase();
+      const aliases = {
+        pending: 'pending_payment',
+        awaiting_payment: 'pending_payment',
+        pending_payment: 'pending_payment',
+        payment_pending: 'pending_payment',
+        approved: 'succeed_payment',
+        paid: 'succeed_payment',
+        payment_succeeded: 'succeed_payment',
+        succeed_payment: 'succeed_payment',
+        failed: 'failed_payment',
+        failed_payment: 'failed_payment',
+        payment_failed: 'failed_payment',
+        rejected: 'payment_cancelled',
+        cancelled: 'payment_cancelled',
+        canceled: 'payment_cancelled',
+        payment_cancelled: 'payment_cancelled',
+        payment_canceled: 'payment_cancelled',
+        refunded: 'payment_refunded',
+        payment_refunded: 'payment_refunded'
+      };
+      if (aliases[lowered]) {
+        return aliases[lowered];
+      }
+      return lowered.replace(/[^a-z0-9_-]/g, '_');
+    }
+
+    function getAdminBookingStatusMeta(rawStatus) {
+      const normalized = normalizeAdminBookingStatus(rawStatus);
+      const metaMap = {
+        pending_payment: { label: 'Pending payment', className: 'status-pending_payment' },
+        succeed_payment: { label: 'Payment complete', className: 'status-succeed_payment' },
+        failed_payment: { label: 'Payment failed', className: 'status-failed_payment' },
+        payment_cancelled: { label: 'Payment cancelled', className: 'status-payment_cancelled' },
+        payment_refunded: { label: 'Payment refunded', className: 'status-payment_refunded' }
+      };
+      if (metaMap[normalized]) {
+        return metaMap[normalized];
+      }
+      return { label: (rawStatus || 'Unknown'), className: 'status-pending' };
+    }
 
     function renderBookingsTable() {
       const container = document.getElementById('bookings-container');
@@ -4246,6 +4650,8 @@ window.saveSessionChanges = async function (sessionId) {
 
         const attrString = attrParts.length ? ' ' + attrParts.join(' ') : '';
 
+        const statusMeta = getAdminBookingStatusMeta(booking.status);
+
         html += `<tr${attrString}>
           <td>
             <input type="checkbox" 
@@ -4256,7 +4662,7 @@ window.saveSessionChanges = async function (sessionId) {
           <td>${booking.startTime || '-'} - ${booking.endTime || '-'}</td>
           <td>${booking.studentName}</td>
           <td>${booking.email}</td>
-          <td><span class="status-badge status-pending">Pending</span></td>
+          <td><span class="status-badge ${statusMeta.className}">${statusMeta.label}</span></td>
           <td class="action-buttons">
             <button class="btn btn-success btn-sm" onclick="approveBooking('${booking.id}')">Approve</button>
             <button class="btn btn-danger btn-sm" onclick="rejectBooking('${booking.id}')">Reject</button>
@@ -4332,10 +4738,19 @@ window.saveSessionChanges = async function (sessionId) {
           // 2A — Mark all bookings approved in Firestore
           for (const b of bookings) {
             const ref = doc(db, "bookings", b.id);
+            const existingHistory = Array.isArray(b.paymentStatusHistory) ? [...b.paymentStatusHistory] : [];
+            existingHistory.push({
+              status: 'pending_payment',
+              changedAt: new Date().toISOString(),
+              changedBy: 'admin:approve',
+              source: 'admin:approve'
+            });
             await updateDoc(ref, {
-              status: "approved",
+              status: 'pending_payment',
               approvedAt: serverTimestamp(),
-              bookingId: b.id
+              bookingId: b.id,
+              approvalStatus: 'approved',
+              paymentStatusHistory: existingHistory
             });
           }
 
@@ -4420,9 +4835,20 @@ window.saveSessionChanges = async function (sessionId) {
         for (const bookingId of selectedBookingIds) {
           try {
             const bookingRef = doc(db, 'bookings', bookingId);
+            const snapshot = await getDoc(bookingRef);
+            const bookingData = snapshot.exists() ? snapshot.data() : {};
+            const history = Array.isArray(bookingData.paymentStatusHistory) ? [...bookingData.paymentStatusHistory] : [];
+            history.push({
+              status: 'payment_cancelled',
+              changedAt: new Date().toISOString(),
+              changedBy: 'admin:reject',
+              source: 'admin:reject'
+            });
             await updateDoc(bookingRef, {
-              status: 'rejected',
-              rejectedAt: serverTimestamp()
+              status: 'payment_cancelled',
+              rejectedAt: serverTimestamp(),
+              approvalStatus: 'rejected',
+              paymentStatusHistory: history
             });
 
             results.success.push(bookingId);
@@ -4470,14 +4896,26 @@ window.saveSessionChanges = async function (sessionId) {
           const suppressEmail = await shouldSuppressApprovalEmail(booking);
             console.log('Approving booking:', bookingId, booking);
             
+            const singleHistory = Array.isArray(booking.paymentStatusHistory) ? [...booking.paymentStatusHistory] : [];
+            singleHistory.push({
+              status: 'pending_payment',
+              changedAt: new Date().toISOString(),
+              changedBy: 'admin:approve',
+              source: 'admin:approve'
+            });
+
             // 👇 NOTE: also store bookingId field on the document
             await updateDoc(bookingRef, {
-            status: 'approved',
-            approvedAt: serverTimestamp(),
-            bookingId: bookingId
+              status: 'pending_payment',
+              approvedAt: serverTimestamp(),
+              bookingId: bookingId,
+              approvalStatus: 'approved',
+              paymentStatusHistory: singleHistory
             });
             
             console.log('Firestore updated. Now syncing to calendar...');
+
+            const guardianComments = (booking.comments || booking.notes || booking.additionalComments || booking.questions || booking.guardianComments || '').trim();
 
             const syncData = {
             action: 'syncToCalendar',
@@ -4489,7 +4927,7 @@ window.saveSessionChanges = async function (sessionId) {
             subject: booking.subject,
             guardianName: booking.guardianName,
             guardianEmail: booking.guardianEmail || booking.email,
-            comments: booking.comments || booking.notes || '',
+            comments: guardianComments,
             suppressEmail
             };
             
@@ -4540,9 +4978,22 @@ window.saveSessionChanges = async function (sessionId) {
       if (!confirm('Reject this booking?')) return;
 
       try {
-        await updateDoc(doc(db, 'bookings', bookingId), {
-          status: 'rejected',
-          rejectedAt: serverTimestamp()
+        const bookingRef = doc(db, 'bookings', bookingId);
+        const bookingSnap = await getDoc(bookingRef);
+        const bookingData = bookingSnap.exists() ? bookingSnap.data() : {};
+        const singleHistory = Array.isArray(bookingData.paymentStatusHistory) ? [...bookingData.paymentStatusHistory] : [];
+        singleHistory.push({
+          status: 'payment_cancelled',
+          changedAt: new Date().toISOString(),
+          changedBy: 'admin:reject',
+          source: 'admin:reject'
+        });
+
+        await updateDoc(bookingRef, {
+          status: 'payment_cancelled',
+          rejectedAt: serverTimestamp(),
+          approvalStatus: 'rejected',
+          paymentStatusHistory: singleHistory
         });
 
         alert('Booking rejected.');
@@ -4620,49 +5071,180 @@ window.saveSessionChanges = async function (sessionId) {
     };
 
     // Users
-    window.loadUsers = async () => {
+    window.loadUsers = async (options = {}) => {
       const container = document.getElementById('users-container');
+      if (!container) {
+        return;
+      }
+
+      const showStatus = options?.showStatus === true;
       container.innerHTML = '<div class="loading">Loading users...</div>';
+      if (showStatus) {
+        setUsersStatus('Loading users...');
+      }
 
       try {
         const snapshot = await getDocs(collection(db, 'users'));
 
         if (snapshot.empty) {
+          userDataCache.clear();
           container.innerHTML = '<div class="empty-state"><h3>No users found</h3></div>';
+          if (showStatus) {
+            setUsersStatus('');
+          }
           return;
         }
 
+        userDataCache.clear();
+        const usersMeta = [];
+
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data() || {};
+          const userId = docSnap.id;
+          userDataCache.set(userId, { id: userId, ...data });
+
+          const joinedDate = data.createdAt && typeof data.createdAt.toDate === 'function'
+            ? data.createdAt.toDate()
+            : null;
+          const joinedDisplay = joinedDate ? joinedDate.toLocaleDateString() : '-';
+
+          const displayName = data.fullName || '-';
+          const displayEmail = data.email || '-';
+          const displayPhone = data.phone || '-';
+
+          const roleMeta = analyzeUserRoles(data);
+
+          usersMeta.push({
+            id: userId,
+            displayName,
+            displayEmail,
+            displayPhone,
+            joinedDisplay,
+            accountType: roleMeta.accountType,
+            stateLabel: roleMeta.stateLabel,
+            stateNote: roleMeta.note,
+            jsSafeId: escapeForInlineScript(userId),
+            jsSafeEmail: escapeForInlineScript(displayEmail === '-' ? '' : displayEmail),
+            jsSafeName: escapeForInlineScript(displayName || 'User')
+          });
+        });
+
         let html = '<div class="data-table"><table><thead><tr>';
-        html += '<th>Name</th><th>Email</th><th>Phone</th><th>Joined</th><th>Actions</th>';
+        html += '<th>Name</th><th>Email</th><th>Phone</th><th>Joined</th><th>Account Type</th><th>Actions</th>';
         html += '</tr></thead><tbody>';
 
-        snapshot.forEach(doc => {
-          const user = doc.data();
-          const userId = doc.id;
-          const joined = user.createdAt ? new Date(user.createdAt.toDate()).toLocaleDateString() : '-';
-          const safeEmail = (user.email || '-').replace(/'/g, "\\'");
-          const safeName = (user.fullName || 'User').replace(/'/g, "\\'");
+        usersMeta.forEach((meta) => {
           html += `<tr>
-            <td>${user.fullName || '-'}</td>
-            <td>${user.email || '-'}</td>
-            <td>${user.phone || '-'}</td>
-            <td>${joined}</td>
+            <td>${escapeHtml(meta.displayName || '-')}</td>
+            <td>${escapeHtml(meta.displayEmail || '-')}</td>
+            <td>${escapeHtml(meta.displayPhone || '-')}</td>
+            <td>${escapeHtml(meta.joinedDisplay || '-')}</td>
+            <td>${renderAccountTypeCell(meta)}</td>
             <td>
               <div class="action-buttons">
-                <button class="btn btn-secondary btn-sm" onclick="viewUserSessions('${userId}')">View Sessions</button>
-                <button class="btn btn-secondary btn-sm" onclick="viewUserStudents('${userId}')">View Students</button>
-                <button class="btn btn-sm" onclick="showAddSessionModal('${userId}', '${safeName}')">Add Session</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteUser('${userId}', '${safeEmail}')">Delete</button>
+                <button class="btn btn-secondary btn-sm" onclick="viewUserSessions('${meta.jsSafeId}')">View Sessions</button>
+                <button class="btn btn-secondary btn-sm" onclick="viewUserStudents('${meta.jsSafeId}')">View Students</button>
+                <button class="btn btn-sm" onclick="showAddSessionModal('${meta.jsSafeId}', '${meta.jsSafeName}')">Add Session</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteUser('${meta.jsSafeId}', '${meta.jsSafeEmail}')">Delete</button>
               </div>
             </td>
           </tr>`;
         });
 
         html += '</tbody></table></div>';
+
+        const tutorEntries = usersMeta.filter((meta) => meta.accountType !== 'student');
+        html += buildTutorSummary(tutorEntries);
+
         container.innerHTML = html;
+
+        if (showStatus) {
+          setUsersStatus('');
+        }
       } catch (error) {
         console.error('Error loading users:', error);
-        container.innerHTML = `<div class="empty-state"><h3>Error loading users</h3><p>${error.message}</p></div>`;
+        container.innerHTML = `<div class="empty-state"><h3>Error loading users</h3><p>${escapeHtml(error.message)}</p></div>`;
+        setUsersStatus('Error loading users. Please check the console for details.', 'error');
+      }
+    };
+
+    window.handleAccountTypeChange = async (userId, target) => {
+      const selectEl = target && target.tagName ? target : null;
+      const newValue = selectEl ? selectEl.value : target;
+
+      if (!userId || !ACCOUNT_TYPE_LABELS[newValue]) {
+        if (selectEl) {
+          const currentValue = selectEl.getAttribute('data-current');
+          if (currentValue) {
+            selectEl.value = currentValue;
+          }
+        }
+        setUsersStatus('Unknown account type selection.', 'error');
+        return;
+      }
+
+      const previousValue = selectEl ? (selectEl.getAttribute('data-current') || '') : '';
+      if (selectEl && newValue === previousValue) {
+        return;
+      }
+
+      const userRecord = await ensureUserRecord(userId);
+      if (!userRecord) {
+        if (selectEl && previousValue) {
+          selectEl.value = previousValue;
+        }
+        setUsersStatus('Unable to load user details. Please refresh and try again.', 'error');
+        return;
+      }
+
+      if (selectEl) {
+        selectEl.disabled = true;
+      }
+
+      setUsersStatus('Updating account type...');
+      const primaryRole = newValue === 'hybrid' ? 'hybrid' : (newValue === 'tutor' ? 'tutor' : 'student');
+      let successMessage = '';
+
+      try {
+        const nextRoles = buildRolesForAccountType(userRecord, newValue);
+        await updateDoc(doc(db, 'users', userId), {
+          roles: nextRoles,
+          accountType: newValue,
+          primaryRole,
+          role: newValue,
+          tutorPending: false,
+          roleLastChangedBy: currentUser?.uid || null,
+          rolesUpdatedAt: serverTimestamp(),
+          roleLastChangedAt: serverTimestamp()
+        });
+
+        userRecord.roles = nextRoles;
+        userRecord.accountType = newValue;
+        userRecord.primaryRole = primaryRole;
+        userDataCache.set(userId, userRecord);
+        successMessage = `Account type updated to ${ACCOUNT_TYPE_LABELS[newValue] || newValue}.`;
+        if (selectEl) {
+          selectEl.setAttribute('data-current', newValue);
+        }
+      } catch (error) {
+        console.error('Error updating account type:', error);
+        if (selectEl && previousValue) {
+          selectEl.value = previousValue;
+        }
+        setUsersStatus(`Error updating account type: ${error.message}`, 'error');
+        if (selectEl) {
+          selectEl.disabled = false;
+        }
+        return;
+      }
+
+      if (selectEl) {
+        selectEl.disabled = false;
+      }
+
+      await loadUsers();
+      if (successMessage) {
+        setUsersStatus(successMessage, 'success');
       }
     };
 
@@ -5872,6 +6454,8 @@ window.saveSessionChanges = async function (sessionId) {
       for (let i = 0; i < docs.length; i++) {
         const bookingDoc = docs[i];
         const booking = bookingDoc.data();
+        const guardianComments = (booking.comments || booking.notes || booking.additionalComments || booking.questions || booking.guardianComments || '').trim();
+
         const syncData = {
           action: 'syncToCalendar',
           bookingId: bookingDoc.id,
@@ -5882,7 +6466,7 @@ window.saveSessionChanges = async function (sessionId) {
           subject: booking.subject,
           guardianName: booking.guardianName,
           guardianEmail: booking.guardianEmail || booking.email,
-          comments: booking.comments || booking.notes || '',
+          comments: guardianComments,
           suppressEmail
         };
 

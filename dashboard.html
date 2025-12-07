@@ -119,6 +119,53 @@
       padding: 2rem;
       color: #9ca3af;
     }
+    .hidden-card {
+      display: none;
+    }
+    .favorite-tutor-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .favorite-tutor-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.75rem;
+      background: #111827;
+      border-radius: 0.5rem;
+      border: 1px solid #374151;
+    }
+    .favorite-tutor-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .favorite-tutor-name {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    .favorite-tutor-meta {
+      font-size: 0.85rem;
+      color: #9ca3af;
+      margin: 0;
+    }
+    .favorite-tutor-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+    .favorite-tutor-actions .btn {
+      padding: 0.4rem 0.9rem;
+      font-size: 0.85rem;
+    }
+    .empty-favorites {
+      font-size: 0.9rem;
+      color: #9ca3af;
+    }
   </style>
 </head>
 <body>
@@ -160,11 +207,43 @@
           <button class="btn primary" onclick="window.location.href='add-student.html'">
             + Add Student
           </button>
-          <button class="btn primary" onclick="window.location.href='book-session.html'">
+          <button class="btn primary" onclick="window.location.href='book.html'">
             📅 Book Session
+          </button>
+          <button class="btn secondary" id="home-link-btn" type="button">
+            Visit My Home Page
           </button>
         </div>
       </div>
+
+      <div class="dashboard-card" id="favorite-tutors-card">
+        <h3>My Favourite Tutors</h3>
+        <div id="favorite-tutors-content">
+          <p class="empty-favorites">
+            No favourite tutors yet. <a href="tutor-search.html">Find a tutor</a> to add one.
+          </p>
+        </div>
+      </div>
+
+        <!-- Tutor Snapshot Card -->
+        <div class="dashboard-card hidden-card" id="tutor-card">
+          <h3>Your Tutor Hub</h3>
+          <p id="tutor-card-message" class="info-item">Set up your tutor profile so families can find you.</p>
+          <div id="tutor-card-details" class="hidden-card">
+            <div class="info-item">
+              <div class="info-label">Status</div>
+              <div id="tutor-status">Draft</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Public URL</div>
+              <div id="tutor-link-display">—</div>
+            </div>
+          </div>
+          <div class="action-buttons">
+            <button class="btn primary" onclick="window.location.href='tutor-dashboard.html'">Open Tutor Hub</button>
+            <button class="btn secondary" id="copy-tutor-link" type="button">Copy Profile Link</button>
+          </div>
+        </div>
     </div>
 
     <!-- My Students Section -->
@@ -193,7 +272,7 @@
 </footer>
 
 <!-- Firebase init -->
-<script type="module" src="firebase.js"></script>
+<script type="module" src="firebase-config.js"></script>
 
 <!-- Dashboard logic -->
 <script type="module">
@@ -208,6 +287,8 @@
   const query = window.firestoreQuery;
   const where = window.firestoreWhere;
   const deleteDoc = window.firestoreDeleteDoc;
+  const updateDoc = window.firestoreUpdateDoc;
+  const arrayRemove = window.firestoreArrayRemove;
 
   const loadingEl = document.getElementById("loading");
   const contentEl = document.getElementById("dashboard-content");
@@ -217,8 +298,20 @@
   const profilePhoneEl = document.getElementById("profile-phone");
   const studentsContainer = document.getElementById("students-container");
   const logoutBtn = document.getElementById("logout-btn");
+  const tutorCardEl = document.getElementById("tutor-card");
+  const tutorCardMessageEl = document.getElementById("tutor-card-message");
+  const tutorCardDetailsEl = document.getElementById("tutor-card-details");
+  const tutorStatusEl = document.getElementById("tutor-status");
+  const tutorLinkDisplayEl = document.getElementById("tutor-link-display");
+  const copyTutorLinkBtn = document.getElementById("copy-tutor-link");
+  const homeLinkBtn = document.getElementById("home-link-btn");
+  const favoriteTutorsContainer = document.getElementById("favorite-tutors-content");
+  const DEFAULT_HOME_PATH = "/home/amitshalev/";
 
   let currentUser = null;
+  let tutorProfileData = null;
+
+  window.__latestUserData = window.__latestUserData || null;
 
   // Check authentication
   onAuth(auth, async (user) => {
@@ -255,6 +348,10 @@
       }
 
       const userData = userDoc.data();
+      userData.favoriteTutorIds = Array.isArray(userData.favoriteTutorIds)
+        ? userData.favoriteTutorIds.filter((id) => typeof id === 'string' && id.trim())
+        : [];
+      window.__latestUserData = userData;
       
       // Display user info
       const fullName = userData.fullName || user.displayName || "Friend";
@@ -262,6 +359,17 @@
       profileHeadingEl.textContent = fullName;
       profileEmailEl.textContent = userData.email || user.email;
       profilePhoneEl.textContent = userData.phone || "Not provided";
+
+      const hasTutorRole = !!(userData?.roles?.tutor);
+      if (hasTutorRole) {
+        await loadTutorSummary(userData);
+      } else if (tutorCardEl) {
+        tutorCardEl.classList.add("hidden-card");
+      }
+
+      updateHomeLink(userData);
+
+      await renderFavoriteTutors(userData);
 
       // Load students
       await loadStudents(user.uid);
@@ -274,6 +382,300 @@
       console.error("Error loading dashboard:", err);
       loadingEl.textContent = "Error loading dashboard. Please refresh the page.";
     }
+  }
+
+  async function loadTutorSummary(userData) {
+    if (!tutorCardEl) {
+      return;
+    }
+
+    tutorCardEl.classList.remove("hidden-card");
+    tutorCardMessageEl.textContent = "Loading your tutor profile…";
+    tutorCardDetailsEl.classList.add("hidden-card");
+    tutorProfileData = null;
+
+    try {
+      const profileId = userData.tutorProfileId;
+      let profileSnapshot = null;
+
+      if (profileId) {
+        profileSnapshot = await getDoc(doc(db, "tutorProfiles", profileId));
+      }
+
+      if (!profileSnapshot || !profileSnapshot.exists()) {
+        const fallbackQuery = query(
+          collection(db, "tutorProfiles"),
+          where("userId", "==", currentUser.uid)
+        );
+        const profilesSnapshot = await getDocs(fallbackQuery);
+        profileSnapshot = profilesSnapshot.docs[0];
+
+        if (profileSnapshot && profileSnapshot.exists() && !profileId) {
+          try {
+            await updateDoc(doc(db, "users", currentUser.uid), {
+              tutorProfileId: profileSnapshot.id
+            });
+          } catch (linkErr) {
+            console.warn("Dashboard: unable to backfill tutorProfileId", linkErr);
+          }
+        }
+      }
+
+      if (!profileSnapshot || !profileSnapshot.exists()) {
+        tutorCardMessageEl.textContent = "Tutor profile not created yet. Open the Tutor Hub to finish setup.";
+        tutorCardDetailsEl.classList.add("hidden-card");
+        if (copyTutorLinkBtn) {
+          copyTutorLinkBtn.disabled = true;
+        }
+        updateHomeLink(window.__latestUserData);
+        return;
+      }
+
+      tutorProfileData = { id: profileSnapshot.id, ...profileSnapshot.data() };
+      const slug = tutorProfileData.slug || "pending";
+      const status = tutorProfileData.status || "draft";
+      const baseUrl = window.location.origin || "";
+      const profileUrl = slug === "pending" ? null : `${baseUrl}/tutor-profile.html?slug=${encodeURIComponent(slug)}`;
+
+      tutorStatusEl.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+      if (profileUrl) {
+        tutorLinkDisplayEl.textContent = profileUrl;
+        tutorCardMessageEl.textContent = "Share your link once your profile looks good.";
+        if (copyTutorLinkBtn) {
+          copyTutorLinkBtn.disabled = false;
+          copyTutorLinkBtn.dataset.profileUrl = profileUrl;
+        }
+      } else {
+        tutorLinkDisplayEl.textContent = "Your profile link will appear once you publish.";
+        tutorCardMessageEl.textContent = "Open the Tutor Hub to finish completing your profile.";
+        if (copyTutorLinkBtn) {
+          copyTutorLinkBtn.disabled = true;
+          delete copyTutorLinkBtn.dataset.profileUrl;
+        }
+      }
+
+      tutorCardDetailsEl.classList.remove("hidden-card");
+    } catch (err) {
+      console.error("Error loading tutor summary:", err);
+      tutorCardMessageEl.textContent = "We ran into an issue loading your tutor profile.";
+      tutorCardDetailsEl.classList.add("hidden-card");
+      if (copyTutorLinkBtn) {
+        copyTutorLinkBtn.disabled = true;
+      }
+    }
+
+    updateHomeLink(window.__latestUserData);
+  }
+
+  function sanitizeSlug(value) {
+    if (!value) return null;
+    const text = String(value).trim().toLowerCase();
+    if (!text) return null;
+    const cleaned = text.replace(/[^a-z0-9]+/g, "");
+    if (!cleaned) return null;
+    if (cleaned === "pending" || cleaned === "draft" || cleaned === "sample" || cleaned === "placeholder") {
+      return null;
+    }
+    return cleaned;
+  }
+
+  function resolveHomeSlugFromSources(userData, tutorProfile) {
+    const candidateKeys = [
+      "homeSlug",
+      "homePageSlug",
+      "homepageSlug",
+      "personalSlug",
+      "username",
+      "handle",
+      "slug",
+      "profileSlug"
+    ];
+    if (userData) {
+      for (const key of candidateKeys) {
+        const value = userData[key];
+        if (typeof value === "string" && value.trim()) {
+          const slug = sanitizeSlug(value);
+          if (slug) return slug;
+        }
+      }
+    }
+    if (tutorProfile && typeof tutorProfile.slug === "string") {
+      const slug = sanitizeSlug(tutorProfile.slug);
+      if (slug) return slug;
+    }
+    return null;
+  }
+
+  function buildHomePath(slug) {
+    if (!slug) return DEFAULT_HOME_PATH;
+    return `/home/${encodeURIComponent(slug)}/`;
+  }
+
+  function updateHomeLink(userData) {
+    if (!homeLinkBtn) return;
+    if (userData) {
+      window.__latestUserData = userData;
+    }
+    const effectiveUser = userData || window.__latestUserData || null;
+    const slug = resolveHomeSlugFromSources(effectiveUser, tutorProfileData);
+    const path = buildHomePath(slug);
+    homeLinkBtn.dataset.homePath = path;
+    homeLinkBtn.onclick = () => {
+      window.location.href = path;
+    };
+    if (slug) {
+      homeLinkBtn.textContent = "Open My Home Page";
+      homeLinkBtn.disabled = false;
+    } else {
+      homeLinkBtn.textContent = "Visit Main Home Page";
+      homeLinkBtn.disabled = false;
+    }
+  }
+
+  async function renderFavoriteTutors(userData) {
+    if (!favoriteTutorsContainer) {
+      return;
+    }
+
+    const favoriteIds = Array.isArray(userData?.favoriteTutorIds)
+      ? userData.favoriteTutorIds.filter((id) => typeof id === 'string' && id.trim())
+      : [];
+
+    if (!favoriteIds.length) {
+      favoriteTutorsContainer.innerHTML = '<p class="empty-favorites">No favourite tutors yet. <a href="tutor-search.html">Find a tutor</a> to add one.</p>';
+      return;
+    }
+
+    favoriteTutorsContainer.innerHTML = '<p class="loading">Loading favourite tutors…</p>';
+
+    try {
+      const snapshots = await Promise.all(
+        favoriteIds.map((id) => getDoc(doc(db, 'tutorProfiles', id)))
+      );
+
+      const tutors = snapshots
+        .filter((snap) => snap.exists())
+        .map((snap) => ({ id: snap.id, ...snap.data() }));
+
+      if (!tutors.length) {
+        favoriteTutorsContainer.innerHTML = '<p class="empty-favorites">No favourite tutors yet. <a href="tutor-search.html">Find a tutor</a> to add one.</p>';
+        return;
+      }
+
+      const list = document.createElement('ul');
+      list.className = 'favorite-tutor-list';
+
+      tutors.forEach((tutor) => {
+        const item = document.createElement('li');
+        item.className = 'favorite-tutor-item';
+
+        const info = document.createElement('div');
+        info.className = 'favorite-tutor-info';
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'favorite-tutor-name';
+        nameEl.textContent = tutor.fullName || 'Tutor';
+        info.appendChild(nameEl);
+
+        const metaParts = [];
+        if (tutor.headline) {
+          metaParts.push(tutor.headline);
+        }
+        if (Array.isArray(tutor.subjectsOffered) && tutor.subjectsOffered.length) {
+          metaParts.push(`Subjects: ${tutor.subjectsOffered.slice(0, 3).join(', ')}`);
+        }
+
+        if (metaParts.length) {
+          const metaEl = document.createElement('p');
+          metaEl.className = 'favorite-tutor-meta';
+          metaEl.textContent = metaParts.join(' • ');
+          info.appendChild(metaEl);
+        }
+
+        item.appendChild(info);
+
+        const actions = document.createElement('div');
+        actions.className = 'favorite-tutor-actions';
+
+        const viewBtn = document.createElement('button');
+        viewBtn.type = 'button';
+        viewBtn.className = 'btn secondary';
+        viewBtn.textContent = 'View Profile';
+        viewBtn.addEventListener('click', () => {
+          const slug = tutor.slug ? String(tutor.slug).trim() : '';
+          const target = slug ? `tutor-profile.html?slug=${encodeURIComponent(slug)}` : 'tutor-profile.html';
+          window.location.href = target;
+        });
+        actions.appendChild(viewBtn);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn secondary';
+        removeBtn.textContent = 'Remove';
+        removeBtn.addEventListener('click', () => removeFavoriteTutor(tutor.id));
+        actions.appendChild(removeBtn);
+
+        item.appendChild(actions);
+
+        list.appendChild(item);
+      });
+
+      favoriteTutorsContainer.innerHTML = '';
+      favoriteTutorsContainer.appendChild(list);
+    } catch (err) {
+      console.error('Error loading favourite tutors:', err);
+      favoriteTutorsContainer.innerHTML = '<p class="error">Unable to load favourite tutors right now.</p>';
+    }
+  }
+
+  async function removeFavoriteTutor(tutorId) {
+    if (!currentUser || !tutorId) {
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        favoriteTutorIds: arrayRemove(tutorId)
+      });
+
+      const nextFavorites = Array.isArray(window.__latestUserData?.favoriteTutorIds)
+        ? window.__latestUserData.favoriteTutorIds.filter((id) => id !== tutorId)
+        : [];
+
+      window.__latestUserData = {
+        ...window.__latestUserData,
+        favoriteTutorIds: nextFavorites
+      };
+
+      await renderFavoriteTutors(window.__latestUserData);
+    } catch (err) {
+      console.error('Failed to remove favourite tutor:', err);
+      alert('Could not remove this tutor from your favourites. Please try again.');
+    }
+  }
+
+  if (copyTutorLinkBtn) {
+    copyTutorLinkBtn.addEventListener("click", async () => {
+      const url = copyTutorLinkBtn.dataset.profileUrl;
+      if (!url) {
+        alert("Your profile link will be available once you publish your tutor page.");
+        return;
+      }
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(url);
+          copyTutorLinkBtn.textContent = "Copied!";
+          setTimeout(() => {
+            copyTutorLinkBtn.textContent = "Copy Profile Link";
+          }, 2000);
+        } else {
+          throw new Error("Clipboard API unavailable");
+        }
+      } catch (err) {
+        console.warn("Clipboard copy failed", err);
+        prompt("Copy this link", url);
+      }
+    });
   }
 
   async function loadStudents(userId) {

@@ -4,7 +4,7 @@ function loadHeader() {
   const headerContainer = document.getElementById('site-header');
   if (!headerContainer) return;
 
-  fetch('header.html')
+  fetch('/header.html')
     .then((response) => response.text())
     .then((html) => {
       headerContainer.innerHTML = html;

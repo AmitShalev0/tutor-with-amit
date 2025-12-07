@@ -78,9 +78,9 @@
       </div>
     </div>
 
-    <div class="field-row" style="margin-top: -0.5rem; margin-bottom: 1rem;">
-      <p class="help-text" style="margin: 0;" data-editable-block="addStudentHelp">
-        Don't see your student? <a href="add-student.html" style="color: var(--primary-color); text-decoration: underline;">Add a new student</a>
+    <div class="field-row tight-space">
+      <p class="help-text no-margin" data-editable-block="addStudentHelp">
+        Don't see your student? <a href="add-student.html" class="link-inline">Add a new student</a>
       </p>
     </div>
 
@@ -200,7 +200,7 @@
 </footer>
 
 <!-- Firebase init -->
-<script type="module" src="firebase.js"></script>
+<script type="module" src="firebase-config.js"></script>
 
 <!-- Booking logic -->
 <script type="module">
@@ -234,6 +234,169 @@
     "student-8"
   ];
   let studentDropdowns = [];
+  const urlParams = new URLSearchParams(window.location.search);
+  const suggestedSubject = urlParams.get('subject');
+  const suggestedTutorName = urlParams.get('tutor');
+
+  const TUTOR_DIRECTORY_COLLECTION = 'tutors';
+  const DEFAULT_TUTOR_DOC_ID = 'fUXnvGI024fYp4w1AvKUcbM7p8z2';
+  let tutorDirectoryCache = null;
+  let tutorDirectoryPromise = null;
+
+  function normalizeLookupValue(value) {
+    if (value == null) {
+      return null;
+    }
+    const text = typeof value === 'string' ? value.trim() : String(value).trim();
+    return text ? text.toLowerCase() : null;
+  }
+
+  function pickFirstValidId(values) {
+    if (!Array.isArray(values)) {
+      return null;
+    }
+    for (const value of values) {
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed) {
+          return trimmed;
+        }
+      }
+    }
+    return null;
+  }
+
+  async function loadTutorDirectory() {
+    if (tutorDirectoryCache) {
+      return tutorDirectoryCache;
+    }
+    if (!tutorDirectoryPromise) {
+      tutorDirectoryPromise = (async () => {
+        if (!db || !collection || !getDocs) {
+          return [];
+        }
+        try {
+          const snapshot = await getDocs(collection(db, TUTOR_DIRECTORY_COLLECTION));
+          tutorDirectoryCache = snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            data: docSnap.data() || {}
+          }));
+        } catch (error) {
+          console.warn('Unable to load tutors directory', error);
+          tutorDirectoryCache = [];
+        }
+        return tutorDirectoryCache;
+      })();
+    }
+    return tutorDirectoryPromise;
+  }
+
+  function matchByCandidate(fields, needle) {
+    if (!needle || !Array.isArray(fields)) {
+      return false;
+    }
+    return fields.some((candidate) => normalizeLookupValue(candidate) === needle);
+  }
+
+  function resolveConfiguredTutorDocId({ bookingSettings, userProfile, directory }) {
+    const configured = pickFirstValidId([
+      bookingSettings?.defaultTutorDocId,
+      bookingSettings?.primaryTutorDocId,
+      bookingSettings?.tutorDocId,
+      bookingSettings?.defaultTutorRecordId,
+      bookingSettings?.primaryTutorRecordId,
+      bookingSettings?.tutorRecordId,
+      userProfile?.preferredTutorDocId,
+      userProfile?.preferredTutorRecordId,
+      userProfile?.tutorDocId
+    ]);
+    if (!configured) {
+      return null;
+    }
+    const configuredNorm = normalizeLookupValue(configured);
+    if (!configuredNorm || !Array.isArray(directory) || !directory.length) {
+      return configured;
+    }
+    const matchingEntry = directory.find((entry) => normalizeLookupValue(entry.id) === configuredNorm);
+    return matchingEntry ? matchingEntry.id : configured;
+  }
+
+  async function resolveTutorDocumentId({ tutorUid, tutorName, bookingSettings = {}, userProfile = null }) {
+    const directory = await loadTutorDirectory();
+    const uidNorm = normalizeLookupValue(tutorUid);
+    if (uidNorm && uidNorm !== 'unassigned') {
+      const directMatch = Array.isArray(directory)
+        ? directory.find((entry) => normalizeLookupValue(entry.id) === uidNorm)
+        : null;
+      if (directMatch) {
+        return directMatch.id;
+      }
+      const relatedMatch = Array.isArray(directory)
+        ? directory.find((entry) => {
+            const data = entry.data || {};
+            const candidates = [
+              data.uid,
+              data.userId,
+              data.userID,
+              data.tutorUid,
+              data.tutorID,
+              data.ownerUid,
+              data.ownerId,
+              data.profile?.uid,
+              data.profile?.userId,
+              data.profile?.ownerUid,
+              data.profile?.userID
+            ];
+            return matchByCandidate(candidates, uidNorm);
+          })
+        : null;
+      if (relatedMatch) {
+        return relatedMatch.id;
+      }
+    }
+
+    const nameNorm = normalizeLookupValue(tutorName);
+    if (nameNorm) {
+      const nameMatch = Array.isArray(directory)
+        ? directory.find((entry) => {
+            const data = entry.data || {};
+            const candidates = [
+              data.fullName,
+              data.displayName,
+              data.legalName,
+              data.preferredName,
+              data.name,
+              data.profile?.fullName,
+              data.profile?.displayName,
+              data.billing?.legalName
+            ];
+            return matchByCandidate(candidates, nameNorm);
+          })
+        : null;
+      if (nameMatch) {
+        return nameMatch.id;
+      }
+    }
+
+    const configuredDocId = resolveConfiguredTutorDocId({ bookingSettings, userProfile, directory });
+    if (configuredDocId) {
+      return configuredDocId;
+    }
+
+    if (Array.isArray(directory) && directory.length === 1) {
+      return directory[0].id;
+    }
+
+    if (uidNorm && uidNorm !== 'unassigned') {
+      return tutorUid;
+    }
+
+    const fallback = bookingSettings?.defaultTutorUid
+      || bookingSettings?.primaryTutorUid
+      || userProfile?.preferredTutorUid
+      || DEFAULT_TUTOR_DOC_ID;
+    return fallback;
+  }
 
   function cacheStudentDropdowns() {
     studentDropdowns = STUDENT_DROPDOWN_IDS.map((id) => document.getElementById(id));
@@ -303,6 +466,13 @@
 
   cacheStudentDropdowns();
   attachStudentDropdownListeners();
+
+  if (suggestedSubject) {
+    const subjectInput = document.getElementById("subject");
+    if (subjectInput && !subjectInput.value) {
+      subjectInput.value = suggestedSubject;
+    }
+  }
 
   // Check authentication
   onAuth(auth, async (user) => {
@@ -545,6 +715,10 @@
     const formData = new FormData(e.target);
     const obj = Object.fromEntries(formData.entries());
     obj.type = "booking_request";
+
+    if (suggestedTutorName) {
+      obj.preferred_tutor = suggestedTutorName;
+    }
     
     // Add user profile data with fallbacks
     obj.guardian_full_name = (userProfile && userProfile.fullName) || "Guest User";
@@ -554,6 +728,9 @@
     obj.num_students = selectedStudents.length;
     obj.student_names = selectedStudents.join(", ");
     obj.session_title = `${obj.subject} – ${selectedStudents.join(", ")}`;
+    if (suggestedTutorName) {
+      obj.session_title += ` (Requested tutor: ${suggestedTutorName})`;
+    }
     
     // Frontend validation: Check required fields before submitting
     const requiredFields = {
@@ -611,8 +788,12 @@
     if (finalCost < 0) {
       finalCost = 0;
     }
-    
-    obj.final_cost = finalCost.toFixed(2);
+
+    const roundedFinalCost = Math.round(finalCost * 100) / 100;
+    const amountCents = Math.round(roundedFinalCost * 100);
+    obj.final_cost = roundedFinalCost.toFixed(2);
+    obj.amount_cents = amountCents;
+    obj.currency = 'cad';
 
     // Debug: Log what we're sending
     console.log("Booking data being sent:", obj);
@@ -634,9 +815,41 @@
       const endDate = new Date(startDate.getTime() + (durationHours * 60 * 60 * 1000));
       const endTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
       
+      const resolveTutorUid = () => {
+        const settings = window.bookingSettings || {};
+        const candidate = settings.defaultTutorUid
+          || settings.primaryTutorUid
+          || settings.tutorUid
+          || settings.defaultTutorId
+          || settings.primaryTutorId
+          || settings.tutorId;
+        if (candidate) {
+          return candidate;
+        }
+        if (userProfile?.preferredTutorUid) {
+          return userProfile.preferredTutorUid;
+        }
+        return 'unassigned';
+      };
+
+      const tutorUid = resolveTutorUid();
+      const resolvedTutorDocId = await resolveTutorDocumentId({
+        tutorUid,
+        tutorName: suggestedTutorName || userProfile?.preferredTutorName || userProfile?.preferredTutor,
+        bookingSettings: window.bookingSettings || {},
+        userProfile
+      });
+      const tutorDocId = (typeof resolvedTutorDocId === 'string' && resolvedTutorDocId.trim())
+        ? resolvedTutorDocId.trim()
+        : (tutorUid && tutorUid !== 'unassigned' ? tutorUid : DEFAULT_TUTOR_DOC_ID);
+
       // Base booking data
       const baseBookingData = {
         userId: currentUser.uid,
+        userID: currentUser.uid,
+        tutorId: tutorUid,
+        tutorUid,
+        tutorID: tutorDocId,
         studentNames: obj.student_names,
         students: obj.student_names,
         studentName: obj.student_names,  // Add this for consistency
@@ -645,7 +858,7 @@
         endTime: endTime,
         duration: durationHours,
         durationHours: durationHours,
-        status: "pending",  // Will change to "approved" when you import it
+        status: "pending_payment",
         comments: obj.questions || "",
         notes: obj.questions || "",
         additionalComments: obj.questions || "",
@@ -654,7 +867,19 @@
         guardianName: userProfile?.fullName || currentUser.displayName || "",
         createdAt: new Date().toISOString(),
         source: "WEBSITE_BOOKING_FORM",
-        cost: obj.final_cost
+        cost: obj.final_cost,
+        requestedTutor: suggestedTutorName || null,
+        approvalStatus: 'pending',
+        currency: 'cad',
+        amountCents,
+        paymentStatusHistory: [
+          {
+            status: 'pending_payment',
+            changedAt: new Date().toISOString(),
+            changedBy: currentUser.uid,
+            source: 'web:booking_form'
+          }
+        ]
       };
       
       // Add to Firestore bookings collection

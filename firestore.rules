@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Admin check function
+    function isAdmin() {
+      return request.auth != null && request.auth.uid == 'fUXnvGI024fYp4w1AvKUcbM7p8z2';
+    }
+    
+    // Users can read/write their own profile
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isAdmin();
+    }
+    
+    // Users can manage their own students
+    match /students/{studentId} {
+      allow read, write: if request.auth != null && 
+        resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && 
+        request.resource.data.userId == request.auth.uid;
+      allow read, write: if isAdmin();
+    }
+    
+    // Bookings (pending requests from website)
+    match /bookings/{bookingId} {
+      allow read: if request.auth != null && 
+        resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null;
+      allow read, write: if isAdmin();
+    }
+    
+    // Sessions (approved sessions synced from TutorDesk)
+    match /sessions/{sessionId} {
+      allow read: if request.auth != null && 
+        resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && 
+        resource.data.userId == request.auth.uid;
+      // Sessions created by TutorDesk sync only
+      allow create, update: if false;
+      allow read, write, delete: if isAdmin();
+    }
+
+    // Public tutor directory and profile management
+    match /tutorProfiles/{profileId} {
+      allow read: if resource.data.status == 'published'
+        || (request.auth != null && resource.data.userId == request.auth.uid)
+        || isAdmin();
+      allow create: if (request.auth != null && request.resource.data.userId == request.auth.uid)
+        || isAdmin();
+      allow update, delete: if (request.auth != null && resource.data.userId == request.auth.uid)
+        || isAdmin();
+    }
+
+    match /tutorCertificates/{certId} {
+      allow create: if request.auth != null && request.resource.data.tutorUid == request.auth.uid;
+      allow read: if request.auth != null && resource.data.tutorUid == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.tutorUid == request.auth.uid;
+      allow read, write: if isAdmin();
+    }
+
+    // Tutor location/travel details (readable for map view)
+    match /tutors/{tutorId} {
+      allow read: if true;
+      allow write: if (request.auth != null && request.auth.uid == tutorId) || isAdmin();
+    }
+
+    // Site-wide configuration (read-only for clients)
+    match /siteSettings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // Admin wildcard access to everything else
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

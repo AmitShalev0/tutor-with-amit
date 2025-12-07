@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tutor Profile – Amit Tutoring</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2rem 0 4rem;
+    }
+    .profile-hero {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 1.5rem;
+      align-items: center;
+      margin-bottom: 2rem;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 1rem;
+      padding: 2rem;
+    }
+    .profile-photo-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .profile-photo {
+      width: 140px;
+      height: 140px;
+      border-radius: 999px;
+      border: 2px solid rgba(96, 165, 250, 0.35);
+      background: rgba(15, 23, 42, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+    .profile-photo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .profile-photo-initials {
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: #bfdbfe;
+    }
+    .profile-hero-details {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .profile-hero h1 {
+      font-size: 2.4rem;
+      margin: 0;
+    }
+    .profile-hero h2 {
+      font-size: 1.25rem;
+      margin: 0;
+      color: #cbd5f5;
+    }
+    .profile-mode-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .profile-location {
+      font-size: 0.95rem;
+      color: #94a3b8;
+    }
+    .profile-location.has-tags::before {
+      content: ' - ';
+      color: #475569;
+    }
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .tag {
+      background: rgba(59, 130, 246, 0.15);
+      color: #bfdbfe;
+      border-radius: 999px;
+      padding: 0.25rem 0.85rem;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    .course-tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+    .course-tag-row .tag {
+      text-transform: none;
+      letter-spacing: 0.01em;
+      font-size: 0.78rem;
+    }
+    .profile-short-bio {
+      margin: 0;
+      color: #e2e8f0;
+      line-height: 1.55;
+      font-size: 1rem;
+    }
+    .profile-actions {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .favorite-btn {
+      background: rgba(59, 130, 246, 0.18);
+      color: #bfdbfe;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+    }
+    .favorite-btn.is-favourite {
+      background: rgba(251, 191, 36, 0.22);
+      color: #facc15;
+      border-color: rgba(250, 204, 21, 0.45);
+    }
+    .favorite-btn:disabled {
+      opacity: 0.7;
+      cursor: wait;
+    }
+    .profile-actions button {
+      flex-shrink: 0;
+    }
+    .profile-body {
+      display: grid;
+      gap: 1.5rem;
+    }
+    .profile-card {
+      background: #0f172a;
+      border-radius: 0.9rem;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      padding: 1.5rem;
+    }
+    .profile-card h3 {
+      margin-top: 0;
+      margin-bottom: 0.75rem;
+      font-size: 1.2rem;
+    }
+    .profile-card p {
+      line-height: 1.6;
+      color: #e2e8f0;
+    }
+    .meta-list {
+      display: grid;
+      gap: 0.5rem;
+    }
+    .meta-item strong {
+      display: inline-block;
+      min-width: 130px;
+      color: #cbd5f5;
+    }
+    .message {
+      text-align: center;
+      padding: 2rem;
+      border-radius: 0.75rem;
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      background: rgba(248, 113, 113, 0.05);
+      color: #fecaca;
+    }
+    @media (max-width: 720px) {
+      .profile-hero {
+        grid-template-columns: 1fr;
+        text-align: center;
+      }
+      .profile-photo-wrapper {
+        justify-content: center;
+      }
+      .profile-hero-details {
+        align-items: center;
+      }
+      .profile-actions {
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="site-header"></div>
+  <script src="header-loader.js"></script>
+
+  <main class="container">
+    <section id="profile-content" hidden>
+      <div class="profile-hero">
+        <div class="profile-photo-wrapper">
+          <div class="profile-photo" id="profile-photo">
+            <span id="profile-photo-initials" class="profile-photo-initials" aria-hidden="true">TU</span>
+            <img id="profile-photo-img" alt="Tutor profile photo" hidden />
+          </div>
+        </div>
+        <div class="profile-hero-details">
+          <div>
+            <p class="tag" id="profile-status-tag">Published</p>
+            <h1 id="profile-name">Tutor</h1>
+            <h2 id="profile-headline"></h2>
+          </div>
+          <div class="profile-mode-row">
+            <div class="tag-row" id="profile-mode-tags"></div>
+            <span id="profile-location" class="profile-location" hidden></span>
+          </div>
+          <div class="course-tag-row" id="profile-course-tags"></div>
+          <p id="profile-short-bio" class="profile-short-bio"></p>
+          <div class="profile-actions">
+            <button class="btn secondary favorite-btn" id="favorite-btn" type="button">Add me to Favourite</button>
+            <button class="btn primary" id="book-session-btn" type="button">Book with me</button>
+            <button class="btn tertiary" id="rate-btn" type="button">Rate me</button>
+          </div>
+        </div>
+      </div>
+
+      <section class="profile-body">
+        <article class="profile-card" id="bio-card">
+          <h3>About</h3>
+          <div id="profile-bio"></div>
+        </article>
+        <article class="profile-card">
+          <h3>Details</h3>
+          <div class="meta-list">
+            <p class="meta-item"><strong>Subjects:</strong> <span id="profile-subjects">—</span></p>
+            <p class="meta-item"><strong>Grades:</strong> <span id="profile-grades">—</span></p>
+            <p class="meta-item" id="profile-location-row" hidden><strong>Location:</strong> <span id="profile-location-detail"></span></p>
+          </div>
+        </article>
+      </section>
+    </section>
+
+    <div id="loading-message" class="detail-text">Loading tutor profile...</div>
+    <div id="error-message" class="message" hidden></div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>
+        © <span id="year"></span> Amit Tutoring ·
+        <a href="contact.html">Contact me</a>
+      </p>
+    </div>
+    <script src="main.js"></script>
+  </footer>
+
+  <script type="module" src="firebase-config.js"></script>
+  <script type="module">
+    const db = window.firebaseDb;
+    const collection = window.firestoreCollection;
+    const query = window.firestoreQuery;
+    const where = window.firestoreWhere;
+    const getDocs = window.firestoreGetDocs;
+    const auth = window.firebaseAuth;
+    const onAuth = window.firebaseOnAuth;
+    const docFn = window.firestoreDoc;
+    const getDocFn = window.firestoreGetDoc;
+    const updateDocFn = window.firestoreUpdateDoc;
+    const arrayUnion = window.firestoreArrayUnion;
+    const arrayRemove = window.firestoreArrayRemove;
+
+    const loadingMessage = document.getElementById('loading-message');
+    const errorMessage = document.getElementById('error-message');
+    const profileContent = document.getElementById('profile-content');
+
+    const statusTag = document.getElementById('profile-status-tag');
+    const nameEl = document.getElementById('profile-name');
+    const headlineEl = document.getElementById('profile-headline');
+    const bioEl = document.getElementById('profile-bio');
+    const subjectsEl = document.getElementById('profile-subjects');
+    const gradesEl = document.getElementById('profile-grades');
+    const locationRow = document.getElementById('profile-location-row');
+    const locationHeroEl = document.getElementById('profile-location');
+    const locationDetailEl = document.getElementById('profile-location-detail');
+    const modeTagsEl = document.getElementById('profile-mode-tags');
+    const courseTagsEl = document.getElementById('profile-course-tags');
+    const shortBioEl = document.getElementById('profile-short-bio');
+    const bookBtn = document.getElementById('book-session-btn');
+    const favoriteBtn = document.getElementById('favorite-btn');
+    const rateBtn = document.getElementById('rate-btn');
+    const photoContainer = document.getElementById('profile-photo');
+    const photoImg = document.getElementById('profile-photo-img');
+    const photoInitials = document.getElementById('profile-photo-initials');
+    let fallbackProfileUrl = null;
+    let currentTutorId = null;
+    let favoriteTutorIds = new Set();
+    let favoriteMutationPending = false;
+    let currentUser = null;
+
+    function getSlugFromLocation() {
+      const pathMatch = window.location.pathname.match(/tutor-profile\/([^/]+)\.html$/i);
+      if (pathMatch && pathMatch[1]) {
+        return decodeURIComponent(pathMatch[1]);
+      }
+      const params = new URLSearchParams(window.location.search);
+      const paramSlug = params.get('slug');
+      if (paramSlug) {
+        return paramSlug.trim();
+      }
+      const hashSlug = window.location.hash.replace('#', '').trim();
+      return hashSlug || null;
+    }
+
+    function buildRestfulProfileUrl(slug) {
+      if (!slug) {
+        return window.location.href;
+      }
+      const url = new URL(window.location.href);
+      const encoded = encodeURIComponent(slug);
+      const desiredSuffix = `/tutor-profile/${encoded}.html`;
+      url.search = '';
+      if (!url.pathname.endsWith(desiredSuffix)) {
+        const pattern = /tutor-profile[^/]*\.html?$/i;
+        if (pattern.test(url.pathname)) {
+          url.pathname = url.pathname.replace(pattern, `tutor-profile/${encoded}.html`);
+        } else {
+          url.pathname = `${url.pathname.replace(/\/?$/, '/')}tutor-profile/${encoded}.html`;
+        }
+      }
+      return url.toString();
+    }
+
+    function buildQueryProfileUrl(slug) {
+      if (!slug) {
+        return window.location.href;
+      }
+      const url = new URL(window.location.href);
+      const encoded = encodeURIComponent(slug);
+      url.search = `?slug=${encoded}`;
+      const pattern = /tutor-profile[^/]*\.html?$/i;
+      if (pattern.test(url.pathname)) {
+        url.pathname = url.pathname.replace(pattern, 'tutor-profile.html');
+      } else {
+        url.pathname = `${url.pathname.replace(/\/?$/, '/')}tutor-profile.html`;
+      }
+      return url.toString();
+    }
+
+    function ensureRestfulUrl(slug) {
+      if (!slug) {
+        return;
+      }
+      try {
+        const desiredUrl = buildRestfulProfileUrl(slug);
+        if (window.location.href !== desiredUrl) {
+          window.history.replaceState(null, '', desiredUrl);
+        }
+        fallbackProfileUrl = buildQueryProfileUrl(slug);
+      } catch (error) {
+        console.warn('Tutor profile: unable to update URL', error);
+      }
+    }
+
+    window.addEventListener('beforeunload', () => {
+      if (fallbackProfileUrl) {
+        try {
+          window.history.replaceState(null, '', fallbackProfileUrl);
+        } catch (error) {
+          // noop: best effort to restore query URL before reload
+        }
+      }
+    });
+
+    function renderCourseTags(subjects) {
+      if (!courseTagsEl) {
+        return;
+      }
+      courseTagsEl.innerHTML = '';
+      if (!Array.isArray(subjects) || subjects.length === 0) {
+        courseTagsEl.hidden = true;
+        return;
+      }
+      courseTagsEl.hidden = false;
+      subjects.slice(0, 15).forEach((subject) => {
+        const tag = document.createElement('span');
+        tag.className = 'tag';
+        tag.textContent = subject;
+        courseTagsEl.appendChild(tag);
+      });
+    }
+
+    function pickRegion(profile, travelInfo) {
+      const province = (profile?.province || profile?.state || profile?.region || '').trim();
+      if (province) {
+        return province;
+      }
+      const travelProvince = (travelInfo?.province || travelInfo?.state || travelInfo?.region || '').trim();
+      if (travelProvince) {
+        return travelProvince;
+      }
+      return '';
+    }
+
+    function resolveLocation(profile, travelInfo) {
+      const city = (profile?.city || '').trim();
+      const travelCity = (travelInfo?.city || '').trim();
+      const locationCity = city || travelCity;
+      const locationRegion = pickRegion(profile, travelInfo);
+      const combined = [locationCity, locationRegion].filter(Boolean).join(', ');
+      if (combined) {
+        return combined;
+      }
+      const displayAddress = (profile?.placesSettings?.displayAddress || '').trim();
+      if (displayAddress) {
+        return displayAddress;
+      }
+      const travelAddress = (travelInfo?.formattedAddress || travelInfo?.postalCode || '').trim();
+      if (travelAddress) {
+        return travelAddress;
+      }
+      return '';
+    }
+
+    function extractShortBio(text) {
+      if (!text) {
+        return '';
+      }
+      const paragraphs = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+      if (paragraphs.length === 0) {
+        return '';
+      }
+      const first = paragraphs[0];
+      if (first.length <= 280) {
+        return first;
+      }
+      const truncated = first.slice(0, 277);
+      const lastSpace = truncated.lastIndexOf(' ');
+      const safe = lastSpace > 200 ? truncated.slice(0, lastSpace) : truncated;
+      return `${safe.trim()}...`;
+    }
+
+    function renderShortBio(text, fallback) {
+      if (!shortBioEl) {
+        return;
+      }
+      const computed = extractShortBio(text) || fallback || '';
+      if (computed) {
+        shortBioEl.textContent = computed;
+        shortBioEl.hidden = false;
+      } else {
+        shortBioEl.textContent = '';
+        shortBioEl.hidden = true;
+      }
+    }
+
+    function renderBio(text) {
+      if (!text) {
+        bioEl.innerHTML = '<p>This tutor has not added a biography yet.</p>';
+        return;
+      }
+      const paragraphs = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+      bioEl.innerHTML = paragraphs.map((paragraph) => `<p>${paragraph}</p>`).join('');
+    }
+
+    function renderMeetingModes(modes) {
+      modeTagsEl.innerHTML = '';
+      const supportsOnline = Boolean(modes?.online || modes?.hybrid);
+      const supportsInPerson = Boolean(modes?.inPerson || modes?.hybrid);
+      const labels = [];
+      if (supportsOnline && supportsInPerson) {
+        labels.push('Online & In person');
+      } else if (supportsOnline) {
+        labels.push('Online');
+      } else if (supportsInPerson) {
+        labels.push('In person');
+      }
+      labels.forEach((label) => {
+        const tag = document.createElement('span');
+        tag.className = 'tag';
+        tag.textContent = label;
+        modeTagsEl.appendChild(tag);
+      });
+      if (locationHeroEl) {
+        const hasTags = modeTagsEl.children.length > 0;
+        locationHeroEl.classList.toggle('has-tags', hasTags);
+      }
+    }
+
+    function updateFavoriteButtonState() {
+      if (!favoriteBtn) {
+        return;
+      }
+      if (!currentTutorId) {
+        favoriteBtn.disabled = true;
+        favoriteBtn.textContent = 'Add me to Favourite';
+        favoriteBtn.title = 'Tutor details are still loading';
+        return;
+      }
+      const isFavourite = favoriteTutorIds.has(currentTutorId);
+      favoriteBtn.disabled = favoriteMutationPending;
+      favoriteBtn.textContent = isFavourite ? '★ In your favourites' : '☆ Add me to Favourite';
+      favoriteBtn.classList.toggle('is-favourite', isFavourite);
+      if (!currentUser) {
+        favoriteBtn.title = 'Sign in to manage favourites';
+      } else {
+        favoriteBtn.title = isFavourite ? 'Remove from favourites' : 'Add to favourites';
+      }
+    }
+
+    async function loadUserFavorites(uid) {
+      if (!uid || !docFn || !getDocFn) {
+        favoriteTutorIds = new Set();
+        updateFavoriteButtonState();
+        return;
+      }
+      try {
+        const userSnap = await getDocFn(docFn(db, 'users', uid));
+        if (userSnap.exists()) {
+          const data = userSnap.data() || {};
+          const ids = Array.isArray(data.favoriteTutorIds) ? data.favoriteTutorIds.filter(Boolean) : [];
+          favoriteTutorIds = new Set(ids);
+        } else {
+          favoriteTutorIds = new Set();
+        }
+      } catch (error) {
+        console.warn('Failed to load favourite tutors', error);
+        favoriteTutorIds = new Set();
+      }
+      updateFavoriteButtonState();
+    }
+
+    async function toggleFavorite() {
+      if (!currentTutorId) {
+        return;
+      }
+      if (!currentUser) {
+        window.location.href = 'login.html';
+        return;
+      }
+      if (!docFn || !updateDocFn || !arrayUnion || !arrayRemove) {
+        alert('Favourites are unavailable right now. Please try again later.');
+        return;
+      }
+      if (favoriteMutationPending) {
+        return;
+      }
+
+      favoriteMutationPending = true;
+      updateFavoriteButtonState();
+
+      try {
+        const userRef = docFn(db, 'users', currentUser.uid);
+        const currentlyFavourite = favoriteTutorIds.has(currentTutorId);
+        const payload = currentlyFavourite
+          ? { favoriteTutorIds: arrayRemove(currentTutorId) }
+          : { favoriteTutorIds: arrayUnion(currentTutorId) };
+        await updateDocFn(userRef, payload);
+        if (currentlyFavourite) {
+          favoriteTutorIds.delete(currentTutorId);
+        } else {
+          favoriteTutorIds.add(currentTutorId);
+        }
+      } catch (error) {
+        console.error('Unable to update favourite tutors', error);
+        alert('Sorry, we could not update your favourites. Please try again.');
+      } finally {
+        favoriteMutationPending = false;
+        updateFavoriteButtonState();
+      }
+    }
+
+    function getInitials(text) {
+      const source = (text || '').replace(/[^a-zA-Z\s]/g, ' ').trim();
+      if (!source) return 'TU';
+      const parts = source.split(/\s+/).filter(Boolean);
+      const initials = parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join('');
+      return initials || 'TU';
+    }
+
+    if (favoriteBtn) {
+      favoriteBtn.addEventListener('click', () => {
+        void toggleFavorite();
+      });
+    }
+
+    function renderProfilePhoto(name, photoUrl) {
+      const initials = getInitials(name);
+      if (photoInitials) {
+        photoInitials.textContent = initials;
+        photoInitials.hidden = !!photoUrl;
+      }
+      if (photoImg) {
+        if (photoUrl) {
+          photoImg.src = photoUrl;
+          photoImg.alt = `${name || 'Tutor'} profile photo`;
+          photoImg.loading = 'lazy';
+          photoImg.hidden = false;
+        } else {
+          photoImg.removeAttribute('src');
+          photoImg.alt = '';
+          photoImg.hidden = true;
+        }
+      }
+    }
+
+    renderProfilePhoto('Tutor', null);
+
+    function buildProfileUrl(slug) {
+      return buildRestfulProfileUrl(slug);
+    }
+
+    async function loadProfile() {
+      const slug = getSlugFromLocation();
+      if (!slug) {
+        loadingMessage.hidden = true;
+        errorMessage.hidden = false;
+        errorMessage.textContent = 'Missing tutor profile identifier. Visit the Find Tutors page to browse available tutors.';
+        return;
+      }
+
+      if (!db) {
+        loadingMessage.hidden = true;
+        errorMessage.hidden = false;
+        errorMessage.textContent = 'Firestore is not configured. Check firebase-config.js setup.';
+        return;
+      }
+
+      try {
+        const snapshot = await getDocs(
+          query(
+            collection(db, 'tutorProfiles'),
+            where('slug', '==', slug)
+          )
+        );
+
+        if (snapshot.empty) {
+          loadingMessage.hidden = true;
+          errorMessage.hidden = false;
+          errorMessage.textContent = 'No tutor profile found for this link. It may have been unpublished.';
+          return;
+        }
+
+        const docSnap = snapshot.docs[0];
+        const profileId = docSnap.id;
+        const profile = docSnap.data();
+
+        if (profile.status !== 'published') {
+          loadingMessage.hidden = true;
+          errorMessage.hidden = false;
+          errorMessage.textContent = 'This tutor profile is not public right now. Please contact us for recommendations.';
+          return;
+        }
+
+        let travelInfo = null;
+        try {
+          if (docFn && getDocFn && profileId) {
+            const travelSnap = await getDocFn(docFn(db, 'tutors', profileId));
+            travelInfo = travelSnap.exists() ? travelSnap.data() : null;
+          }
+        } catch (travelError) {
+          console.warn('Failed to load travel/location info', travelError);
+        }
+
+        populateProfile(profileId, profile, travelInfo);
+      } catch (error) {
+        console.error('Tutor profile load error', error);
+        loadingMessage.hidden = true;
+        errorMessage.hidden = false;
+        errorMessage.textContent = 'Unable to load this tutor right now. Please refresh or try again later.';
+      }
+    }
+
+    function populateProfile(tutorId, profile, travelInfo) {
+      loadingMessage.hidden = true;
+      errorMessage.hidden = true;
+      profileContent.hidden = false;
+
+      currentTutorId = tutorId || null;
+      updateFavoriteButtonState();
+
+      nameEl.textContent = profile.fullName || 'Tutor';
+      if (profile.fullName) {
+        document.title = `${profile.fullName} – Tutor Profile`;
+      }
+      renderProfilePhoto(profile.fullName, profile.photoURL);
+      headlineEl.textContent = profile.headline || '';
+      renderBio(profile.bio);
+      renderShortBio(profile.bio, profile.headline);
+      renderCourseTags(profile.subjectsOffered);
+
+      subjectsEl.textContent = profile.subjectsOffered?.length
+        ? profile.subjectsOffered.join(', ')
+        : 'Tutor has not listed specific subjects yet.';
+
+      gradesEl.textContent = profile.gradeLevels?.length
+        ? profile.gradeLevels.join(', ')
+        : 'Tutor has not listed grade levels yet.';
+
+      renderMeetingModes(profile.meetingModes);
+
+      const displayLocation = resolveLocation(profile, travelInfo);
+
+      if (displayLocation) {
+        if (locationHeroEl) {
+          locationHeroEl.textContent = displayLocation;
+          locationHeroEl.hidden = false;
+          const hasTags = modeTagsEl ? modeTagsEl.children.length > 0 : false;
+          locationHeroEl.classList.toggle('has-tags', hasTags);
+        }
+        if (locationDetailEl) {
+          locationDetailEl.textContent = displayLocation;
+        }
+        locationRow.hidden = false;
+      } else {
+        if (locationHeroEl) {
+          locationHeroEl.textContent = '';
+          locationHeroEl.hidden = true;
+          locationHeroEl.classList.remove('has-tags');
+        }
+        if (locationDetailEl) {
+          locationDetailEl.textContent = '';
+        }
+        locationRow.hidden = true;
+      }
+
+      statusTag.textContent = 'Published';
+
+      ensureRestfulUrl(profile.slug);
+
+      const profileUrl = buildProfileUrl(profile.slug);
+      fallbackProfileUrl = profileUrl;
+
+      if (bookBtn) {
+        bookBtn.disabled = false;
+        bookBtn.onclick = () => {
+          const target = tutorId
+            ? `book.html?tutor=${encodeURIComponent(tutorId)}`
+            : 'book.html';
+          window.location.href = target;
+        };
+      }
+
+      if (rateBtn) {
+        rateBtn.disabled = false;
+        rateBtn.onclick = () => {
+          alert('Rating form coming soon!');
+        };
+      }
+    }
+
+    if (typeof onAuth === 'function' && auth) {
+      onAuth(auth, async (user) => {
+        currentUser = user || null;
+        await loadUserFavorites(currentUser ? currentUser.uid : null);
+      });
+    } else {
+      updateFavoriteButtonState();
+    }
+
+    loadProfile();
+  </script>
+</body>
+</html>

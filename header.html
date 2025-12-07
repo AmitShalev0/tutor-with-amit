@@ -1,165 +1,882 @@
+<link rel="stylesheet" href="/role-header.css" />
 
-<!-- Unified Site Header -->
-<header class="site-header">
-  <div class="container header-inner">
-    <h1 class="logo">
-      <a href="index.html" class="logo-text">
-        <span class="logo-text-primary">Amit</span>
-        <span class="logo-text-secondary">tutoring</span>
-      </a>
-    </h1>
-    <span id="header-greeting" class="header-greeting header-hidden" aria-live="polite"></span>
-    <nav class="header-nav">
-      <a href="dashboard.html" id="dashboard-link" class="btn tertiary header-nav-item">Dashboard</a>
-      <a href="sessions.html" id="sessions-link" class="btn tertiary header-nav-item">Sessions</a>
-      <button id="header-auth-btn" class="btn secondary header-auth-btn header-nav-item" type="button">Login</button>
-    </nav>
-    <div class="header-right">
-      <div id="current-time" class="current-time"></div>
-    </div>
-  </div>
+<header class="role-header" data-role-header>
+	<div class="container role-header__inner">
+		<a class="role-header__brand" href="login.html" aria-label="Sign in to view your profile" data-role-brand>
+			<span class="role-header__brand-text">TMTYT</span>
+		</a>
+
+		<button class="role-header__toggle" type="button" id="role-header-toggle" aria-expanded="false" aria-controls="role-header-nav">
+			<span class="role-header__toggle-bar"></span>
+			<span class="role-header__toggle-bar"></span>
+			<span class="role-header__toggle-bar"></span>
+			<span class="sr-only">Toggle navigation</span>
+		</button>
+
+		<nav class="role-header__nav" id="role-header-nav" data-role-nav>
+			<ul class="role-header__nav-list" id="role-header-nav-list"></ul>
+			<div class="role-header__meta">
+				<span class="role-header__badge" id="role-header-badge" hidden></span>
+				<span class="role-header__greeting" id="role-header-greeting"></span>
+				<button class="btn secondary role-header__auth" id="role-header-auth" type="button">Log In</button>
+			</div>
+		</nav>
+	</div>
 </header>
 
 <script>
 (function () {
-  const INIT_FLAG = '__headerInitialized';
+	const headerHost = document.getElementById('site-header') || document;
+	const headerEl = headerHost.querySelector('[data-role-header]');
+	if (!headerEl) {
+		return;
+	}
 
-  function waitForFirebase(timeoutMs = 10000) {
-    return new Promise((resolve, reject) => {
-      const start = Date.now();
-      function check() {
-        if (window.firebaseAuth && window.firebaseOnAuth) {
-          resolve();
-        } else if (Date.now() - start >= timeoutMs) {
-          reject(new Error('Firebase not ready'));
-        } else {
-          setTimeout(check, 50);
-        }
-      }
-      check();
-    });
-  }
+	const navContainer = headerEl.querySelector('#role-header-nav');
+	const navList = headerEl.querySelector('#role-header-nav-list');
+	const toggleButton = headerEl.querySelector('#role-header-toggle');
+	const authButton = headerEl.querySelector('#role-header-auth');
+	const greetingEl = headerEl.querySelector('#role-header-greeting');
+	const badgeEl = headerEl.querySelector('#role-header-badge');
+	const brandLink = headerEl.querySelector('[data-role-brand]');
 
-  function formatName(raw) {
-    if (!raw) return '';
-    const [first] = raw.trim().split(/\s+/);
-    if (!first) return '';
-    return first.charAt(0).toUpperCase() + first.slice(1);
-  }
+	const HEADER_CACHE_PREFIX = 'role-header-cache';
+	const HEADER_CACHE_TTL_MS = 1000 * 60 * 5;
+	const DEFAULT_HOME_PATH = '/home/amitshalev/';
+	const ADMIN_UID_ALLOWLIST = new Set(['fUXnvGI024fYp4w1AvKUcbM7p8z2']);
+	const ADMIN_EMAIL_ALLOWLIST = new Set(['amitshalev1510@gmail.com']);
+	let activeUserUid = null;
+	let lastHomePath = DEFAULT_HOME_PATH;
 
-  async function resolveFirstName(user) {
-    const db = window.firestoreDb;
-    const docFn = window.firestoreDoc;
-    const getDocFn = window.firestoreGetDoc;
+	const NAV_BUILDERS = {
+		guest: () => [
+			{ label: 'FIND TUTOR', href: '/tutor-search/', id: 'nav-find-tutor' },
+			{ label: 'BOOK SESSION', href: '/book.html', id: 'nav-book', emphasize: true }
+		],
+		student: () => [
+			{ label: 'FIND TUTOR', href: '/tutor-search/', id: 'nav-find-tutor' },
+			{ label: 'MY SESSIONS', href: '/sessions/', id: 'nav-my-sessions-student' }
+		],
+		tutor: () => [
+			{ label: 'FIND STUDENTS', href: '/student-search/', id: 'nav-find-students' },
+			{ label: 'MY SESSIONS', href: '/tutsessions/', id: 'nav-my-sessions-tutor' }
+		],
+		tutor_pending: () => [
+			{ label: 'FIND STUDENTS', href: '/student-search/', id: 'nav-find-students' },
+			{ label: 'MY SESSIONS', href: '/tutsessions/', id: 'nav-my-sessions-tutor' }
+		],
+		hybrid: () => [
+			{
+				label: 'FIND',
+				id: 'nav-find-menu',
+				children: [
+					{ label: 'FIND TUTORS', href: '/tutor-search/', id: 'nav-find-tutors' },
+					{ label: 'FIND STUDENTS', href: '/student-search/', id: 'nav-find-students' }
+				]
+			},
+			{
+				label: 'MY SESSIONS',
+				id: 'nav-my-sessions-menu',
+				children: [
+					{ label: 'AS A STUDENT', href: '/sessions/', id: 'nav-sessions-student' },
+					{ label: 'AS A TUTOR', href: '/tutsessions/', id: 'nav-sessions-tutor' }
+				]
+			}
+		]
+	};
 
-    if (db && docFn && getDocFn) {
-      try {
-        const ref = docFn(db, 'users', user.uid);
-        const snapshot = await getDocFn(ref);
-        if (snapshot && snapshot.exists()) {
-          const data = snapshot.data();
-          const fromProfile = data.firstName || formatName(data.fullName || '');
-          if (fromProfile) {
-            return fromProfile;
-          }
-        }
-      } catch (error) {
-        console.warn('Header: failed to load profile name', error);
-      }
-    }
+	const BRAND_DESTINATIONS = {
+		guest: { href: '/login.html', label: 'Sign in to manage your account' },
+		student: { href: '/dashboard/', label: 'Go to your dashboard' },
+		tutor: { href: '/dashboard/', label: 'Go to your dashboard' },
+		hybrid: { href: '/dashboard/', label: 'Go to your dashboard' },
+		tutor_pending: { href: '/dashboard/', label: 'Go to your dashboard' },
+		default: { href: '/dashboard/', label: 'Go to your dashboard' }
+	};
 
-    if (user.displayName) {
-      const fromDisplayName = formatName(user.displayName);
-      if (fromDisplayName) return fromDisplayName;
-    }
+	const ROLE_PRIORITY = {
+		guest: 0,
+		student: 1,
+		tutor: 2,
+		tutor_pending: 2,
+		hybrid: 3
+	};
 
-    if (user.email) {
-      const localPart = user.email.split('@')[0];
-      const cleaned = localPart.replace(/[._]/g, ' ');
-      const formatted = formatName(cleaned);
-      if (formatted) return formatted;
-    }
+	function readCachedState(uid) {
+		if (!uid || !window.sessionStorage) {
+			return null;
+		}
+		try {
+			const raw = window.sessionStorage.getItem(`${HEADER_CACHE_PREFIX}:${uid}`);
+			if (!raw) return null;
+			const parsed = JSON.parse(raw);
+			if (!parsed || typeof parsed !== 'object') return null;
+			const age = Date.now() - Number(parsed.timestamp || 0);
+			if (age > HEADER_CACHE_TTL_MS) {
+				window.sessionStorage.removeItem(`${HEADER_CACHE_PREFIX}:${uid}`);
+				return null;
+			}
+			return parsed.state || null;
+		} catch (error) {
+			return null;
+		}
+	}
 
-    return 'User';
-  }
+	function writeCachedState(uid, state) {
+		if (!uid || !window.sessionStorage) {
+			return;
+		}
+		try {
+			const payload = {
+				timestamp: Date.now(),
+				state
+			};
+			window.sessionStorage.setItem(`${HEADER_CACHE_PREFIX}:${uid}`, JSON.stringify(payload));
+		} catch (error) {
+			console.warn('Header: failed to cache nav state', error);
+		}
+	}
 
-  function setLoggedOutState(greetingEl, authBtn) {
-    if (greetingEl) {
-      greetingEl.textContent = '';
-      greetingEl.classList.add('header-hidden');
-    }
-    if (authBtn) {
-      authBtn.textContent = 'Login';
-      authBtn.onclick = () => {
-        window.location.href = 'login.html';
-      };
-    }
-  }
+	function clearCachedState(uid) {
+		if (!uid || !window.sessionStorage) {
+			return;
+		}
+		try {
+			window.sessionStorage.removeItem(`${HEADER_CACHE_PREFIX}:${uid}`);
+		} catch (error) {
+			// no-op
+		}
+	}
 
-  function setLoggedInState(greetingEl, authBtn, firstName) {
-    if (greetingEl) {
-      greetingEl.textContent = `Hello, ${firstName}`;
-      greetingEl.classList.remove('header-hidden');
-    }
-    if (authBtn) {
-      authBtn.textContent = 'Logout';
-      authBtn.onclick = async () => {
-        try {
-          if (window.firebaseSignOut && window.firebaseAuth) {
-            await window.firebaseSignOut(window.firebaseAuth);
-          }
-        } catch (err) {
-          console.error('Header: logout failed', err);
-        } finally {
-          window.location.href = 'index.html';
-        }
-      };
-    }
-  }
+	function updateBrandLink(stateKey) {
+		if (!brandLink) return;
+		const config = BRAND_DESTINATIONS[stateKey] || BRAND_DESTINATIONS.default;
+		brandLink.href = config.href;
+		brandLink.setAttribute('aria-label', config.label);
+		brandLink.dataset.brandState = stateKey || 'guest';
+	}
 
-  window.initializeHeader = function initializeHeader() {
-    if (window[INIT_FLAG]) return;
-    window[INIT_FLAG] = true;
+	function pickBetterRole(primary, fallback) {
+		if (!fallback) return primary;
+		if (!primary) return fallback;
+		const primaryRank = ROLE_PRIORITY[primary.key] ?? 0;
+		const fallbackRank = ROLE_PRIORITY[fallback.key] ?? 0;
+		if (fallbackRank > primaryRank) {
+			return fallback;
+		}
+		if (fallbackRank === primaryRank && fallback.tone === 'warning' && primary.tone !== 'warning') {
+			return fallback;
+		}
+		return primary;
+	}
 
-    const headerScope = document.getElementById('site-header') || document;
-    const greetingEl = headerScope.querySelector('#header-greeting');
-    const authBtn = headerScope.querySelector('#header-auth-btn');
+	function normalizeRoleFlag(rawValue) {
+		if (rawValue == null) {
+			return { active: false, pending: false, frozen: false };
+		}
+		if (typeof rawValue === 'boolean') {
+			return { active: rawValue, pending: false, frozen: !rawValue };
+		}
+		if (typeof rawValue === 'string') {
+			const value = rawValue.toLowerCase();
+			return {
+				active: value.includes('active') || value === 'enabled' || value === 'true',
+				pending: value.includes('pending'),
+				frozen: value.includes('freeze') || value.includes('suspend') || value.includes('pause')
+			};
+		}
+		if (typeof rawValue === 'object') {
+			return {
+				active: rawValue.active !== undefined ? Boolean(rawValue.active) : Boolean(rawValue.enabled ?? rawValue === true),
+				pending: Boolean(rawValue.pending),
+				frozen: Boolean(rawValue.frozen || rawValue.suspended || rawValue.paused)
+			};
+		}
+		return { active: false, pending: false, frozen: false };
+	}
 
-    if (!greetingEl || !authBtn) {
-      window[INIT_FLAG] = false;
-      return;
-    }
+	function collectRoleKeywords(userDoc) {
+		const keywords = new Set();
+		if (!userDoc) {
+			return keywords;
+		}
+		const rawRoles = userDoc.roles;
+		if (Array.isArray(rawRoles)) {
+			rawRoles.forEach((role) => {
+				if (typeof role === 'string') {
+					keywords.add(role.toLowerCase());
+				}
+			});
+		} else if (rawRoles && typeof rawRoles === 'string') {
+			rawRoles.split(/[,\s]+/).forEach((role) => {
+				if (role) keywords.add(role.toLowerCase());
+			});
+		} else if (rawRoles && typeof rawRoles === 'object') {
+			Object.entries(rawRoles).forEach(([roleKey, roleValue]) => {
+				const normalizedKey = String(roleKey).toLowerCase();
+				if (roleValue === true) {
+					keywords.add(normalizedKey);
+				} else if (typeof roleValue === 'string') {
+					const val = roleValue.toLowerCase();
+					if (val === 'active' || val === 'enabled' || val === 'true') {
+						keywords.add(normalizedKey);
+					}
+				}
+			});
+		}
+		['role', 'primaryRole', 'accountType'].forEach((key) => {
+			const value = userDoc[key];
+			if (typeof value === 'string') {
+				keywords.add(value.toLowerCase());
+			}
+		});
+		return keywords;
+	}
 
-    setLoggedOutState(greetingEl, authBtn);
+	function deriveRoleDetailsFromDoc(userDoc) {
+		if (!userDoc) return null;
+		const roles = userDoc.roles || {};
+		const studentFlags = normalizeRoleFlag(roles.student);
+		const tutorFlags = normalizeRoleFlag(roles.tutor);
+		const keywords = collectRoleKeywords(userDoc);
+		const tutorPending = Boolean(tutorFlags.pending || userDoc.tutorPending);
+		const tutorActive = Boolean(tutorFlags.active || keywords.has('tutor') || keywords.has('coach'));
+		const studentActive = Boolean(studentFlags.active || keywords.has('student'));
+		const tutorFrozen = Boolean(tutorFlags.frozen);
+		const studentFrozen = Boolean(studentFlags.frozen);
+		const hasHybridKeyword = keywords.has('hybrid') || keywords.has('student_tutor');
+		const studentPresence = studentActive || studentFlags.pending || studentFrozen || keywords.has('student') || roles.student === true;
+		const tutorPresence = tutorActive || tutorPending || tutorFrozen || keywords.has('tutor') || keywords.has('coach') || Boolean(userDoc.tutorProfileId || userDoc.tutorStatus || userDoc.tutorProfileSlug);
 
-    waitForFirebase()
-      .then(() => {
-        const auth = window.firebaseAuth;
-        const onAuth = window.firebaseOnAuth;
-        if (!auth || !onAuth) {
-          setLoggedOutState(greetingEl, authBtn);
-          return;
-        }
+		if (hasHybridKeyword || (tutorActive && studentActive) || (studentPresence && tutorPresence && !tutorPending)) {
+			let badge = 'HYBRID';
+			let tone = null;
+			if (tutorFrozen && studentFrozen) {
+				badge = 'HYBRID (PAUSED)';
+				tone = 'warning';
+			} else if (tutorFrozen) {
+				badge = 'HYBRID (TUTOR PAUSED)';
+				tone = 'warning';
+			} else if (studentFrozen) {
+				badge = 'HYBRID (STUDENT PAUSED)';
+				tone = 'warning';
+			}
+			return { key: 'hybrid', badge, tone };
+		}
+		if (tutorPending && !tutorActive) {
+			return { key: 'tutor_pending', badge: 'TUTORS PENDING', tone: 'warning' };
+		}
+		if (tutorActive) {
+			const tone = tutorFrozen ? 'warning' : null;
+			const badge = tutorFrozen ? 'TUTORS (PAUSED)' : 'TUTORS';
+			return { key: 'tutor', badge, tone };
+		}
+		if (studentActive) {
+			const tone = studentFrozen ? 'warning' : null;
+			const badge = studentFrozen ? 'STUDENTS (PAUSED)' : 'STUDENTS';
+			return { key: 'student', badge, tone };
+		}
+		return null;
+	}
 
-        onAuth(auth, async (user) => {
-          if (!user) {
-            setLoggedOutState(greetingEl, authBtn);
-            return;
-          }
+	function mapRoleLabelToDetails(label, info) {
+		switch (label) {
+			case 'tutor':
+				return { key: 'tutor', badge: info?.tutorFrozen ? 'TUTORS (PAUSED)' : 'TUTORS', tone: info?.tutorFrozen ? 'warning' : null };
+			case 'hybrid':
+				return { key: 'hybrid', badge: info?.tutorFrozen || info?.studentFrozen ? 'HYBRID (PAUSED)' : 'HYBRID', tone: info?.tutorFrozen || info?.studentFrozen ? 'warning' : null };
+			case 'hybrid_freeze_tutor':
+				return { key: 'hybrid', badge: 'HYBRID (TUTOR PAUSED)', tone: 'warning' };
+			case 'hybrid_freeze_student':
+				return { key: 'hybrid', badge: 'HYBRID (STUDENT PAUSED)', tone: 'warning' };
+			case 'tutor_pending':
+				return { key: 'tutor_pending', badge: 'TUTORS PENDING', tone: 'warning' };
+			default:
+				return { key: 'student', badge: info?.studentFrozen ? 'STUDENTS (PAUSED)' : 'STUDENTS', tone: info?.studentFrozen ? 'warning' : null };
+		}
+	}
 
-          const firstName = await resolveFirstName(user);
-          setLoggedInState(greetingEl, authBtn, firstName);
-        });
-      })
-      .catch(() => {
-        setLoggedOutState(greetingEl, authBtn);
-      });
-  };
+	function sanitizeHomeSlug(value) {
+		if (!value) return null;
+		const text = String(value).trim().toLowerCase();
+		if (!text) return null;
+		const cleaned = text.replace(/[^a-z0-9]+/g, '');
+		if (!cleaned) return null;
+		if (cleaned === 'pending' || cleaned === 'draft' || cleaned === 'sample' || cleaned === 'placeholder') {
+			return null;
+		}
+		return cleaned;
+	}
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', window.initializeHeader, { once: true });
-  } else {
-    window.initializeHeader();
-  }
+	function resolveHomeSlug(userDoc, tutorProfileMeta) {
+		const candidateKeys = ['homeSlug', 'homePageSlug', 'homepageSlug', 'personalSlug', 'username', 'handle', 'slug', 'profileSlug'];
+		for (const key of candidateKeys) {
+			if (userDoc && typeof userDoc[key] === 'string' && userDoc[key].trim()) {
+				const slug = sanitizeHomeSlug(userDoc[key]);
+				if (slug) return slug;
+			}
+		}
+		if (tutorProfileMeta && typeof tutorProfileMeta.slug === 'string') {
+			const slug = sanitizeHomeSlug(tutorProfileMeta.slug);
+			if (slug) return slug;
+		}
+		return null;
+	}
+
+	function buildHomePathFromSlug(slug) {
+		if (!slug) return DEFAULT_HOME_PATH;
+		const encoded = encodeURIComponent(slug);
+		return `/home/${encoded}/`;
+	}
+
+	function updateAuthRedirect(path) {
+		const nextPath = path || DEFAULT_HOME_PATH;
+		lastHomePath = nextPath;
+		if (authButton) {
+			authButton.dataset.redirectHome = nextPath;
+		}
+	}
+
+	const ADMIN_LINK = { label: 'Admin', href: '/admin.html', id: 'nav-admin', className: 'role-header__nav-link--admin' };
+
+	function cloneItem(item) {
+		const copy = Object.assign({}, item);
+		if (Array.isArray(item.children)) {
+			copy.children = item.children.map(cloneItem);
+		}
+		return copy;
+	}
+
+	function applyTutorProfileSlug(items, slug) {
+		if (!slug || !Array.isArray(items)) {
+			return;
+		}
+		items.forEach((item) => {
+			if (!item || typeof item !== 'object') {
+				return;
+			}
+			if (item.id === 'nav-tutor-profile') {
+				const sanitizedSlug = sanitizeHomeSlug(slug) || slug;
+				const homePath = buildHomePathFromSlug(sanitizedSlug);
+				item.href = homePath;
+				item.profileSlug = slug;
+				item.profileHomeSlug = sanitizedSlug;
+			}
+			if (Array.isArray(item.children)) {
+				applyTutorProfileSlug(item.children, slug);
+			}
+		});
+	}
+
+	function buildNavItems(navKey, options) {
+		const builder = NAV_BUILDERS[navKey] || NAV_BUILDERS.student;
+		const items = builder().map(cloneItem);
+		if (options && options.tutorProfileSlug) {
+			applyTutorProfileSlug(items, options.tutorProfileSlug);
+		}
+		if (options && options.isAdmin) {
+			const hasAdmin = items.some((entry) => entry.id === ADMIN_LINK.id);
+			if (!hasAdmin) {
+				items.push({ type: 'divider' });
+				items.push(cloneItem(ADMIN_LINK));
+			}
+		}
+		return items;
+	}
+
+	function createNavAnchor(item, isDropdown) {
+		const anchor = document.createElement('a');
+		anchor.className = isDropdown ? 'role-header__dropdown-link' : 'role-header__nav-link';
+		if (item.className) {
+			anchor.classList.add(item.className);
+		}
+		if (item.emphasize && !isDropdown) {
+			anchor.classList.add('role-header__nav-link--emphasis');
+		}
+		anchor.href = item.href || '#';
+		anchor.textContent = item.label || '';
+		if (item.id) {
+			anchor.id = item.id;
+		}
+		if (item.profileSlug) {
+			anchor.dataset.profileSlug = item.profileSlug;
+			const homeSlug = item.profileHomeSlug || sanitizeHomeSlug(item.profileSlug) || item.profileSlug;
+			anchor.dataset.profileRestfulHref = buildHomePathFromSlug(homeSlug);
+		}
+		return anchor;
+	}
+
+	function renderNav(items) {
+		if (!navList) return;
+		navList.innerHTML = '';
+		items.forEach((item) => {
+			if (item.type === 'divider') {
+				const divider = document.createElement('li');
+				divider.className = 'role-header__divider';
+				navList.appendChild(divider);
+				return;
+			}
+			const li = document.createElement('li');
+			li.className = 'role-header__nav-item';
+			if (item.id) {
+				li.dataset.navId = item.id;
+			}
+
+			if (Array.isArray(item.children) && item.children.length) {
+				li.dataset.dropdown = 'true';
+				const button = document.createElement('button');
+				button.type = 'button';
+				button.className = 'role-header__nav-link role-header__nav-link--toggle';
+				button.textContent = item.label || '';
+				button.setAttribute('data-dropdown-toggle', 'true');
+				button.setAttribute('aria-expanded', 'false');
+				li.appendChild(button);
+
+				const dropdown = document.createElement('ul');
+				dropdown.className = 'role-header__dropdown';
+				item.children.forEach((child) => {
+					const childLi = document.createElement('li');
+					childLi.className = 'role-header__nav-item';
+					const childAnchor = createNavAnchor(child, true);
+					childLi.appendChild(childAnchor);
+					dropdown.appendChild(childLi);
+				});
+				li.appendChild(dropdown);
+			} else {
+				const anchor = createNavAnchor(item, false);
+				li.appendChild(anchor);
+			}
+
+			navList.appendChild(li);
+		});
+		closeAllDropdowns();
+	}
+
+	function closeAllDropdowns() {
+		if (!navList) return;
+		navList.querySelectorAll('[data-dropdown="true"]').forEach((item) => {
+			item.classList.remove('is-open');
+			const toggle = item.querySelector('[data-dropdown-toggle]');
+			if (toggle) {
+				toggle.setAttribute('aria-expanded', 'false');
+			}
+		});
+	}
+
+	function handleDropdownToggle(button) {
+		const parent = button.closest('[data-dropdown="true"]');
+		if (!parent) return;
+		const isOpen = parent.classList.contains('is-open');
+		closeAllDropdowns();
+		parent.classList.toggle('is-open', !isOpen);
+		button.setAttribute('aria-expanded', String(!isOpen));
+	}
+
+	function openNav() {
+		if (!navContainer || !toggleButton) return;
+		navContainer.classList.add('is-open');
+		toggleButton.setAttribute('aria-expanded', 'true');
+	}
+
+	function closeNav() {
+		if (!navContainer || !toggleButton) return;
+		navContainer.classList.remove('is-open');
+		toggleButton.setAttribute('aria-expanded', 'false');
+	}
+
+	function setGreeting(text) {
+		if (!greetingEl) return;
+		greetingEl.textContent = text || '';
+	}
+
+	function setBadge(label, tone) {
+		if (!badgeEl) return;
+		if (!label) {
+			badgeEl.hidden = true;
+			badgeEl.textContent = '';
+			badgeEl.classList.remove('is-warning');
+			return;
+		}
+		const text = String(label).trim().toUpperCase();
+		badgeEl.hidden = false;
+		badgeEl.textContent = text;
+		badgeEl.classList.toggle('is-warning', tone === 'warning');
+	}
+
+	function setAuthButtonLoggedOut() {
+		if (!authButton) return;
+		authButton.textContent = 'LOG IN';
+		authButton.onclick = () => {
+			window.location.href = '/login.html';
+		};
+		authButton.dataset.redirectHome = DEFAULT_HOME_PATH;
+	}
+
+	function setAuthButtonLoggedIn() {
+		if (!authButton) return;
+		authButton.textContent = 'LOG OUT';
+		authButton.onclick = async () => {
+			try {
+				if (window.firebaseSignOut && window.firebaseAuth) {
+					await window.firebaseSignOut(window.firebaseAuth);
+				}
+			} catch (error) {
+				console.warn('Header sign-out failed', error);
+			} finally {
+				const redirectTarget = authButton.dataset.redirectHome || lastHomePath || DEFAULT_HOME_PATH;
+				window.location.href = redirectTarget;
+			}
+		};
+	}
+
+	function setGuestState() {
+		setGreeting('');
+		setBadge('');
+		setAuthButtonLoggedOut();
+		renderNav(buildNavItems('guest', { isAdmin: false }));
+		headerEl.dataset.roleState = 'guest';
+		updateBrandLink('guest');
+		closeNav();
+	}
+
+	function waitForFirebase(timeoutMs) {
+		return new Promise((resolve, reject) => {
+			const start = Date.now();
+			function check() {
+				if (window.firebaseAuth && window.firebaseOnAuth) {
+					resolve();
+					return;
+				}
+				if (Date.now() - start >= timeoutMs) {
+					reject(new Error('Firebase not available'));
+					return;
+				}
+				setTimeout(check, 50);
+			}
+			check();
+		});
+	}
+
+	function waitForRoleUtils(timeoutMs) {
+		return new Promise((resolve, reject) => {
+			if (window.RoleUtils) {
+				resolve(window.RoleUtils);
+				return;
+			}
+			const start = Date.now();
+			function check() {
+				if (window.RoleUtils) {
+					resolve(window.RoleUtils);
+					return;
+				}
+				if (Date.now() - start >= timeoutMs) {
+					reject(new Error('Role utils not available'));
+					return;
+				}
+				setTimeout(check, 50);
+			}
+			check();
+		});
+	}
+
+	async function loadUserDocument(user) {
+		const db = window.firebaseDb;
+		const docFn = window.firestoreDoc;
+		const getDocFn = window.firestoreGetDoc;
+		if (!db || !docFn || !getDocFn) {
+			return null;
+		}
+		try {
+			const ref = docFn(db, 'users', user.uid);
+			const snapshot = await getDocFn(ref);
+			if (snapshot && snapshot.exists()) {
+				return snapshot.data();
+			}
+		} catch (error) {
+			console.warn('Header: failed to load user profile', error);
+		}
+		return null;
+	}
+
+	async function loadTutorProfileMeta(user, userDoc) {
+		const db = window.firebaseDb;
+		const docFn = window.firestoreDoc;
+		const getDocFn = window.firestoreGetDoc;
+		const collectionFn = window.firestoreCollection;
+		const whereFn = window.firestoreWhere;
+		const queryFn = window.firestoreQuery;
+		const getDocsFn = window.firestoreGetDocs;
+		if (!db || !docFn || !getDocFn || !collectionFn || !whereFn || !queryFn || !getDocsFn) {
+			return null;
+		}
+		const profileId = userDoc?.tutorProfileId;
+		try {
+			if (profileId) {
+				const profileRef = docFn(db, 'tutorProfiles', profileId);
+				const profileSnap = await getDocFn(profileRef);
+				if (profileSnap && profileSnap.exists()) {
+					const data = profileSnap.data() || {};
+					return { id: profileSnap.id, slug: data.slug || null };
+				}
+			}
+			const userId = user?.uid || userDoc?.uid;
+			if (!userId) {
+				return null;
+			}
+			const profileQuery = queryFn(collectionFn(db, 'tutorProfiles'), whereFn('userId', '==', userId));
+			const snapshot = await getDocsFn(profileQuery);
+			const docSnap = snapshot.docs && snapshot.docs[0];
+			if (docSnap) {
+				const data = docSnap.data() || {};
+				return { id: docSnap.id, slug: data.slug || null };
+			}
+		} catch (error) {
+			console.warn('Header: failed to load tutor profile metadata', error);
+		}
+		return null;
+	}
+
+	function toFirstName(value) {
+		if (!value) return '';
+		const text = String(value).trim();
+		if (!text) return '';
+		const parts = text.split(/\s+/);
+		if (!parts.length) return '';
+		const first = parts[0];
+		if (!first) return '';
+		return first.charAt(0).toUpperCase() + first.slice(1);
+	}
+
+	function resolveFirstName(userDoc, user) {
+		const fromDoc = toFirstName(userDoc && (userDoc.firstName || userDoc.fullName));
+		if (fromDoc) {
+			return fromDoc;
+		}
+		const fromProfile = toFirstName(user && user.displayName);
+		if (fromProfile) {
+			return fromProfile;
+		}
+		if (user && user.email) {
+			const localPart = user.email.split('@')[0].replace(/[._]/g, ' ');
+			const fromEmail = toFirstName(localPart);
+			if (fromEmail) {
+				return fromEmail;
+			}
+		}
+		return '';
+	}
+
+	function addCandidateEmail(target, value) {
+		if (!target || typeof target.add !== 'function') {
+			return;
+		}
+		if (typeof value !== 'string') {
+			return;
+		}
+		const trimmed = value.trim();
+		if (!trimmed || !trimmed.includes('@')) {
+			return;
+		}
+		target.add(trimmed.toLowerCase());
+	}
+
+	function addCandidateUid(target, value) {
+		if (!target || typeof target.add !== 'function' || value == null) {
+			return;
+		}
+		const text = String(value).trim();
+		if (text) {
+			target.add(text);
+		}
+	}
+
+	function isAdminUser(userDoc, authUser) {
+		const uidCandidates = new Set();
+		addCandidateUid(uidCandidates, authUser && authUser.uid);
+		addCandidateUid(uidCandidates, userDoc && userDoc.uid);
+		addCandidateUid(uidCandidates, userDoc && userDoc.id);
+
+		for (const uid of uidCandidates) {
+			if (ADMIN_UID_ALLOWLIST.has(uid)) {
+				return true;
+			}
+		}
+
+		const emailCandidates = new Set();
+		addCandidateEmail(emailCandidates, authUser && authUser.email);
+		addCandidateEmail(emailCandidates, userDoc && userDoc.email);
+		addCandidateEmail(emailCandidates, userDoc && userDoc.primaryEmail);
+		addCandidateEmail(emailCandidates, userDoc && userDoc.contactEmail);
+
+		if (userDoc && Array.isArray(userDoc.emails)) {
+			userDoc.emails.forEach((email) => addCandidateEmail(emailCandidates, email));
+		}
+
+		if (userDoc && userDoc.contact && typeof userDoc.contact === 'object') {
+			Object.values(userDoc.contact).forEach((value) => addCandidateEmail(emailCandidates, value));
+		}
+
+		for (const email of emailCandidates) {
+			if (ADMIN_EMAIL_ALLOWLIST.has(email)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	function deriveRoleDetails(roleUtils, userDoc) {
+		const docState = deriveRoleDetailsFromDoc(userDoc);
+		let utilsState = null;
+		if (roleUtils && userDoc) {
+			try {
+				const info = roleUtils.normalizeRoleInfo(userDoc);
+				const label = roleUtils.getRoleStateLabel(info);
+				utilsState = mapRoleLabelToDetails(label, info);
+			} catch (error) {
+				console.warn('Header: failed to interpret role via RoleUtils', error);
+			}
+		}
+		const best = pickBetterRole(utilsState, docState) || utilsState || docState;
+		return best || { key: 'student', badge: 'STUDENTS', tone: null };
+	}
+
+	function renderAuthenticated(state) {
+		setAuthButtonLoggedIn();
+		const greeting = state.firstName ? `Hi ${state.firstName}` : 'Hi there';
+		setGreeting(greeting);
+		setBadge(state.badge, state.tone);
+		renderNav(buildNavItems(state.key, { isAdmin: state.isAdmin, tutorProfileSlug: state.tutorProfileSlug }));
+		headerEl.dataset.roleState = state.key || 'student';
+		updateBrandLink(state.key || 'student');
+		updateAuthRedirect(state.homePath || DEFAULT_HOME_PATH);
+		closeNav();
+	}
+
+	function initialize() {
+		if (headerEl.dataset.ready === 'true') return;
+		headerEl.dataset.ready = 'true';
+
+		if (toggleButton) {
+			toggleButton.addEventListener('click', () => {
+				const expanded = toggleButton.getAttribute('aria-expanded') === 'true';
+				if (expanded) {
+					closeNav();
+				} else {
+					openNav();
+				}
+			});
+		}
+
+		if (navList) {
+			navList.addEventListener('click', (event) => {
+				const toggle = event.target.closest('[data-dropdown-toggle]');
+				if (toggle) {
+					event.preventDefault();
+					handleDropdownToggle(toggle);
+					return;
+				}
+				const anchor = event.target.closest('a');
+				if (anchor) {
+					closeAllDropdowns();
+					closeNav();
+				}
+			});
+		}
+
+		document.addEventListener('click', (event) => {
+			if (!headerEl.contains(event.target)) {
+				closeAllDropdowns();
+				closeNav();
+			}
+		});
+
+		document.addEventListener('keydown', (event) => {
+			if (event.key === 'Escape') {
+				closeAllDropdowns();
+				closeNav();
+			}
+		});
+
+		window.addEventListener('resize', () => {
+			if (window.innerWidth > 900) {
+				closeNav();
+			}
+		});
+
+		setGuestState();
+
+		waitForFirebase(10000)
+			.then(() => {
+				const auth = window.firebaseAuth;
+				const onAuth = window.firebaseOnAuth;
+				if (!auth || !onAuth) {
+					return;
+				}
+				onAuth(auth, async (user) => {
+					if (!user) {
+						activeUserUid = null;
+						setGuestState();
+						return;
+					}
+					activeUserUid = user.uid;
+					const cachedState = readCachedState(user.uid);
+					if (cachedState) {
+						renderAuthenticated(cachedState);
+					} else {
+						renderAuthenticated({
+							uid: user.uid,
+							firstName: resolveFirstName(null, user),
+							key: 'student',
+							badge: 'STUDENTS',
+							tone: null,
+							isAdmin: false,
+							tutorProfileSlug: null,
+							homeSlug: null,
+							homePath: DEFAULT_HOME_PATH
+						});
+					}
+					try {
+						const userDoc = await loadUserDocument(user);
+						const [roleUtils, tutorProfileMeta] = await Promise.all([
+							waitForRoleUtils(5000).catch(() => null),
+							loadTutorProfileMeta(user, userDoc).catch(() => null)
+						]);
+						const firstName = resolveFirstName(userDoc, user) || cachedState?.firstName || resolveFirstName(null, user);
+						const roleState = deriveRoleDetails(roleUtils, userDoc || {});
+						const isAdmin = isAdminUser(userDoc, user);
+						const homeSlug = resolveHomeSlug(userDoc, tutorProfileMeta);
+						const homePath = buildHomePathFromSlug(homeSlug);
+						const computedState = {
+							uid: user.uid,
+							firstName,
+							key: roleState.key,
+							badge: roleState.badge,
+							tone: roleState.tone,
+							isAdmin,
+							tutorProfileSlug: tutorProfileMeta?.slug || null,
+							homeSlug,
+							homePath
+						};
+						renderAuthenticated(computedState);
+						writeCachedState(user.uid, computedState);
+					} catch (error) {
+						console.warn('Header: failed to finalize authenticated state', error);
+					}
+				});
+			})
+			.catch(() => {
+				setGuestState();
+			});
+	}
+
+	window.initializeHeader = initialize;
+	window.initializeRoleHeader = initialize;
+
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', initialize, { once: true });
+	} else {
+		initialize();
+	}
 })();
 </script>

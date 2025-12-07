@@ -5,7 +5,7 @@
 
   const PAGE_ID = document.body?.dataset?.pageId || "default";
   const EDITABLE_SELECTOR = "[data-editable-block]";
-  const SUPPORTED_PAGES = new Set(["index", "book-session"]);
+  const SUPPORTED_PAGES = new Set(["home", "book"]);
   const FONT_SIZE_OPTIONS = [
     { key: "normal", label: "Normal", size: "inherit" },
     { key: "small", label: "Small", size: "0.9em" },

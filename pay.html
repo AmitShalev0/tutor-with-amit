@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tutoring Checkout</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .checkout-shell {
+      max-width: 480px;
+      margin: 64px auto;
+      padding: 32px;
+      background: #0f172a;
+      border-radius: 20px;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.35);
+      color: #e2e8f0;
+    }
+    .checkout-shell h1 {
+      margin-bottom: 0.5rem;
+      font-size: 1.8rem;
+    }
+    #payment-element {
+      margin-top: 24px;
+    }
+    #payment-message {
+      margin-top: 16px;
+      font-size: 0.95rem;
+      color: #f8fafc;
+    }
+    #submit-button {
+      margin-top: 28px;
+      width: 100%;
+      position: relative;
+    }
+    #spinner {
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 3px solid rgba(148, 163, 184, 0.3);
+      border-top-color: #38bdf8;
+      animation: spin 0.75s linear infinite;
+      display: none;
+    }
+    @keyframes spin {
+      from { transform: translateY(-50%) rotate(0deg); }
+      to { transform: translateY(-50%) rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div id="site-header"></div>
+  <script src="header-loader.js"></script>
+
+  <main class="checkout-shell">
+    <h1>Complete Your Booking</h1>
+    <p id="booking-summary">Preparing checkout…</p>
+    <form id="payment-form">
+      <div id="payment-element"><!-- Stripe injects UI here --></div>
+      <button id="submit-button" class="btn primary" type="submit">
+        <span id="submit-text">Pay now</span>
+        <span id="spinner"></span>
+      </button>
+      <p id="payment-message" hidden></p>
+    </form>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>© <span id="year"></span> Amit Tutoring · <a href="contact.html">Contact me</a></p>
+    </div>
+    <script src="main.js"></script>
+  </footer>
+
+  <script src="https://js.stripe.com/v3/"></script>
+  <script type="module">
+    import { firebaseAuth, firebaseOnAuth, firebaseFunctionsBase } from './firebase-auth-shim.js';
+
+    const params = new URLSearchParams(window.location.search);
+    const bookingId = params.get('bookingId');
+    const amountCents = Number(params.get('amountCents')) || 0;
+    const currency = params.get('currency') || 'cad';
+    const tutorUid = params.get('tutorUid');
+
+    const bookingSummary = document.getElementById('booking-summary');
+    bookingSummary.textContent = amountCents
+      ? `Total due: ${(amountCents / 100).toFixed(2)} ${currency.toUpperCase()}`
+      : 'Confirm the amount with your advisor.';
+
+    const publishableKey = await fetch('/config/stripe-publishable-key.json')
+      .then((res) => res.json())
+      .then((json) => json.publishableKey);
+
+    if (!publishableKey) {
+      bookingSummary.textContent = 'Stripe publishable key not configured.';
+      throw new Error('Missing publishable key');
+    }
+
+    const stripe = Stripe(publishableKey, {
+      betas: ['payment_element_beta_2']
+    });
+
+    const projectId = 'tutordesk-3cafb';
+    const defaultFunctionsBase = `https://us-central1-${projectId}.cloudfunctions.net`;
+    const functionsBase = firebaseFunctionsBase || defaultFunctionsBase;
+    let elements;
+
+    firebaseOnAuth(firebaseAuth, async (user) => {
+      if (!user) {
+        window.location.href = `/login.html?redirect=${encodeURIComponent(window.location.href)}`;
+        return;
+      }
+
+      const token = await user.getIdToken();
+      const response = await fetch(`${functionsBase}/createPaymentIntent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          bookingId,
+          studentUid: user.uid,
+          tutorUid,
+          amountCents,
+          currency,
+          platformFeePercent: 10
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create payment intent: ${errorText}`);
+      }
+
+      const { clientSecret } = await response.json();
+      elements = stripe.elements({ clientSecret });
+      const paymentElement = elements.create('payment');
+      paymentElement.mount('#payment-element');
+    });
+
+    const form = document.getElementById('payment-form');
+    const submitButton = document.getElementById('submit-button');
+    const submitText = document.getElementById('submit-text');
+    const spinner = document.getElementById('spinner');
+    const message = document.getElementById('payment-message');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!elements) return;
+      toggleLoading(true);
+      const { error } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/payment-success.html?bookingId=${encodeURIComponent(bookingId || '')}`
+        }
+      });
+      if (error) {
+        message.hidden = false;
+        message.textContent = error.message || 'Unable to confirm payment.';
+        toggleLoading(false);
+      }
+    });
+
+    function toggleLoading(isLoading) {
+      submitButton.disabled = isLoading;
+      spinner.style.display = isLoading ? 'block' : 'none';
+      submitText.textContent = isLoading ? 'Processing…' : 'Pay now';
+    }
+  </script>
+</body>
+</html>
