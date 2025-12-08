@@ -328,33 +328,103 @@
         <div class="divider"></div>
 
         <div class="edit-grid" id="edit-availability-grid">
-          <div class="input-group">
-            <label for="avail-mon">Monday availability</label>
-            <textarea id="avail-mon" data-day="0" placeholder="09:00-12:00, 13:00-15:00"></textarea>
+          <div class="input-group availability-row" data-day="0">
+            <label>Monday availability</label>
+            <div class="field-row">
+              <div class="input-group compact" style="flex:1; min-width:140px;">
+                <label class="muted-note">Start</label>
+                <input type="time" data-role="start" step="900" />
+              </div>
+              <div class="input-group compact" style="flex:1; min-width:140px;">
+                <label class="muted-note">End</label>
+                <input type="time" data-role="end" step="900" />
+              </div>
+            </div>
+            <p class="helper-text">Leave blank if not available.</p>
           </div>
-          <div class="input-group">
-            <label for="avail-tue">Tuesday availability</label>
-            <textarea id="avail-tue" data-day="1" placeholder="09:00-12:00, 13:00-15:00"></textarea>
+          <div class="input-group availability-row" data-day="1">
+            <label>Tuesday availability</label>
+            <div class="field-row">
+              <div class="input-group compact" style="flex:1; min-width:140px;">
+                <label class="muted-note">Start</label>
+                <input type="time" data-role="start" step="900" />
+              </div>
+              <div class="input-group compact" style="flex:1; min-width:140px;">
+                <label class="muted-note">End</label>
+                <input type="time" data-role="end" step="900" />
+              </div>
+            </div>
+            <p class="helper-text">Leave blank if not available.</p>
           </div>
-          <div class="input-group">
-            <label for="avail-wed">Wednesday availability</label>
-            <textarea id="avail-wed" data-day="2" placeholder="09:00-12:00, 13:00-15:00"></textarea>
+          <div class="input-group availability-row" data-day="2">
+            <label>Wednesday availability</label>
+            <div class="field-row">
+              <div class="input-group compact" style="flex:1; min-width:140px;">
+                <label class="muted-note">Start</label>
+                <input type="time" data-role="start" step="900" />
+              </div>
+              <div class="input-group compact" style="flex:1; min-width:140px;">
+                <label class="muted-note">End</label>
+                <input type="time" data-role="end" step="900" />
+              </div>
+            </div>
+            <p class="helper-text">Leave blank if not available.</p>
           </div>
-          <div class="input-group">
-            <label for="avail-thu">Thursday availability</label>
-            <textarea id="avail-thu" data-day="3" placeholder="09:00-12:00, 13:00-15:00"></textarea>
+          <div class="input-group availability-row" data-day="3">
+            <label>Thursday availability</label>
+            <div class="field-row">
+              <div class="input-group compact" style="flex:1; min-width:140px;">
+                <label class="muted-note">Start</label>
+                <input type="time" data-role="start" step="900" />
+              </div>
+              <div class="input-group compact" style="flex:1; min-width:140px;">
+                <label class="muted-note">End</label>
+                <input type="time" data-role="end" step="900" />
+              </div>
+            </div>
+            <p class="helper-text">Leave blank if not available.</p>
           </div>
-          <div class="input-group">
-            <label for="avail-fri">Friday availability</label>
-            <textarea id="avail-fri" data-day="4" placeholder="09:00-12:00, 13:00-15:00"></textarea>
+          <div class="input-group availability-row" data-day="4">
+            <label>Friday availability</label>
+            <div class="field-row">
+              <div class="input-group compact" style="flex:1; min-width:140px;">
+                <label class="muted-note">Start</label>
+                <input type="time" data-role="start" step="900" />
+              </div>
+              <div class="input-group compact" style="flex:1; min-width:140px;">
+                <label class="muted-note">End</label>
+                <input type="time" data-role="end" step="900" />
+              </div>
+            </div>
+            <p class="helper-text">Leave blank if not available.</p>
           </div>
-          <div class="input-group">
-            <label for="avail-sat">Saturday availability</label>
-            <textarea id="avail-sat" data-day="5" placeholder="10:00-14:00"></textarea>
+          <div class="input-group availability-row" data-day="5">
+            <label>Saturday availability</label>
+            <div class="field-row">
+              <div class="input-group compact" style="flex:1; min-width:140px;">
+                <label class="muted-note">Start</label>
+                <input type="time" data-role="start" step="900" />
+              </div>
+              <div class="input-group compact" style="flex:1; min-width:140px;">
+                <label class="muted-note">End</label>
+                <input type="time" data-role="end" step="900" />
+              </div>
+            </div>
+            <p class="helper-text">Leave blank if not available.</p>
           </div>
-          <div class="input-group">
-            <label for="avail-sun">Sunday availability</label>
-            <textarea id="avail-sun" data-day="6" placeholder=""></textarea>
+          <div class="input-group availability-row" data-day="6">
+            <label>Sunday availability</label>
+            <div class="field-row">
+              <div class="input-group compact" style="flex:1; min-width:140px;">
+                <label class="muted-note">Start</label>
+                <input type="time" data-role="start" step="900" />
+              </div>
+              <div class="input-group compact" style="flex:1; min-width:140px;">
+                <label class="muted-note">End</label>
+                <input type="time" data-role="end" step="900" />
+              </div>
+            </div>
+            <p class="helper-text">Leave blank if not available.</p>
           </div>
         </div>
 
@@ -501,7 +571,14 @@
       courses: document.getElementById('edit-courses')
     };
 
-    const availabilityInputs = Array.from(document.querySelectorAll('#edit-availability-grid textarea'));
+    const availabilityInputs = Array.from(document.querySelectorAll('#edit-availability-grid .availability-row')).map((row) => {
+      return {
+        dayKey: row.dataset.day,
+        start: row.querySelector('input[data-role="start"]'),
+        end: row.querySelector('input[data-role="end"]'),
+        label: row.querySelector('label')?.textContent?.replace(' availability', '') || ''
+      };
+    }).filter((entry) => entry.dayKey != null);
     const calendarDayCheckboxes = Array.from(document.querySelectorAll('#edit-calendar-days input[type="checkbox"]'));
 
     const fieldEls = {
@@ -748,13 +825,6 @@
       return match === -1 ? null : String(match);
     }
 
-    function formatAvailabilityForInput(slots = []) {
-      if (!Array.isArray(slots) || !slots.length) {
-        return '';
-      }
-      return slots.map((slot) => `${slot.start}-${slot.end}`).join(', ');
-    }
-
     function formatHourForTimeInput(hour) {
       const numeric = coerceHour(hour, 8);
       const clamped = Math.max(0, Math.min(23, Math.floor(numeric)));
@@ -768,30 +838,6 @@
     function cloneAvailabilityTemplate(base = DEFAULT_BOOKING_SETTINGS.availability) {
       const template = base || DEFAULT_BOOKING_SETTINGS.availability;
       return JSON.parse(JSON.stringify(template));
-    }
-
-    function parseAvailabilityInputValue(value) {
-      if (typeof value !== 'string') {
-        return [];
-      }
-      const parts = value.split(',').map((part) => part.trim()).filter(Boolean);
-      if (!parts.length) {
-        return [];
-      }
-      const slots = [];
-      for (const part of parts) {
-        const [rawStart, rawEnd] = part.split('-').map((p) => p.trim());
-        const start = normalizeTimeString(rawStart);
-        const end = normalizeTimeString(rawEnd);
-        if (!start || !end) {
-          throw new Error(`Invalid time range "${part}". Use HH:MM-HH:MM.`);
-        }
-        if (end <= start) {
-          throw new Error(`End time must be later than start time for "${part}".`);
-        }
-        slots.push({ start, end });
-      }
-      return slots;
     }
 
     function normalizeBookingSettings(raw = {}, baseDefaults = DEFAULT_BOOKING_SETTINGS) {
@@ -1047,23 +1093,33 @@
         });
       }
 
-      availabilityInputs.forEach((textarea) => {
-        const dayKey = textarea.dataset.day;
-        const slots = safe.availability?.[dayKey] || [];
-        textarea.value = formatAvailabilityForInput(slots);
+      availabilityInputs.forEach((entry) => {
+        const slots = safe.availability?.[entry.dayKey] || [];
+        const first = Array.isArray(slots) && slots.length ? slots[0] : null;
+        entry.start.value = first?.start || '';
+        entry.end.value = first?.end || '';
       });
     }
 
     function buildAvailabilityPayload() {
       const payload = cloneAvailabilityTemplate();
-      availabilityInputs.forEach((textarea) => {
-        const dayKey = textarea.dataset.day;
-        const value = (textarea.value || '').trim();
-        if (!value) {
-          payload[dayKey] = [];
+      availabilityInputs.forEach((entry) => {
+        const start = normalizeTimeString(entry.start.value || '');
+        const end = normalizeTimeString(entry.end.value || '');
+
+        if (!start && !end) {
+          payload[entry.dayKey] = [];
           return;
         }
-        payload[dayKey] = parseAvailabilityInputValue(value);
+
+        if (!start || !end) {
+          throw new Error(`Please enter both start and end times for ${entry.label || 'this day'}, or leave both blank.`);
+        }
+        if (end <= start) {
+          throw new Error(`End time must be later than start time for ${entry.label || 'this day'}.`);
+        }
+
+        payload[entry.dayKey] = [{ start, end }];
       });
       return payload;
     }
