@@ -42,8 +42,8 @@ import {
 const firebaseConfig = {
   apiKey: "AIzaSyCaGn37wfc76LOCg5UejFG4GswxQZNNEUA",
   authDomain: "tutordesk-3cafb.firebaseapp.com",
-  projectId: "tutordesk-3cafb",
-    storageBucket: "tutordesk-3cafb.appspot.com",
+    projectId: "tutordesk-3cafb",
+        storageBucket: "tutordesk-3cafb.firebasestorage.app",
   messagingSenderId: "356804623998",
   appId: "1:356804623998:web:3587313df2c513d02ee22f",
   measurementId: "G-4LHV6QPX9J"
