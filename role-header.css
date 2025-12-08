@@ -211,7 +211,12 @@
 }
 
 .role-header__auth {
+  /* Compact pill button so logout stays subtle */
   white-space: nowrap;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  line-height: 1.2;
 }
 
 .role-header__auth.btn.secondary {

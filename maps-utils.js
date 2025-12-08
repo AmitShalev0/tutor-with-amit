@@ -1,5 +1,29 @@
 let mapsLoaderPromise = null;
 
+async function fetchMapsConfigWithFallback() {
+  const endpoints = [
+    '/config/google-maps-key.json',
+    '/config/google-maps-key.example.json'
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Config request failed (${response.status})`);
+      }
+      const json = await response.json();
+      if (json && json.apiKey) {
+        return json.apiKey;
+      }
+    } catch (error) {
+      console.warn(`[maps-utils] Unable to load config from ${url}:`, error.message);
+    }
+  }
+
+  throw new Error('Unable to read Google Maps key configuration.');
+}
+
 function injectGoogleMapsScript(apiKey, params = {}) {
   return new Promise((resolve, reject) => {
     if (!apiKey) {
@@ -41,17 +65,8 @@ export function loadGoogleMapsApi(options = {}) {
   }
 
   if (!mapsLoaderPromise) {
-    mapsLoaderPromise = fetch('/config/google-maps-key.json', { cache: 'no-store' })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error('Unable to read Google Maps key configuration.');
-        }
-        const { apiKey } = await response.json();
-        if (!apiKey) {
-          throw new Error('Google Maps apiKey not found in configuration file.');
-        }
-        return injectGoogleMapsScript(apiKey, options);
-      });
+    mapsLoaderPromise = fetchMapsConfigWithFallback()
+      .then((apiKey) => injectGoogleMapsScript(apiKey, options));
   }
 
   return mapsLoaderPromise;

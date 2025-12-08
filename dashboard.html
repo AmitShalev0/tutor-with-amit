@@ -9,24 +9,35 @@
     .dashboard-header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
+      gap: 1rem;
       margin-bottom: 2rem;
+    }
+    .dashboard-header-actions {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
     }
     .welcome-text {
       font-size: 1.8rem;
       font-weight: 600;
     }
-    .logout-btn {
-      padding: 0.5rem 1rem;
-      background: transparent;
+    .dashboard-view-toggle {
+      display: none;
+      padding: 0.45rem 0.9rem;
+      border-radius: 999px;
       border: 1px solid #4b5563;
-      color: #e5e7eb;
-      border-radius: 0.4rem;
+      background: rgba(59, 130, 246, 0.15);
+      color: #bfdbfe;
+      font-size: 0.85rem;
+      font-weight: 600;
       cursor: pointer;
-      font-size: 0.9rem;
+      transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
     }
-    .logout-btn:hover {
-      background: #1f2937;
+    .dashboard-view-toggle:hover {
+      background: rgba(59, 130, 246, 0.3);
+      border-color: #60a5fa;
+      color: #e0f2fe;
     }
     .dashboard-grid {
       display: grid;
@@ -106,6 +117,13 @@
       gap: 1rem;
       flex-wrap: wrap;
     }
+    .students-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
     .info-item {
       margin-bottom: 0.5rem;
       font-size: 0.95rem;
@@ -166,6 +184,36 @@
       font-size: 0.9rem;
       color: #9ca3af;
     }
+    #dashboard-content.dashboard-flip {
+      animation: dashboardFlip 0.6s ease both;
+    }
+    @keyframes dashboardFlip {
+      0% {
+        transform: perspective(1200px) rotateY(0deg);
+        opacity: 1;
+      }
+      50% {
+        transform: perspective(1200px) rotateY(-90deg);
+        opacity: 0;
+      }
+      100% {
+        transform: perspective(1200px) rotateY(0deg);
+        opacity: 1;
+      }
+    }
+    @media (max-width: 768px) {
+      body[data-dashboard-hybrid="true"] .dashboard-view-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      body[data-dashboard-hybrid="true"][data-dashboard-view="tutor"] [data-dashboard-section="student"] {
+        display: none !important;
+      }
+      body[data-dashboard-hybrid="true"][data-dashboard-view="student"] [data-dashboard-section="tutor"] {
+        display: none !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -175,7 +223,9 @@
 <main class="container">
   <div class="dashboard-header">
     <h2 class="welcome-text">Welcome,<br> <span id="user-name">...</span>!</h2>
-    <button id="logout-btn" class="logout-btn">Log Out</button>
+    <div class="dashboard-header-actions">
+      <button class="dashboard-view-toggle" id="dashboard-view-toggle" type="button" hidden>Student Page -&gt;</button>
+    </div>
   </div>
 
   <div id="loading" class="loading">Loading your dashboard...</div>
@@ -183,7 +233,7 @@
   <div id="dashboard-content" class="hidden-content">
     <div class="dashboard-grid">
       <!-- My Profile Card -->
-      <div class="dashboard-card">
+      <div class="dashboard-card" data-dashboard-section="shared">
         <h3 id="profile-heading">My Profile</h3>
         <div id="profile-info">
           <div class="info-item">
@@ -201,22 +251,19 @@
       </div>
 
       <!-- Quick Actions Card -->
-      <div class="dashboard-card">
+      <div class="dashboard-card" data-dashboard-section="student">
         <h3>Quick Actions</h3>
         <div class="quick-actions">
           <button class="btn primary" onclick="window.location.href='add-student.html'">
             + Add Student
           </button>
           <button class="btn primary" onclick="window.location.href='book.html'">
-            📅 Book Session
-          </button>
-          <button class="btn secondary" id="home-link-btn" type="button">
-            Visit My Home Page
+            📅 Book Sessions
           </button>
         </div>
       </div>
 
-      <div class="dashboard-card" id="favorite-tutors-card">
+      <div class="dashboard-card" id="favorite-tutors-card" data-dashboard-section="student">
         <h3>My Favourite Tutors</h3>
         <div id="favorite-tutors-content">
           <p class="empty-favorites">
@@ -226,7 +273,7 @@
       </div>
 
         <!-- Tutor Snapshot Card -->
-        <div class="dashboard-card hidden-card" id="tutor-card">
+        <div class="dashboard-card hidden-card" id="tutor-card" data-dashboard-section="tutor">
           <h3>Your Tutor Hub</h3>
           <p id="tutor-card-message" class="info-item">Set up your tutor profile so families can find you.</p>
           <div id="tutor-card-details" class="hidden-card">
@@ -247,8 +294,8 @@
     </div>
 
     <!-- My Students Section -->
-    <div class="dashboard-card">
-      <!-- <div class="flex-between mb-1"> -->
+    <div class="dashboard-card" data-dashboard-section="student">
+      <div class="students-header">
         <h3 class="m-0">My Students</h3>
         <button class="btn primary" onclick="window.location.href='add-student.html'">+ Add Student</button>
       </div>
@@ -297,7 +344,6 @@
   const profileEmailEl = document.getElementById("profile-email");
   const profilePhoneEl = document.getElementById("profile-phone");
   const studentsContainer = document.getElementById("students-container");
-  const logoutBtn = document.getElementById("logout-btn");
   const tutorCardEl = document.getElementById("tutor-card");
   const tutorCardMessageEl = document.getElementById("tutor-card-message");
   const tutorCardDetailsEl = document.getElementById("tutor-card-details");
@@ -305,13 +351,90 @@
   const tutorLinkDisplayEl = document.getElementById("tutor-link-display");
   const copyTutorLinkBtn = document.getElementById("copy-tutor-link");
   const homeLinkBtn = document.getElementById("home-link-btn");
+  const dashboardViewToggleBtn = document.getElementById("dashboard-view-toggle");
+  const hybridViewportQuery = typeof window !== "undefined" && window.matchMedia
+    ? window.matchMedia("(max-width: 768px)")
+    : null;
   const favoriteTutorsContainer = document.getElementById("favorite-tutors-content");
   const DEFAULT_HOME_PATH = "/home/amitshalev/";
 
   let currentUser = null;
   let tutorProfileData = null;
+  let hybridAccountEnabled = false;
 
   window.__latestUserData = window.__latestUserData || null;
+
+  function updateHybridToggleLabel() {
+    if (!dashboardViewToggleBtn) {
+      return;
+    }
+    const isMobileHybrid = hybridAccountEnabled && hybridViewportQuery && hybridViewportQuery.matches;
+    if (!isMobileHybrid) {
+      dashboardViewToggleBtn.hidden = true;
+      return;
+    }
+    dashboardViewToggleBtn.hidden = false;
+    const currentView = document.body.dataset.dashboardView === "student" ? "student" : "tutor";
+    dashboardViewToggleBtn.textContent = currentView === "tutor" ? "Student Page ->" : "Tutor Page ->";
+  }
+
+  function handleHybridViewportChange() {
+    if (!hybridAccountEnabled) {
+      return;
+    }
+    if (hybridViewportQuery && hybridViewportQuery.matches) {
+      document.body.dataset.dashboardHybrid = "true";
+    } else {
+      delete document.body.dataset.dashboardHybrid;
+    }
+    updateHybridToggleLabel();
+  }
+
+  function setHybridAccountState(enabled) {
+    hybridAccountEnabled = enabled;
+    if (!enabled) {
+      delete document.body.dataset.dashboardHybrid;
+      delete document.body.dataset.dashboardView;
+      updateHybridToggleLabel();
+      return;
+    }
+    if (!document.body.dataset.dashboardView) {
+      document.body.dataset.dashboardView = "tutor";
+    }
+    handleHybridViewportChange();
+  }
+
+  function triggerHybridFlip() {
+    if (!contentEl) {
+      return;
+    }
+    contentEl.classList.remove("dashboard-flip");
+    // Force reflow so the animation can replay
+    void contentEl.offsetWidth;
+    contentEl.classList.add("dashboard-flip");
+  }
+
+  if (dashboardViewToggleBtn) {
+    dashboardViewToggleBtn.addEventListener("click", () => {
+      if (!hybridAccountEnabled) {
+        return;
+      }
+      const currentView = document.body.dataset.dashboardView === "student" ? "student" : "tutor";
+      const nextView = currentView === "tutor" ? "student" : "tutor";
+      document.body.dataset.dashboardView = nextView;
+      updateHybridToggleLabel();
+      triggerHybridFlip();
+    });
+  }
+
+  if (hybridViewportQuery) {
+    const viewportListener = () => handleHybridViewportChange();
+    if (typeof hybridViewportQuery.addEventListener === "function") {
+      hybridViewportQuery.addEventListener("change", viewportListener);
+    } else if (typeof hybridViewportQuery.addListener === "function") {
+      hybridViewportQuery.addListener(viewportListener);
+    }
+  }
 
   // Check authentication
   onAuth(auth, async (user) => {
@@ -323,17 +446,6 @@
 
     currentUser = user;
     await loadDashboard(user);
-  });
-
-  // Logout handler
-  logoutBtn.addEventListener("click", async () => {
-    try {
-      await signOut(auth);
-      window.location.href = "login.html";
-    } catch (err) {
-      console.error("Logout error:", err);
-      alert("Failed to log out. Please try again.");
-    }
   });
 
   async function loadDashboard(user) {
@@ -361,6 +473,8 @@
       profilePhoneEl.textContent = userData.phone || "Not provided";
 
       const hasTutorRole = !!(userData?.roles?.tutor);
+      const hasStudentRole = !!(userData?.roles?.student);
+      setHybridAccountState(hasTutorRole && hasStudentRole);
       if (hasTutorRole) {
         await loadTutorSummary(userData);
       } else if (tutorCardEl) {
@@ -602,6 +716,11 @@
         viewBtn.className = 'btn secondary';
         viewBtn.textContent = 'View Profile';
         viewBtn.addEventListener('click', () => {
+          const homeSlug = resolveHomeSlugFromSources(null, tutor);
+          if (homeSlug) {
+            window.location.href = `/home/${encodeURIComponent(homeSlug)}/`;
+            return;
+          }
           const slug = tutor.slug ? String(tutor.slug).trim() : '';
           const target = slug ? `tutor-profile.html?slug=${encodeURIComponent(slug)}` : 'tutor-profile.html';
           window.location.href = target;
