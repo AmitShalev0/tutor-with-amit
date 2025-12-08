@@ -2,6 +2,7 @@ import { logger } from 'firebase-functions';
 import { defineString } from 'firebase-functions/params';
 import { onRequest } from 'firebase-functions/v2/https';
 import { setGlobalOptions } from 'firebase-functions/v2/options';
+import { google } from 'googleapis';
 import crypto from 'node:crypto';
 import { admin, db } from './firebaseAdmin.js';
 
@@ -31,7 +32,11 @@ const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const LINKEDIN_SCOPES = ['r_liteprofile', 'r_emailaddress'];
 const CALENDAR_STATE_COLLECTION = 'calendarAuthStates';
 const CALENDAR_STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
-const CALENDAR_SCOPES = ['https://www.googleapis.com/auth/calendar'];
+const CALENDAR_SCOPES = [
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'openid'
+];
 
 function getAllowedOrigins() {
   return appOriginsParam
@@ -410,6 +415,31 @@ function renderCallbackPage(payload, errorMessage = null) {
 </html>`;
 }
 
+function renderCalendarCallbackPage(payload, errorMessage = null) {
+  const safePayload = JSON.stringify(payload || {}).replace(/</g, '\u003c');
+  const safeError = errorMessage ? JSON.stringify(errorMessage).replace(/</g, '\u003c') : 'null';
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Google Calendar Pairing</title>
+  </head>
+  <body>
+    <script>
+      (function() {
+        const payload = ${safePayload};
+        const errorMessage = ${safeError};
+        if (window.opener && typeof window.opener.postMessage === 'function') {
+          window.opener.postMessage({ provider: 'google-calendar', payload, errorMessage }, '*');
+        }
+        window.close();
+      })();
+    </script>
+    <p>You can close this window.</p>
+  </body>
+</html>`;
+}
+
 export const startLinkedInAuth = onRequest(async (req, res) => {
   if (applyCors(req, res)) {
     return;
@@ -593,6 +623,171 @@ export const unlinkLinkedIn = onRequest(async (req, res) => {
   }
 });
 
+export const startGoogleCalendarAuth = onRequest(async (req, res) => {
+  if (applyCors(req, res)) {
+    return;
+  }
+
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  let uid;
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) {
+    res.status(401).json({ error: 'Authorization token required.' });
+    return;
+  }
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    uid = decoded.uid;
+  } catch (error) {
+    logger.warn('Failed to verify ID token for Google Calendar start', error);
+    res.status(401).json({ error: 'Invalid or expired token.' });
+    return;
+  }
+
+  let oauthClient;
+  try {
+    oauthClient = createGoogleAuthClient();
+  } catch (error) {
+    logger.error('Google OAuth config error', error);
+    res.status(500).json({ error: error.message });
+    return;
+  }
+
+  const state = randomState();
+  await createCalendarState(state, uid);
+
+  const authUrl = oauthClient.generateAuthUrl({
+    access_type: 'offline',
+    prompt: 'consent',
+    scope: CALENDAR_SCOPES,
+    state,
+    include_granted_scopes: true
+  });
+
+  res.json({ url: authUrl, state, expiresIn: CALENDAR_STATE_TTL_MS / 1000 });
+});
+
+export const googleCalendarCallback = onRequest(async (req, res) => {
+  if (applyCors(req, res)) {
+    return;
+  }
+
+  const { state, code, error, error_description: errorDescription } = req.query;
+
+  if (!state) {
+    res.status(400).send(renderCalendarCallbackPage(null, 'Missing state.'));
+    return;
+  }
+
+  const stateData = await consumeCalendarState(state);
+  if (!stateData?.uid) {
+    res.status(400).send(renderCalendarCallbackPage(null, 'Invalid or expired pairing attempt.'));
+    return;
+  }
+
+  if (error) {
+    const message = errorDescription || error;
+    res.status(400).send(renderCalendarCallbackPage(null, message));
+    return;
+  }
+
+  if (!code) {
+    res.status(400).send(renderCalendarCallbackPage(null, 'Missing authorization code.'));
+    return;
+  }
+
+  let oauthClient;
+  try {
+    oauthClient = createGoogleAuthClient();
+  } catch (configError) {
+    logger.error('Google OAuth config error', configError);
+    res.status(500).send(renderCalendarCallbackPage(null, 'Server configuration error.'));
+    return;
+  }
+
+  try {
+    const { tokens } = await oauthClient.getToken(code);
+    oauthClient.setCredentials(tokens);
+
+    let email = null;
+    try {
+      const oauth2 = google.oauth2({ version: 'v2', auth: oauthClient });
+      const { data: userInfo } = await oauth2.userinfo.get();
+      email = userInfo?.email || null;
+    } catch (infoError) {
+      logger.warn('Failed to fetch Google userinfo', infoError);
+    }
+
+    let primaryCalendarId = 'primary';
+    let primarySummary = null;
+    try {
+      const calendarApi = google.calendar({ version: 'v3', auth: oauthClient });
+      const { data: primary } = await calendarApi.calendarList.get({ calendarId: 'primary' });
+      primaryCalendarId = primary?.id || 'primary';
+      primarySummary = primary?.summary || null;
+    } catch (calendarError) {
+      logger.warn('Failed to fetch primary calendar', calendarError);
+    }
+
+    const tokenPayload = {
+      email: email || primaryCalendarId || null,
+      primaryCalendarId,
+      primaryCalendarSummary: primarySummary,
+      accessToken: tokens.access_token || null,
+      refreshToken: tokens.refresh_token || null,
+      scope: tokens.scope || CALENDAR_SCOPES.join(' '),
+      tokenType: tokens.token_type || 'Bearer',
+      expiryDate: tokens.expiry_date || null,
+      connected: true,
+      syncedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const userRef = db.collection('users').doc(stateData.uid);
+    await userRef.set({
+      calendar: {
+        google: tokenPayload
+      }
+    }, { merge: true });
+
+    const userDoc = await userRef.get();
+    const tutorProfileId = userDoc.exists ? userDoc.data().tutorProfileId : null;
+    if (tutorProfileId) {
+      await db.collection('tutorProfiles').doc(tutorProfileId).set({
+        calendar: {
+          google: {
+            email: tokenPayload.email,
+            primaryCalendarId,
+            primaryCalendarSummary: primarySummary,
+            connected: true,
+            syncedAt: admin.firestore.FieldValue.serverTimestamp()
+          }
+        }
+      }, { merge: true });
+    }
+
+    const responsePayload = {
+      calendar: {
+        email: tokenPayload.email,
+        primaryCalendarId,
+        primaryCalendarSummary: primarySummary,
+        connected: true,
+        syncedAt: new Date().toISOString()
+      }
+    };
+
+    res.status(200).send(renderCalendarCallbackPage(responsePayload, null));
+  } catch (authError) {
+    logger.error('Google Calendar callback error', authError);
+    res.status(500).send(renderCalendarCallbackPage(null, 'Unable to complete Google Calendar pairing.'));
+  }
+});
+
 export const getPlaceDetails = onRequest(async (req, res) => {
   if (applyCors(req, res)) {
     return;
@@ -651,10 +846,10 @@ export const getPlaceDetails = onRequest(async (req, res) => {
   } catch (error) {
     logger.error('Google Places lookup error', error);
     res.status(500).json({ error: 'Unable to retrieve Google Places details.' });
+  }
+});
+
 export { createConnectAccount } from './https/createConnectAccount.js';
-export { createCheckoutSession } from './stripe/createCheckoutSession.js';
-export { createPaymentIntent } from './stripe/createPaymentIntent.js';
-export { stripeWebhook } from './stripe/handleWebhook.js';
 export { createCheckoutSession } from './stripe/createCheckoutSession.js';
 export { createPaymentIntent } from './stripe/createPaymentIntent.js';
 export { stripeWebhook } from './stripe/handleWebhook.js';
