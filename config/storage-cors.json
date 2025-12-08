@@ -5,7 +5,9 @@
       "http://127.0.0.1:5501",
       "http://localhost",
       "http://127.0.0.1",
-      "https://amitshalev0.github.io"
+      "https://amitshalev0.github.io",
+      "https://discovertutor.com",
+      "https://www.discovertutor.com"
     ],
     "method": ["GET", "POST", "PUT", "HEAD", "DELETE", "OPTIONS"],
     "responseHeader": [
