@@ -612,6 +612,15 @@
         </div>
         <p id="linkedin-message" class="message-area"></p>
       </article>
+
+      <article class="hub-card" id="calendar-card">
+        <h2>Calendar Sync</h2>
+        <p class="subtle-text" id="calendar-status-text">Pair your Google Calendar to automatically add confirmed sessions and avoid double bookings.</p>
+        <div class="inline-controls">
+          <button class="btn secondary" type="button" id="calendar-pair-btn">Pair Google Calendar</button>
+        </div>
+        <p id="calendar-message" class="message-area"></p>
+      </article>
     </section>
   </main>
 
@@ -668,6 +677,9 @@
     const linkedinRefreshBtn = document.getElementById('linkedin-refresh-btn');
     const linkedinDisconnectBtn = document.getElementById('linkedin-disconnect-btn');
     const linkedinMessage = document.getElementById('linkedin-message');
+    const calendarPairBtn = document.getElementById('calendar-pair-btn');
+    const calendarStatusText = document.getElementById('calendar-status-text');
+    const calendarMessage = document.getElementById('calendar-message');
     const verificationMessage = document.getElementById('verification-message');
     const certificateMessage = document.getElementById('certificate-message');
     const certificateStatusDetail = document.getElementById('certificate-status-detail');
@@ -725,6 +737,7 @@
     let tutorProfileData = null;
     let latestCertificate = null;
     let isStripeBusy = false;
+    let isCalendarBusy = false;
     let isUploadingCertificate = false;
 
     function buildProfileUrl(slug) {
@@ -863,6 +876,18 @@
       linkedinMessage.classList.add(isError ? 'error' : 'ok');
     }
 
+    function setCalendarMessage(message, type = 'neutral') {
+      if (!calendarMessage) return;
+      calendarMessage.textContent = message || '';
+      calendarMessage.classList.remove('ok', 'error');
+      if (!message) return;
+      if (type === 'success') {
+        calendarMessage.classList.add('ok');
+      } else if (type === 'error') {
+        calendarMessage.classList.add('error');
+      }
+    }
+
     function toDateValue(value) {
       if (!value) return null;
       if (typeof value.toDate === 'function') {
@@ -956,6 +981,35 @@
         statusText: 'Connected',
         helperText: linkedinData.syncedAt ? `Synced ${formatLinkedInTimestamp(linkedinData.syncedAt)}` : 'Synced recently.'
       };
+    }
+
+    function deriveCalendarStatus(userData = currentUserData) {
+      const calendar = userData?.calendar?.google || userData?.googleCalendar || null;
+      const email = calendar?.email || calendar?.primaryEmail || null;
+      const connected = calendar?.connected === true || calendar?.refreshToken || calendar?.accessToken;
+      const syncedAt = calendar?.syncedAt || calendar?.updatedAt || null;
+
+      if (connected) {
+        const lastSync = syncedAt ? formatLinkedInTimestamp(syncedAt) : null;
+        return {
+          state: 'connected',
+          helperText: email ? `Paired with ${email}${lastSync ? ` · ${lastSync}` : ''}` : 'Google Calendar paired.',
+          buttonLabel: 'Re-pair Google Calendar'
+        };
+      }
+
+      return {
+        state: 'disconnected',
+        helperText: 'Pair Google Calendar to auto-add confirmed sessions and block conflicts.',
+        buttonLabel: 'Pair Google Calendar'
+      };
+    }
+
+    function renderCalendarStatus(userData = currentUserData) {
+      if (!calendarStatusText || !calendarPairBtn) return;
+      const status = deriveCalendarStatus(userData);
+      calendarStatusText.textContent = status.helperText;
+      calendarPairBtn.textContent = status.buttonLabel;
     }
 
     function deriveCertificateStatus(userData = currentUserData, certificateRecord = latestCertificate) {
@@ -1108,6 +1162,7 @@
         if (userSnap.exists()) {
           currentUserData = userSnap.data();
           renderLinkedInCard(currentUserData);
+          renderCalendarStatus(currentUserData);
         }
         await loadLatestCertificate();
       } catch (error) {
@@ -1122,6 +1177,15 @@
       } catch (error) {
         return null;
       }
+    }
+
+    function openCenteredPopup(url, name = 'oauthPopup') {
+      const width = 540;
+      const height = 720;
+      const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
+      const top = window.screenY + Math.max(0, (window.outerHeight - height) / 3);
+      const features = `width=${width},height=${height},left=${left},top=${top}`;
+      return window.open(url, name, features);
     }
 
     async function startLinkedInAuthFlow(mode = 'link') {
@@ -1156,14 +1220,43 @@
         throw new Error('LinkedIn sign-in URL was not returned.');
       }
 
-      const width = 540;
-      const height = 720;
-      const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
-      const top = window.screenY + Math.max(0, (window.outerHeight - height) / 3);
-      const features = `width=${width},height=${height},left=${left},top=${top}`;
-      const popup = window.open(data.url, 'linkedinAuth', features);
+      const popup = openCenteredPopup(data.url, 'linkedinAuth');
       if (!popup) {
         throw new Error('Please enable pop-ups to continue with LinkedIn.');
+      }
+      return popup;
+    }
+
+    async function startGoogleCalendarAuth() {
+      if (!functionsBase) {
+        throw new Error('Calendar pairing is not configured yet.');
+      }
+      if (!currentUser) {
+        throw new Error('You must be signed in to pair your calendar.');
+      }
+
+      const token = await currentUser.getIdToken();
+      const response = await fetch(`${functionsBase}/startGoogleCalendarAuth`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Unable to start Google Calendar pairing.');
+      }
+
+      if (!data?.url) {
+        throw new Error('Google Calendar pairing URL was not returned.');
+      }
+
+      const popup = openCenteredPopup(data.url, 'googleCalendarAuth');
+      if (!popup) {
+        throw new Error('Please enable pop-ups to continue with Google Calendar.');
       }
       return popup;
     }
@@ -1456,6 +1549,50 @@
     }
 
     window.addEventListener('message', handleLinkedInMessage);
+
+    function handleCalendarMessage(event) {
+      const allowedOrigins = [window.location.origin, getFunctionsOrigin()].filter(Boolean);
+      if (!allowedOrigins.includes(event.origin)) {
+        return;
+      }
+
+      const data = event.data || {};
+      if (data.provider !== 'google-calendar') {
+        return;
+      }
+
+      const { payload, errorMessage } = data;
+
+      if (errorMessage) {
+        setCalendarMessage(typeof errorMessage === 'string' ? errorMessage : 'Google Calendar pairing cancelled.', 'error');
+        return;
+      }
+
+      if (!payload) {
+        setCalendarMessage('Google Calendar pairing did not return any data.', 'error');
+        return;
+      }
+
+      if (!currentUserData) {
+        currentUserData = {};
+      }
+
+      const calendarPayload = payload.calendar || payload;
+      currentUserData.calendar = {
+        ...(currentUserData.calendar || {}),
+        google: {
+          ...(calendarPayload || {}),
+          connected: true,
+          syncedAt: calendarPayload?.syncedAt || new Date().toISOString()
+        }
+      };
+
+      renderCalendarStatus(currentUserData);
+      setCalendarMessage('Google Calendar paired.', 'success');
+      reloadUserData();
+    }
+
+    window.addEventListener('message', handleCalendarMessage);
 
     function matchCatalogItem(rawValue) {
       const value = (rawValue || '').trim();
@@ -1921,6 +2058,24 @@
       });
     }
 
+    if (calendarPairBtn) {
+      calendarPairBtn.addEventListener('click', async () => {
+        if (isCalendarBusy) return;
+        try {
+          isCalendarBusy = true;
+          calendarPairBtn.disabled = true;
+          setCalendarMessage('Opening Google Calendar...', 'neutral');
+          await startGoogleCalendarAuth();
+        } catch (error) {
+          console.error('Tutor Hub Google Calendar pair error', error);
+          setCalendarMessage(error.message || 'Unable to start Google Calendar pairing.', 'error');
+        } finally {
+          isCalendarBusy = false;
+          calendarPairBtn.disabled = false;
+        }
+      });
+    }
+
     if (linkedinConnectBtn) {
       linkedinConnectBtn.addEventListener('click', async () => {
         try {
@@ -2227,6 +2382,7 @@
         currentUserData = result.userData || null;
         populateProfile(result.data);
         renderLinkedInCard(currentUserData);
+        renderCalendarStatus(currentUserData);
         await loadLatestCertificate();
       } catch (error) {
         console.error('Tutor Hub load error', error);

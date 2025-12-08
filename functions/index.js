@@ -22,10 +22,16 @@ const googlePlacesApiKey = defineString('GOOGLE_PLACES_API_KEY');
 const appOriginsParam = defineString('APP_ORIGIN', {
   default: '*'
 });
+const googleOAuthClientId = defineString('GOOGLE_OAUTH_CLIENT_ID');
+const googleOAuthClientSecret = defineString('GOOGLE_OAUTH_CLIENT_SECRET');
+const googleOAuthRedirectUri = defineString('GOOGLE_OAUTH_REDIRECT_URI');
 
 const STATE_COLLECTION = 'linkedinAuthStates';
 const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const LINKEDIN_SCOPES = ['r_liteprofile', 'r_emailaddress'];
+const CALENDAR_STATE_COLLECTION = 'calendarAuthStates';
+const CALENDAR_STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const CALENDAR_SCOPES = ['https://www.googleapis.com/auth/calendar'];
 
 function getAllowedOrigins() {
   return appOriginsParam
@@ -93,6 +99,27 @@ function ensureGooglePlacesKey() {
     throw new Error('Missing Google Places API key. Set google.places_api_key.');
   }
   return key;
+}
+
+function ensureGoogleOAuthConfig() {
+  const config = {
+    clientId: googleOAuthClientId.value(),
+    clientSecret: googleOAuthClientSecret.value(),
+    redirectUri: googleOAuthRedirectUri.value()
+  };
+  if (!config.clientId || !config.clientSecret || !config.redirectUri) {
+    throw new Error('Missing Google OAuth configuration. Set google_oauth_client_id, google_oauth_client_secret, and google_oauth_redirect_uri.');
+  }
+  return config;
+}
+
+function createGoogleAuthClient() {
+  const { clientId, clientSecret, redirectUri } = ensureGoogleOAuthConfig();
+  return new google.auth.OAuth2({
+    clientId,
+    clientSecret,
+    redirectUri
+  });
 }
 
 function buildLinkedInAuthUrl(state, redirectUri, clientId) {
@@ -188,6 +215,29 @@ async function consumeState(state) {
   }
   const data = snapshot.data();
   await ref.delete().catch((error) => logger.warn('Failed to delete state doc', error));
+  return data;
+}
+
+async function createCalendarState(state, uid) {
+  await db.collection(CALENDAR_STATE_COLLECTION).doc(state).set({
+    uid,
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+async function consumeCalendarState(state) {
+  const ref = db.collection(CALENDAR_STATE_COLLECTION).doc(state);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) {
+    return null;
+  }
+  const data = snapshot.data();
+  const createdAt = data?.createdAt?.toDate?.();
+  if (!createdAt || Date.now() - createdAt.getTime() > CALENDAR_STATE_TTL_MS) {
+    await ref.delete().catch((error) => logger.warn('Failed to delete expired calendar state', error));
+    return null;
+  }
+  await ref.delete().catch((error) => logger.warn('Failed to delete calendar state doc', error));
   return data;
 }
 
@@ -601,10 +651,10 @@ export const getPlaceDetails = onRequest(async (req, res) => {
   } catch (error) {
     logger.error('Google Places lookup error', error);
     res.status(500).json({ error: 'Unable to retrieve Google Places details.' });
-  }
-});
-
 export { createConnectAccount } from './https/createConnectAccount.js';
+export { createCheckoutSession } from './stripe/createCheckoutSession.js';
+export { createPaymentIntent } from './stripe/createPaymentIntent.js';
+export { stripeWebhook } from './stripe/handleWebhook.js';
 export { createCheckoutSession } from './stripe/createCheckoutSession.js';
 export { createPaymentIntent } from './stripe/createPaymentIntent.js';
 export { stripeWebhook } from './stripe/handleWebhook.js';
