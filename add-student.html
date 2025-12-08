@@ -98,11 +98,23 @@
   const addDoc = window.firestoreAddDoc;
   const collection = window.firestoreCollection;
   const serverTimestamp = window.firestoreServerTimestamp;
+  const getDocs = window.firestoreGetDocs;
+  const query = window.firestoreQuery;
+  const where = window.firestoreWhere;
+  const doc = window.firestoreDoc;
+  const getDoc = window.firestoreGetDoc;
+  const updateDoc = window.firestoreUpdateDoc;
 
   const form = document.getElementById("add-student-form");
   const msg = document.getElementById("form-message");
 
   let currentUser = null;
+
+  const normalizeStudentName = (value = "") => value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s'-]+/g, ' ')
+    .replace(/\s+/g, ' ');
 
   // Check authentication
   onAuth(auth, (user) => {
@@ -137,20 +149,66 @@
       updatedAt: serverTimestamp()
     };
 
+    const normalizedFullName = normalizeStudentName(studentData.studentName);
+    studentData.normalizedFullName = normalizedFullName;
+
     try {
-      // Add to Firestore
-      const docRef = await addDoc(collection(db, "students"), studentData);
-      const firestoreDocId = docRef.id; // Get the Firestore document ID
+      const studentsRef = collection(db, "students");
+      const studentQuery = query(studentsRef, where("userId", "==", currentUser.uid));
+      const existingStudentsSnapshot = await getDocs(studentQuery);
+      let duplicateRecord = null;
+
+      for (const docSnap of existingStudentsSnapshot.docs) {
+        const existingData = docSnap.data();
+        const existingName = normalizeStudentName(existingData?.studentName || "");
+        if (existingName && existingName === normalizedFullName) {
+          duplicateRecord = { id: docSnap.id, data: existingData };
+          break;
+        }
+      }
+
+      let firestoreDocId;
+      const previousStudentName = duplicateRecord?.data?.studentName || null;
+      const isUpdate = Boolean(duplicateRecord);
+
+      if (isUpdate) {
+        firestoreDocId = duplicateRecord.id;
+        const preservedCreatedAt = duplicateRecord.data?.createdAt || studentData.createdAt;
+        const updatePayload = {
+          ...studentData,
+          createdAt: preservedCreatedAt,
+          updatedAt: serverTimestamp()
+        };
+        await updateDoc(doc(db, "students", firestoreDocId), updatePayload);
+      } else {
+        const docRef = await addDoc(studentsRef, studentData);
+        firestoreDocId = docRef.id;
+      }
       
       // Also sync to Google Sheets for desktop app
       try {
-        // Get user profile for guardian email/phone
-        const getDoc = window.firestoreGetDoc;
-        const doc = window.firestoreDoc;
         const userDoc = await getDoc(doc(db, "users", currentUser.uid));
         const userData = userDoc.exists() ? userDoc.data() : {};
-        
-        await fetch('https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec', {
+
+        const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec';
+
+        if (isUpdate) {
+          await fetch(appsScriptUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              type: 'delete_student',
+              studentId: firestoreDocId,
+              studentName: previousStudentName || studentData.studentName,
+              userId: currentUser.uid
+            })
+          });
+        }
+
+        await fetch(appsScriptUrl, {
           method: 'POST',
           mode: 'no-cors',
           headers: {
@@ -176,7 +234,7 @@
         // Don't fail the operation if sheets sync fails
       }
       
-      msg.textContent = "Student added successfully!";
+      msg.textContent = isUpdate ? "Student updated successfully!" : "Student added successfully!";
       msg.classList.add("ok");
       
       // Redirect to dashboard after 1.5 seconds

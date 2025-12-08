@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Become a Student – Amit Tutoring</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="site-header"></div>
+  <script src="header-loader.js"></script>
+
+<main class="container">
+  <h2>Become a Student (Hybrid Account)</h2>
+  <p>Share your own learning goals below to unlock the student toolkit on your dashboard. This form mirrors the regular student intake, so families and admins have all the info they need.</p>
+
+  <form id="become-student-form" class="card">
+    <div class="field-row">
+      <label>Your Full Name*</label>
+      <input type="text" name="student_name" id="student-name" placeholder="Alex Johnson" required 
+             pattern="^[a-zA-Z][a-zA-Z'-]* [a-zA-Z][a-zA-Z'-]*$" 
+             title="Student name must be two words (first and last name), each with only letters, apostrophes, or dashes." />
+    </div>
+
+    <div class="field-row">
+      <label>Birthdate*</label>
+      <input type="date" name="birthdate" id="birthdate" min="1990-01-01" max="2030-12-31" title="Your birthdate" required />
+    </div>
+
+    <div class="field-row">
+      <label>Pronouns</label>
+      <select name="pronouns" id="pronouns" title="Pronouns">
+        <option value="">Please select your pronouns</option>
+        <option value="he/him">He/Him</option>
+        <option value="she/her">She/Her</option>
+        <option value="they/them">They/Them</option>
+        <option value="ze/zir">Ze/Zir</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+
+    <div class="field-row">
+      <label>Main Subject</label>
+      <input type="text" name="subject" id="subject" placeholder="e.g. Math 7, Physics 30, Chemistry 30 IB, Biology 30..." />
+    </div>
+
+    <div class="field-row">
+      <label>School</label>
+      <input type="text" name="school" id="school" placeholder="e.g. Woodbine Elementary, Wisewood High School..." />
+    </div>
+
+    <div class="field-row">
+      <label>Relationship to You</label>
+      <select name="relationship" id="relationship" title="Relationship to you">
+        <option value="self">Self (I'm the student)</option>
+        <option value="dependent">Dependent</option>
+        <option value="sibling">Sibling</option>
+        <option value="friend">Friend</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+
+    <div class="field-row">
+      <label>Additional Notes</label>
+      <textarea name="notes" id="notes" rows="4" placeholder="Any additional information about learning style, goals, or challenges..."></textarea>
+    </div>
+
+    <div class="flex-buttons">
+        <button type="submit" class="btn primary">Save &amp; become hybrid</button>
+        <button type="button" class="btn tertiary" onclick="window.location.href='edit-profile.html'">Cancel</button>
+    </div>
+
+    <p id="form-message" class="form-message"></p>
+  </form>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>
+      © <span id="year"></span> Amit Tutoring ·
+      <a href="contact.html">Contact me</a>
+    </p>
+  </div>
+  <script src="main.js"></script>
+</footer>
+
+<!-- Firebase init -->
+<script type="module" src="firebase-config.js"></script>
+
+<!-- Become student logic -->
+<script type="module">
+  const auth = window.firebaseAuth;
+  const db = window.firebaseDb;
+  const onAuth = window.firebaseOnAuth;
+  const addDoc = window.firestoreAddDoc;
+  const collection = window.firestoreCollection;
+  const serverTimestamp = window.firestoreServerTimestamp;
+  const getDoc = window.firestoreGetDoc;
+  const doc = window.firestoreDoc;
+  const updateDoc = window.firestoreUpdateDoc;
+
+  const form = document.getElementById("become-student-form");
+  const msg = document.getElementById("form-message");
+
+  let currentUser = null;
+  let latestUserData = null;
+
+  onAuth(auth, (user) => {
+    if (!user) {
+      window.location.href = "login.html";
+      return;
+    }
+    currentUser = user;
+    loadCurrentUserProfile();
+  });
+
+  async function loadCurrentUserProfile() {
+    if (!currentUser) {
+      return;
+    }
+    try {
+      const userSnap = await getDoc(doc(db, "users", currentUser.uid));
+      if (userSnap.exists()) {
+        latestUserData = userSnap.data();
+        if (latestUserData.fullName) {
+          document.getElementById("student-name").value = latestUserData.fullName;
+        }
+      }
+    } catch (profileError) {
+      console.warn('Hybrid onboarding: unable to prefill profile', profileError);
+    }
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    msg.textContent = "Saving your student profile...";
+    msg.className = "form-message";
+
+    if (!currentUser) {
+      msg.textContent = "You must be logged in to continue.";
+      msg.classList.add("error");
+      return;
+    }
+
+    const studentData = {
+      userId: currentUser.uid,
+      studentName: document.getElementById("student-name").value.trim(),
+      birthdate: document.getElementById("birthdate").value,
+      pronouns: document.getElementById("pronouns").value || null,
+      subject: document.getElementById("subject").value.trim() || null,
+      school: document.getElementById("school").value.trim() || null,
+      relationship: document.getElementById("relationship").value || "self",
+      notes: document.getElementById("notes").value.trim(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+
+    try {
+      const docRef = await addDoc(collection(db, "students"), studentData);
+      const firestoreDocId = docRef.id;
+
+      try {
+        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        const userData = userDoc.exists() ? userDoc.data() : latestUserData || {};
+        await fetch('https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec', {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'add_student',
+            studentId: firestoreDocId,
+            userId: currentUser.uid,
+            studentName: studentData.studentName,
+            yearOfBirth: studentData.birthdate ? new Date(studentData.birthdate).getFullYear().toString() : '',
+            subject: studentData.subject || '',
+            school: studentData.school || '',
+            relationship: studentData.relationship || '',
+            userEmail: userData.email || currentUser.email,
+            userPhone: userData.phone || '',
+            notes: studentData.notes || ''
+          })
+        });
+      } catch (sheetError) {
+        console.warn('Hybrid onboarding: sheets sync failed', sheetError);
+      }
+
+      await upgradeUserToHybrid();
+
+      msg.textContent = "You're all set! Redirecting to your hybrid dashboard...";
+      msg.classList.add("ok");
+      setTimeout(() => {
+        window.location.href = "dashboard.html";
+      }, 1200);
+    } catch (error) {
+      console.error("Error creating hybrid student profile:", error);
+      msg.textContent = "Something went wrong. Please try again or contact support.";
+      msg.classList.add("error");
+    }
+  });
+
+  async function upgradeUserToHybrid() {
+    if (!currentUser) {
+      throw new Error('No authenticated user');
+    }
+    const userRef = doc(db, "users", currentUser.uid);
+    await updateDoc(userRef, {
+      "roles.student": { active: true, pending: false, frozen: false },
+      accountType: "hybrid",
+      role: "hybrid",
+      primaryRole: "hybrid",
+      hybridActivatedAt: serverTimestamp()
+    });
+  }
+</script>
+</body>
+</html>

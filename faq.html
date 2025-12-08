@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>FAQ – Amit Tutoring</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .faq-hero {
+      margin-top: 2rem;
+      padding: 2rem;
+    }
+    .faq-grid {
+      display: grid;
+      gap: 1.25rem;
+      margin-top: 2rem;
+    }
+    @media (min-width: 768px) {
+      .faq-grid {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      }
+    }
+    .faq-card {
+      padding: 1.5rem;
+    }
+    .faq-card summary {
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 1.05rem;
+    }
+    .faq-card details[open] summary {
+      color: var(--accent, #4f9dff);
+    }
+    .faq-card p {
+      margin-top: 0.75rem;
+      line-height: 1.5;
+    }
+    .faq-cta {
+      margin-top: 2rem;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .faq-cta-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="site-header"></div>
+  <script src="header-loader.js"></script>
+
+  <main class="container">
+    <section class="card faq-hero">
+      <p class="kicker">Answers, fast.</p>
+      <h1>Frequently Asked Questions</h1>
+      <p>
+        Whether you tutor, learn, or do both as a hybrid user, these quick answers explain how the
+        platform keeps everything organized. Still unsure? Reach out and we will walk you through it.
+      </p>
+    </section>
+
+    <section class="faq-grid">
+      <article class="card faq-card">
+        <details open>
+          <summary>What is a hybrid account?</summary>
+          <p>
+            Hybrid accounts unlock both the tutor hub and the student dashboard with a single login.
+            You can manage your teaching schedule, then flip to the student side to book time with
+            other tutors for your own learning goals.
+          </p>
+        </details>
+      </article>
+
+      <article class="card faq-card">
+        <details>
+          <summary>How do I become a hybrid user?</summary>
+          <p>
+            Open <strong>Edit Profile</strong> from your dashboard, then pick <em>Become a student
+            (hybrid account)</em>. You will complete the same quick form families use for new
+            students. Once you save, the dashboard automatically switches into hybrid mode.
+          </p>
+        </details>
+      </article>
+
+      <article class="card faq-card">
+        <details>
+          <summary>Will families see my private student details?</summary>
+          <p>
+            No. Student records that you create for yourself stay private to admins and the tutoring
+            team. Families only see their own students and the public information on your tutor
+            profile.
+          </p>
+        </details>
+      </article>
+
+      <article class="card faq-card">
+        <details>
+          <summary>Can I edit or remove my student profile later?</summary>
+          <p>
+            Absolutely. Head to <strong>Dashboard → My Students</strong> to edit notes, update
+            subjects, or archive the record entirely. Archiving keeps your tutor access intact.
+          </p>
+        </details>
+      </article>
+
+      <article class="card faq-card">
+        <details>
+          <summary>How fast are new student submissions reviewed?</summary>
+          <p>
+            Most requests are approved within one business day. If you need help sooner, send a note
+            through the contact page or mention it when booking a session and we will prioritize it.
+          </p>
+        </details>
+      </article>
+
+      <article class="card faq-card">
+        <details>
+          <summary>Who should I message when something looks off?</summary>
+          <p>
+            Use the <a href="contact.html">contact form</a> for anything account related. Include a
+            quick screenshot or student name if possible so we can find the issue faster.
+          </p>
+        </details>
+      </article>
+    </section>
+
+    <section class="card faq-cta">
+      <h2>Need more help?</h2>
+      <p>
+        We are happy to hop on a quick call or respond over email. Let us know what you are trying to
+        accomplish and we will point you to the best place in the dashboard.
+      </p>
+      <div class="faq-cta-actions">
+        <button class="btn primary" type="button" onclick="window.location.href='book.html'">
+          Book a planning call
+        </button>
+        <button class="btn secondary" type="button" onclick="window.location.href='contact.html'">
+          Message support
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>
+        © <span id="year"></span> Amit Tutoring ·
+        <a href="contact.html">Contact me</a>
+      </p>
+    </div>
+    <script src="main.js"></script>
+  </footer>
+
+  <script type="module" src="firebase-config.js"></script>
+</body>
+</html>

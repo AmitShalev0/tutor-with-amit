@@ -30,6 +30,16 @@ a:hover { text-decoration: underline; }
   padding: 0 16px;
 }
 
+.page-top-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin: 1rem 0;
+}
+
+.page-top-actions .btn {
+  font-size: 0.9rem;
+}
+
 .site-header {
   border-bottom: 1px solid var(--border);
   background: rgba(10, 10, 12, 0.9);

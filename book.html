@@ -865,6 +865,15 @@
         }
       });
     }
+
+    if (userStudents.length === 1 && primaryStudentDropdown && !primaryStudentDropdown.disabled) {
+      const soleStudentId = userStudents[0]?.id;
+      if (soleStudentId) {
+        primaryStudentDropdown.value = soleStudentId;
+        primaryStudentDropdown.dispatchEvent(new Event('change', { bubbles: true }));
+        handleStudentSelectionChange();
+      }
+    }
   }
 
   // Initialize booking form (reuse existing main.js logic)

@@ -117,6 +117,47 @@
       gap: 1rem;
       flex-wrap: wrap;
     }
+    .subject-request-copy {
+      margin-top: -0.25rem;
+      margin-bottom: 1rem;
+      color: #d1d5db;
+      font-size: 0.95rem;
+    }
+    .subject-request-form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+    .subject-request-form input[type="text"] {
+      flex: 1 1 220px;
+      min-width: 200px;
+      padding: 0.65rem 0.9rem;
+      border-radius: 0.5rem;
+      border: 1px solid #4b5563;
+      background: #111827;
+      color: #f9fafb;
+      font-size: 0.95rem;
+    }
+    .subject-request-form input[type="text"]:focus {
+      outline: none;
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.25);
+    }
+    .subject-request-message {
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+      color: #9ca3af;
+    }
+    .subject-request-message.ok {
+      color: #34d399;
+    }
+    .subject-request-message.error {
+      color: #f87171;
+    }
+    .subject-request-message.pending {
+      color: #bfdbfe;
+    }
     .students-header {
       display: flex;
       justify-content: space-between;
@@ -263,6 +304,24 @@
         </div>
       </div>
 
+      <div class="dashboard-card" data-dashboard-section="student">
+        <h3>Can't find the subject you need?</h3>
+        <p class="subject-request-copy">Tell us the course and we'll email you as soon as we open it up.</p>
+        <form id="subject-request-form" class="subject-request-form">
+          <label class="sr-only" for="subject-request-input">Course name</label>
+          <input
+            type="text"
+            id="subject-request-input"
+            name="subjectRequest"
+            placeholder="e.g. AP Physics 2, IB French HL"
+            autocomplete="off"
+            required
+          />
+          <button type="submit" class="btn primary">Notify me</button>
+        </form>
+        <p id="subject-request-message" class="subject-request-message" role="status"></p>
+      </div>
+
       <div class="dashboard-card" id="favorite-tutors-card" data-dashboard-section="student">
         <h3>My Favourite Tutors</h3>
         <div id="favorite-tutors-content">
@@ -351,18 +410,76 @@
   const tutorLinkDisplayEl = document.getElementById("tutor-link-display");
   const copyTutorLinkBtn = document.getElementById("copy-tutor-link");
   const homeLinkBtn = document.getElementById("home-link-btn");
+  const subjectRequestForm = document.getElementById("subject-request-form");
+  const subjectRequestInput = document.getElementById("subject-request-input");
+  const subjectRequestMessage = document.getElementById("subject-request-message");
   const dashboardViewToggleBtn = document.getElementById("dashboard-view-toggle");
   const hybridViewportQuery = typeof window !== "undefined" && window.matchMedia
     ? window.matchMedia("(max-width: 768px)")
     : null;
   const favoriteTutorsContainer = document.getElementById("favorite-tutors-content");
   const DEFAULT_HOME_PATH = "/home/amitshalev/";
+  const SUBJECT_INTEREST_ENDPOINT = "https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec";
 
   let currentUser = null;
   let tutorProfileData = null;
   let hybridAccountEnabled = false;
 
   window.__latestUserData = window.__latestUserData || null;
+
+  function setSubjectRequestMessage(text, state) {
+    if (!subjectRequestMessage) {
+      return;
+    }
+    const baseClass = "subject-request-message";
+    subjectRequestMessage.className = state ? `${baseClass} ${state}` : baseClass;
+    subjectRequestMessage.textContent = text || "";
+  }
+
+  async function handleSubjectRequestSubmit(event) {
+    event.preventDefault();
+    if (!subjectRequestInput) {
+      return;
+    }
+    const courseName = subjectRequestInput.value.trim();
+    if (!courseName) {
+      setSubjectRequestMessage("Please share the course you want help with.", "error");
+      subjectRequestInput.focus();
+      return;
+    }
+    if (!currentUser) {
+      setSubjectRequestMessage("Please sign in again to send your request.", "error");
+      return;
+    }
+
+    setSubjectRequestMessage("Sending your request...", "pending");
+
+    const latestUser = window.__latestUserData || {};
+    const payload = {
+      type: "subject_interest",
+      userId: currentUser.uid,
+      courseName,
+      userName: latestUser.fullName || currentUser.displayName || "",
+      userEmail: latestUser.email || currentUser.email || "",
+      submittedAt: new Date().toISOString()
+    };
+
+    try {
+      await fetch(SUBJECT_INTEREST_ENDPOINT, {
+        method: "POST",
+        mode: "no-cors",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      setSubjectRequestMessage("Thanks! We'll notify you when that subject becomes available.", "ok");
+      subjectRequestInput.value = "";
+    } catch (err) {
+      console.error("Subject request error:", err);
+      setSubjectRequestMessage("We couldn't send that request. Please try again soon.", "error");
+    }
+  }
 
   function updateHybridToggleLabel() {
     if (!dashboardViewToggleBtn) {
@@ -434,6 +551,10 @@
     } else if (typeof hybridViewportQuery.addListener === "function") {
       hybridViewportQuery.addListener(viewportListener);
     }
+  }
+
+  if (subjectRequestForm && subjectRequestInput) {
+    subjectRequestForm.addEventListener("submit", handleSubjectRequestSubmit);
   }
 
   // Check authentication
