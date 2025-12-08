@@ -98,6 +98,69 @@
       opacity: 0.7;
       cursor: wait;
     }
+    .booking-section {
+      margin: 2rem 0;
+    }
+    .booking-cards {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+    .booking-card {
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 1rem;
+      padding: 1.1rem 1.25rem;
+    }
+    .booking-card h3 {
+      margin-top: 0;
+      margin-bottom: 0.5rem;
+    }
+    .booking-metrics {
+      display: grid;
+      gap: 0.35rem;
+    }
+    .booking-metrics .label {
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+    .booking-metrics .value {
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+    .availability-list,
+    .courses-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .availability-list li,
+    .courses-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      color: #e2e8f0;
+      font-size: 0.95rem;
+    }
+    .availability-list .day {
+      color: #94a3b8;
+      font-weight: 600;
+    }
+    .courses-list li::before {
+      content: "•";
+      color: #60a5fa;
+      margin-right: 0.35rem;
+    }
+    @media (max-width: 720px) {
+      .availability-list li,
+      .courses-list li {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
     @media (max-width: 720px) {
       .tutor-summary-card {
         grid-template-columns: 1fr;
@@ -150,6 +213,44 @@
         <li>STEM specialties: mathematics, physics, chemistry, biology</li>
         <li>Flexible scheduling for in-person or virtual sessions</li>
       </ul>
+    </section>
+
+    <section class="home-section booking-section" id="booking-section" hidden>
+      <h2 class="section-title">Booking Information</h2>
+      <div class="booking-cards">
+        <article class="booking-card">
+          <h3>Session Pricing</h3>
+          <div class="booking-metrics">
+            <div><span class="label">First student</span><div class="value" id="home-rate-base">—</div></div>
+            <div><span class="label">Each additional student</span><div class="value" id="home-rate-extra">—</div></div>
+            <div><span class="label">Session summary add-on</span><div class="value" id="home-rate-summary">—</div></div>
+          </div>
+        </article>
+        <article class="booking-card">
+          <h3>Session Length &amp; Group Size</h3>
+          <div class="booking-metrics">
+            <div><span class="label">Minimum session length</span><div class="value" id="home-session-min">—</div></div>
+            <div><span class="label">Maximum session length</span><div class="value" id="home-session-max">—</div></div>
+            <div><span class="label">Maximum students per session</span><div class="value" id="home-session-max-students">—</div></div>
+            <div><span class="label">Recurring sessions bookable up to</span><div class="value" id="home-session-recurring">—</div></div>
+          </div>
+        </article>
+        <article class="booking-card">
+          <h3>Calendar Display</h3>
+          <div class="booking-metrics">
+            <div><span class="label">Visible hours</span><div class="value" id="home-calendar-hours">—</div></div>
+            <div><span class="label">Visible days</span><div class="value" id="home-calendar-days">—</div></div>
+          </div>
+        </article>
+        <article class="booking-card">
+          <h3>Weekly Availability</h3>
+          <ul class="availability-list" id="home-availability-list"></ul>
+        </article>
+        <article class="booking-card">
+          <h3>Courses Offered</h3>
+          <ul class="courses-list" id="home-courses-list"></ul>
+        </article>
+      </div>
     </section>
 
     <section class="home-section">
@@ -258,6 +359,47 @@
     const heroActions = document.getElementById("hero-actions");
     const loginLink = document.querySelector('[data-login-link]');
 
+    const bookingSection = document.getElementById("booking-section");
+    const bookingFields = {
+      rateBase: document.getElementById("home-rate-base"),
+      rateExtra: document.getElementById("home-rate-extra"),
+      rateSummary: document.getElementById("home-rate-summary"),
+      sessionMin: document.getElementById("home-session-min"),
+      sessionMax: document.getElementById("home-session-max"),
+      sessionMaxStudents: document.getElementById("home-session-max-students"),
+      sessionRecurring: document.getElementById("home-session-recurring"),
+      calendarHours: document.getElementById("home-calendar-hours"),
+      calendarDays: document.getElementById("home-calendar-days"),
+      availabilityList: document.getElementById("home-availability-list"),
+      coursesList: document.getElementById("home-courses-list")
+    };
+
+    const DEFAULT_BOOKING_SETTINGS = {
+      maxStudentsPerSession: 4,
+      maxHoursPerSession: 2,
+      minSessionMinutes: 60,
+      baseSessionCost: 50,
+      extraStudentCost: 20,
+      sessionSummaryAddOn: 10,
+      recurringMaxAdvanceWeeks: 12,
+      availability: {
+        "0": [],
+        "1": [],
+        "2": [],
+        "3": [],
+        "4": [],
+        "5": [],
+        "6": [{ start: "11:00", end: "16:00" }]
+      },
+      calendarDisplay: {
+        startHour: 8,
+        endHour: 20,
+        visibleDays: ["0", "1", "2", "3", "4"]
+      },
+      courses: [],
+      currency: "CAD"
+    };
+
     const slugMatch = window.location.pathname.match(/\/home\/([^/]+)/i);
     if (slugMatch) {
       document.body.dataset.homeSlug = decodeURIComponent(slugMatch[1]);
@@ -340,6 +482,167 @@
         tag.textContent = subject;
         summaryCourseTagsEl.appendChild(tag);
       });
+    }
+
+    function normalizeTimeString(value) {
+      if (typeof value !== "string") return null;
+      const trimmed = value.trim();
+      const match = trimmed.match(/^([0-1]?\d|2[0-3]):([0-5]\d)$/);
+      if (!match) return null;
+      const hours = match[1].padStart(2, "0");
+      const minutes = match[2];
+      return `${hours}:${minutes}`;
+    }
+
+    function normalizeAvailability(rawAvailability = {}) {
+      const template = JSON.parse(JSON.stringify(DEFAULT_BOOKING_SETTINGS.availability));
+      const result = {};
+      Object.keys(template).forEach((key) => {
+        const slots = Array.isArray(rawAvailability[key]) ? rawAvailability[key] : template[key];
+        const normalizedSlots = [];
+        slots.forEach((slot) => {
+          const start = normalizeTimeString(slot?.start ?? slot?.from ?? slot?.begin ?? slot?.[0]);
+          const end = normalizeTimeString(slot?.end ?? slot?.to ?? slot?.finish ?? slot?.[1]);
+          if (start && end && start < end) {
+            normalizedSlots.push({ start, end });
+          }
+        });
+        result[key] = normalizedSlots;
+      });
+      return result;
+    }
+
+    function normalizeVisibleDays(rawDays) {
+      const normalizeKey = (value) => {
+        if (value == null) return null;
+        const raw = String(value).trim();
+        if (!raw) return null;
+        if (/^[0-6]$/.test(raw)) return raw;
+        const dayMap = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+        const idx = dayMap.findIndex((prefix) => raw.toLowerCase().startsWith(prefix));
+        return idx === -1 ? null : String(idx);
+      };
+      const days = Array.isArray(rawDays) ? rawDays : typeof rawDays === "string" ? rawDays.split(",").map((d) => d.trim()) : DEFAULT_BOOKING_SETTINGS.calendarDisplay.visibleDays;
+      const normalized = Array.from(new Set(days.map(normalizeKey).filter((d) => d != null)));
+      if (!normalized.length) {
+        return DEFAULT_BOOKING_SETTINGS.calendarDisplay.visibleDays.slice();
+      }
+      normalized.sort((a, b) => Number(a) - Number(b));
+      return normalized;
+    }
+
+    function normalizeBookingSettings(raw = {}) {
+      const base = { ...DEFAULT_BOOKING_SETTINGS, ...(raw || {}) };
+      const safe = {
+        maxStudentsPerSession: Number.isFinite(base.maxStudentsPerSession) ? base.maxStudentsPerSession : DEFAULT_BOOKING_SETTINGS.maxStudentsPerSession,
+        maxHoursPerSession: Number.isFinite(base.maxHoursPerSession) ? base.maxHoursPerSession : DEFAULT_BOOKING_SETTINGS.maxHoursPerSession,
+        minSessionMinutes: Number.isFinite(base.minSessionMinutes) ? base.minSessionMinutes : DEFAULT_BOOKING_SETTINGS.minSessionMinutes,
+        baseSessionCost: Number.isFinite(base.baseSessionCost) ? base.baseSessionCost : DEFAULT_BOOKING_SETTINGS.baseSessionCost,
+        extraStudentCost: Number.isFinite(base.extraStudentCost) ? base.extraStudentCost : DEFAULT_BOOKING_SETTINGS.extraStudentCost,
+        sessionSummaryAddOn: Number.isFinite(base.sessionSummaryAddOn) ? base.sessionSummaryAddOn : DEFAULT_BOOKING_SETTINGS.sessionSummaryAddOn,
+        recurringMaxAdvanceWeeks: Number.isFinite(base.recurringMaxAdvanceWeeks) ? base.recurringMaxAdvanceWeeks : DEFAULT_BOOKING_SETTINGS.recurringMaxAdvanceWeeks,
+        currency: typeof base.currency === "string" && base.currency.trim() ? base.currency.trim().toUpperCase() : DEFAULT_BOOKING_SETTINGS.currency,
+        calendarDisplay: {
+          startHour: Number.isFinite(base.calendarDisplay?.startHour) ? base.calendarDisplay.startHour : DEFAULT_BOOKING_SETTINGS.calendarDisplay.startHour,
+          endHour: Number.isFinite(base.calendarDisplay?.endHour) ? base.calendarDisplay.endHour : DEFAULT_BOOKING_SETTINGS.calendarDisplay.endHour,
+          visibleDays: normalizeVisibleDays(base.calendarDisplay?.visibleDays)
+        },
+        availability: normalizeAvailability(base.availability),
+        courses: Array.isArray(base.courses)
+          ? base.courses.map((c) => String(c || "").trim()).filter(Boolean)
+          : typeof base.courses === "string"
+            ? base.courses.split(/\r?\n|,/).map((c) => c.trim()).filter(Boolean)
+            : []
+      };
+      return safe;
+    }
+
+    function formatCurrency(amount, currency) {
+      const formatter = new Intl.NumberFormat("en-CA", {
+        style: "currency",
+        currency: currency || "CAD",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+      return formatter.format(amount || 0);
+    }
+
+    function formatDurationMinutes(minutes) {
+      if (!Number.isFinite(minutes) || minutes <= 0) return "—";
+      const total = Math.round(minutes);
+      const hours = Math.floor(total / 60);
+      const mins = total % 60;
+      const parts = [];
+      if (hours) parts.push(`${hours} hr${hours === 1 ? "" : "s"}`);
+      if (mins) parts.push(`${mins} min`);
+      return parts.join(" ") || "0 min";
+    }
+
+    function formatHourRange(startHour, endHour) {
+      const toLabel = (hour) => {
+        const date = new Date();
+        date.setHours(hour, 0, 0, 0);
+        return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(date);
+      };
+      return `${toLabel(startHour)} – ${toLabel(endHour)}`;
+    }
+
+    function formatVisibleDays(visibleDays) {
+      if (!Array.isArray(visibleDays) || !visibleDays.length) return "—";
+      const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      return visibleDays.map((v) => labels[Number(v)] || v).join(", ");
+    }
+
+    function renderAvailability(listEl, availability) {
+      if (!listEl) return;
+      listEl.innerHTML = "";
+      const dayLabels = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+      dayLabels.forEach((label, index) => {
+        const slots = availability?.[String(index)] || [];
+        const item = document.createElement("li");
+        const daySpan = document.createElement("span");
+        daySpan.className = "day";
+        daySpan.textContent = label;
+        const valueSpan = document.createElement("span");
+        valueSpan.className = "value";
+        valueSpan.textContent = slots.length ? slots.map((slot) => `${slot.start} – ${slot.end}`).join(", ") : "Not available";
+        item.appendChild(daySpan);
+        item.appendChild(valueSpan);
+        listEl.appendChild(item);
+      });
+    }
+
+    function renderCourses(listEl, courses) {
+      if (!listEl) return;
+      listEl.innerHTML = "";
+      if (!Array.isArray(courses) || !courses.length) {
+        const li = document.createElement("li");
+        li.textContent = "No courses listed.";
+        listEl.appendChild(li);
+        return;
+      }
+      courses.forEach((course) => {
+        const li = document.createElement("li");
+        li.textContent = course;
+        listEl.appendChild(li);
+      });
+    }
+
+    function renderBookingSection(settings) {
+      if (!bookingSection) return;
+      const safe = normalizeBookingSettings(settings || {});
+      bookingFields.rateBase.textContent = formatCurrency(safe.baseSessionCost, safe.currency);
+      bookingFields.rateExtra.textContent = formatCurrency(safe.extraStudentCost, safe.currency);
+      bookingFields.rateSummary.textContent = formatCurrency(safe.sessionSummaryAddOn, safe.currency);
+      bookingFields.sessionMin.textContent = formatDurationMinutes(safe.minSessionMinutes);
+      bookingFields.sessionMax.textContent = formatDurationMinutes(safe.maxHoursPerSession * 60);
+      bookingFields.sessionMaxStudents.textContent = safe.maxStudentsPerSession;
+      bookingFields.sessionRecurring.textContent = `${safe.recurringMaxAdvanceWeeks} week${safe.recurringMaxAdvanceWeeks === 1 ? "" : "s"}`;
+      bookingFields.calendarHours.textContent = formatHourRange(safe.calendarDisplay.startHour, safe.calendarDisplay.endHour);
+      bookingFields.calendarDays.textContent = formatVisibleDays(safe.calendarDisplay.visibleDays);
+      renderAvailability(bookingFields.availabilityList, safe.availability);
+      renderCourses(bookingFields.coursesList, safe.courses);
+      bookingSection.hidden = false;
     }
 
     function pickRegion(profile, travelData) {
@@ -557,6 +860,8 @@
         renderSummaryLocation(locationDisplay);
         const existingBioText = summaryBioEl ? summaryBioEl.textContent : "";
         renderSummaryBio(profile.bio, profile.headline || existingBioText);
+
+        renderBookingSection(profile.bookingSettings || DEFAULT_BOOKING_SETTINGS);
 
         if (summaryBookBtn) {
           summaryBookBtn.href = currentTutorId

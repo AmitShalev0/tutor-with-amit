@@ -15,11 +15,18 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 1rem;
       margin-bottom: 2rem;
     }
     .hub-title {
       font-size: 2rem;
       margin: 0;
+    }
+    .hub-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
     }
     .status-pill {
       display: inline-flex;
@@ -464,7 +471,10 @@
   <main class="container">
     <div class="hub-header">
       <h1 class="hub-title">Tutor Hub</h1>
-      <span class="status-pill" id="profile-status">Loading...</span>
+      <div class="hub-actions">
+        <a class="btn secondary" id="booking-info-link" href="booking-info.html" hidden>Booking Info</a>
+        <span class="status-pill" id="profile-status">Loading...</span>
+      </div>
     </div>
 
     <section class="hub-card" id="profile-summary">
@@ -660,6 +670,7 @@
     const functionsBase = window.firebaseFunctionsBase;
 
     const statusPill = document.getElementById('profile-status');
+    const bookingInfoLink = document.getElementById('booking-info-link');
     const profileLinkEl = document.getElementById('profile-link');
     const copyLinkBtn = document.getElementById('copy-public-link');
     const profileForm = document.getElementById('tutor-profile-form');
@@ -2326,6 +2337,7 @@
 
     function populateProfile(profile) {
       tutorProfileData = profile;
+      const profileId = tutorProfileRef?.id || profile?.id || null;
       renderProfilePhoto(profile);
       const status = formatStatus(profile.status);
       setStatus(status);
@@ -2359,6 +2371,15 @@
         profileLinkEl.textContent = 'Add details and publish to receive your public link.';
         copyLinkBtn.disabled = true;
         delete copyLinkBtn.dataset.profileUrl;
+      }
+
+      if (bookingInfoLink) {
+        if (profileId) {
+          bookingInfoLink.href = `booking-info.html?tutorId=${encodeURIComponent(profileId)}`;
+          bookingInfoLink.hidden = false;
+        } else {
+          bookingInfoLink.hidden = true;
+        }
       }
     }
 
