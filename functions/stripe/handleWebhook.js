@@ -1,4 +1,7 @@
-import functions from 'firebase-functions';
+// import functions from 'firebase-functions';
+// import { onRequest } from "firebase-functions/v2/https";
+import * as functions from "firebase-functions";
+
 import { onRequest } from 'firebase-functions/v2/https';
 import { admin, db } from '../firebaseAdmin.js';
 import { getStripe } from './client.js';
