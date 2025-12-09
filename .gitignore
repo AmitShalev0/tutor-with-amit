@@ -1,3 +1,10 @@
 node_modules/
 functions/node_modules/
 config/google-maps-key.json
+
+functions/.env
+functions/.env.*
+tutorDesk/credentials.json
+tutorDesk/token.json
+*.pem
+*.p12
