@@ -2200,8 +2200,18 @@
     function hasTutorRole(userData) {
       if (!userData) return false;
       const roles = normalizeRolesObject(userData.roles);
-      if (roles.tutor === true) return true;
-      if (roles['coach'] === true) return true;
+      const tutorRole = roles.tutor;
+      const coachRole = roles['coach'];
+
+      const isRoleObjectActive = (roleVal) => {
+        if (!roleVal || typeof roleVal !== 'object') return false;
+        if (roleVal.active === true || roleVal.enabled === true) return true;
+        if (roleVal.pending === true && roleVal.active !== false && roleVal.enabled !== false) return true;
+        return false;
+      };
+
+      if (tutorRole === true || isRoleObjectActive(tutorRole)) return true;
+      if (coachRole === true || isRoleObjectActive(coachRole)) return true;
       const singularRole = typeof userData.role === 'string' ? userData.role.trim().toLowerCase() : '';
       if (singularRole === 'tutor') return true;
       if (Array.isArray(userData.roles) && userData.roles.some((role) => (role || '').toLowerCase() === 'tutor')) {
