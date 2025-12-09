@@ -29,7 +29,7 @@ const googleOAuthRedirectUri = defineString('GOOGLE_OAUTH_REDIRECT_URI');
 
 const STATE_COLLECTION = 'linkedinAuthStates';
 const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
-const LINKEDIN_SCOPES = ['r_liteprofile', 'r_emailaddress'];
+const LINKEDIN_SCOPES = ['openid', 'profile', 'r_profile_basicinfo'];
 const CALENDAR_STATE_COLLECTION = 'calendarAuthStates';
 const CALENDAR_STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const CALENDAR_SCOPES = [
