@@ -2199,24 +2199,39 @@
 
     function hasTutorRole(userData) {
       if (!userData) return false;
+
+      // If the account type is explicitly hybrid or tutor, allow access.
+      const accountType = typeof userData.accountType === 'string' ? userData.accountType.toLowerCase() : '';
+      if (accountType === 'hybrid' || accountType === 'tutor') {
+        return true;
+      }
+
       const roles = normalizeRolesObject(userData.roles);
       const tutorRole = roles.tutor;
       const coachRole = roles['coach'];
 
-      const isRoleObjectActive = (roleVal) => {
+      const isRoleObjectAllowed = (roleVal) => {
         if (!roleVal || typeof roleVal !== 'object') return false;
-        if (roleVal.active === true || roleVal.enabled === true) return true;
-        if (roleVal.pending === true && roleVal.active !== false && roleVal.enabled !== false) return true;
-        return false;
+        // If explicitly false/disabled, block. Otherwise allow (covers active/pending/frozen states).
+        if (roleVal.active === false || roleVal.enabled === false || roleVal.frozen === true || roleVal.paused === true) {
+          return false;
+        }
+        return true;
       };
 
-      if (tutorRole === true || isRoleObjectActive(tutorRole)) return true;
-      if (coachRole === true || isRoleObjectActive(coachRole)) return true;
+      if (tutorRole === true || isRoleObjectAllowed(tutorRole)) return true;
+      if (coachRole === true || isRoleObjectAllowed(coachRole)) return true;
+
       const singularRole = typeof userData.role === 'string' ? userData.role.trim().toLowerCase() : '';
-      if (singularRole === 'tutor') return true;
-      if (Array.isArray(userData.roles) && userData.roles.some((role) => (role || '').toLowerCase() === 'tutor')) {
+      if (singularRole === 'tutor' || singularRole === 'hybrid') return true;
+
+      if (Array.isArray(userData.roles) && userData.roles.some((role) => {
+        const val = (role || '').toLowerCase();
+        return val === 'tutor' || val === 'hybrid';
+      })) {
         return true;
       }
+
       return false;
     }
 
