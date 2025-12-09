@@ -465,6 +465,11 @@
         return;
       }
 
+      if (!tutorId) {
+        console.warn('Favourite toggle skipped: missing tutorId');
+        return;
+      }
+
       if (!docFn || !updateDocFn || !arrayUnion || !arrayRemove) {
         alert('Favourite tutors are unavailable right now. Please try again later.');
         return;
@@ -480,18 +485,8 @@
           ? { favoriteTutorIds: arrayRemove(tutorId) }
           : { favoriteTutorIds: arrayUnion(tutorId) };
 
-        try {
-          await updateDocFn(userRef, payload);
-        } catch (error) {
-          const notFound = error && (error.code === 'not-found' || /no document to update/i.test(String(error)));
-          if (notFound && typeof setDocFn === 'function') {
-            // Create a stub user doc so we can store favourites
-            await setDocFn(userRef, { favoriteTutorIds: [] }, { merge: true });
-            await updateDocFn(userRef, payload);
-          } else {
-            throw error;
-          }
-        }
+        // setDoc with merge + arrayUnion/arrayRemove creates the doc if missing and reduces 404 retries
+        await setDocFn(userRef, payload, { merge: true });
 
         if (isFavourite) {
           favoriteTutorIds.delete(tutorId);
