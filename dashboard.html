@@ -301,6 +301,9 @@
           <button class="btn primary" onclick="window.location.href='book.html'">
             📅 Book Sessions
           </button>
+          <button class="btn secondary" id="edit-book-form-btn" type="button" hidden>
+            ✏️ Edit my Book Form
+          </button>
         </div>
       </div>
 
@@ -410,6 +413,7 @@
   const tutorLinkDisplayEl = document.getElementById("tutor-link-display");
   const copyTutorLinkBtn = document.getElementById("copy-tutor-link");
   const homeLinkBtn = document.getElementById("home-link-btn");
+  const editBookFormBtn = document.getElementById("edit-book-form-btn");
   const subjectRequestForm = document.getElementById("subject-request-form");
   const subjectRequestInput = document.getElementById("subject-request-input");
   const subjectRequestMessage = document.getElementById("subject-request-message");
@@ -434,6 +438,25 @@
     const baseClass = "subject-request-message";
     subjectRequestMessage.className = state ? `${baseClass} ${state}` : baseClass;
     subjectRequestMessage.textContent = text || "";
+  }
+
+  function isAdminUserData(userData) {
+    if (!userData) return false;
+    const email = (userData.email || "").toLowerCase();
+    if (email === "amitshalev1510@gmail.com") return true;
+    if (userData.isAdmin === true || userData.admin === true) return true;
+    if (userData.roles) {
+      if (userData.roles.admin === true) return true;
+      if (Array.isArray(userData.roles)) {
+        const lowered = userData.roles.map((role) => (role || "").toLowerCase());
+        if (lowered.includes("admin")) return true;
+      }
+      if (typeof userData.roles === "object" && !Array.isArray(userData.roles)) {
+        const roleKeys = Object.keys(userData.roles).map((key) => key.toLowerCase());
+        if (roleKeys.includes("admin")) return true;
+      }
+    }
+    return false;
   }
 
   async function handleSubjectRequestSubmit(event) {
@@ -557,6 +580,17 @@
     subjectRequestForm.addEventListener("submit", handleSubjectRequestSubmit);
   }
 
+  if (editBookFormBtn) {
+    editBookFormBtn.addEventListener("click", () => {
+      try {
+        sessionStorage.setItem("page-editor:book", "1");
+      } catch (_err) {
+        // ignore storage issues
+      }
+      window.location.href = "book.html?editPage=1";
+    });
+  }
+
   // Check authentication
   onAuth(auth, async (user) => {
     if (!user) {
@@ -585,6 +619,10 @@
         ? userData.favoriteTutorIds.filter((id) => typeof id === 'string' && id.trim())
         : [];
       window.__latestUserData = userData;
+
+      if (editBookFormBtn) {
+        editBookFormBtn.hidden = !isAdminUserData(userData);
+      }
       
       // Display user info
       const fullName = userData.fullName || user.displayName || "Friend";

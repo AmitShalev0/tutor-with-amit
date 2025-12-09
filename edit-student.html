@@ -5,6 +5,17 @@
   <title>Edit Student – Amit Tutoring</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="style.css" />
+  <style>
+    .link-button {
+      background: none;
+      border: none;
+      color: var(--primary-color);
+      text-decoration: underline;
+      padding: 0;
+      cursor: pointer;
+      font: inherit;
+    }
+  </style>
 </head>
 <body>
 <div id="site-header"></div>
@@ -41,7 +52,9 @@
 
     <div class="field-row">
       <label>Main Subject</label>
-      <input type="text" name="subject" id="subject" placeholder="e.g. Math 7, Physics 30, Chemistry 30 IB, Biology 30..." />
+      <input type="text" name="subject" id="subject" placeholder="Search and choose a course" list="student-course-options" autocomplete="off" />
+      <datalist id="student-course-options"></datalist>
+      <p class="help-text">Pick from the list or <button type="button" id="request-course-btn" class="link-button">Don't see your course? Add it here!</button></p>
     </div>
 
     <div class="field-row">
@@ -90,19 +103,34 @@
 
 <!-- Edit student logic -->
 <script type="module">
+  import { CANONICAL_COURSES, buildCourseIndex, sortCourses, findCourseByLabel } from './course-catalog.js';
+
   const auth = window.firebaseAuth;
   const db = window.firebaseDb;
   const onAuth = window.firebaseOnAuth;
   const getDoc = window.firestoreGetDoc;
+  const getDocs = window.firestoreGetDocs;
   const updateDoc = window.firestoreUpdateDoc;
+  const addDoc = window.firestoreAddDoc;
+  const collection = window.firestoreCollection;
   const doc = window.firestoreDoc;
   const serverTimestamp = window.firestoreServerTimestamp;
 
+  const COURSES_COLLECTION = 'courses';
+  const COURSE_REQUESTS_COLLECTION = 'courseRequests';
+
   const form = document.getElementById("edit-student-form");
   const msg = document.getElementById("form-message");
+  const subjectInput = document.getElementById('subject');
+  const courseOptions = document.getElementById('student-course-options');
+  const requestCourseBtn = document.getElementById('request-course-btn');
 
   let currentUser = null;
   let studentId = null;
+  let canonicalCourses = [];
+  let courseIndex = null;
+  let currentCourseId = null;
+  let coursesPromise = null;
 
   // Get student ID from URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -113,6 +141,140 @@
     window.location.href = "dashboard.html";
   }
 
+  function getDefaultCourses() {
+    return sortCourses(CANONICAL_COURSES.map((c) => ({ ...c })));
+  }
+
+  function setCourses(list) {
+    canonicalCourses = sortCourses(list || []);
+    courseIndex = buildCourseIndex(canonicalCourses);
+  }
+
+  async function loadCoursesFromFirestore() {
+    if (!db) {
+      setCourses(getDefaultCourses());
+      return canonicalCourses;
+    }
+    try {
+      const querySnap = await getDocs(collection(db, COURSES_COLLECTION));
+      const rows = querySnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+      if (rows.length) {
+        setCourses(rows);
+        return canonicalCourses;
+      }
+    } catch (error) {
+      console.warn('Courses fetch failed, using defaults', error);
+    }
+
+    setCourses(getDefaultCourses());
+    return canonicalCourses;
+  }
+
+  function getCourseBySubjectAndLevel(subjectGroup, gradeCeiling) {
+    const candidates = canonicalCourses
+      .filter((c) => c.subjectGroup === subjectGroup)
+      .sort((a, b) => (a.gradeCeiling || 0) - (b.gradeCeiling || 0));
+    if (!candidates.length) return null;
+    if (gradeCeiling) {
+      const exact = candidates.find((c) => c.gradeCeiling === gradeCeiling);
+      if (exact) return exact;
+      const lower = candidates.filter((c) => c.gradeCeiling <= gradeCeiling);
+      if (lower.length) return lower[lower.length - 1];
+    }
+    return candidates[candidates.length - 1];
+  }
+
+  function inferCourseFromText(value) {
+    if (!value) return null;
+    const text = value.toString().trim().toLowerCase();
+    if (!text) return null;
+
+    let subjectGroup = null;
+    if (text.includes('math')) subjectGroup = 'math';
+    else if (text.includes('english') || text.includes('ela')) subjectGroup = 'english';
+    else if (text.includes('social')) subjectGroup = 'social';
+    else if (text.includes('science')) subjectGroup = 'science';
+
+    let gradeCeiling = null;
+    if (/gr\s*12|grade\s*12|\b12\b/.test(text)) gradeCeiling = 12;
+    else if (/gr\s*11|grade\s*11|\b11\b/.test(text)) gradeCeiling = 11;
+    else if (/gr\s*10|grade\s*10|\b10\b/.test(text)) gradeCeiling = 10;
+    else if (/jr|junior|grade\s*[7-9]|\b7\b|\b8\b|\b9\b/.test(text)) gradeCeiling = 9;
+    else if (/elem|elementary|k-6|\bk\b|kindergarten|\b[1-6]\b/.test(text)) gradeCeiling = 6;
+
+    if (!subjectGroup) return null;
+    return getCourseBySubjectAndLevel(subjectGroup, gradeCeiling || undefined);
+  }
+
+  function findCourseFromInput(value) {
+    if (!value) return null;
+    const direct = courseIndex ? findCourseByLabel(value, courseIndex) : null;
+    if (direct) return direct;
+    return inferCourseFromText(value);
+  }
+
+  function renderCourseOptions(priorityCourseId = null) {
+    if (!courseOptions) return;
+    courseOptions.innerHTML = '';
+    const seen = new Set();
+    const addOption = (course) => {
+      if (!course || seen.has(course.id)) return;
+      seen.add(course.id);
+      const opt = document.createElement('option');
+      opt.value = course.label;
+      courseOptions.appendChild(opt);
+    };
+
+    if (priorityCourseId) {
+      const course = courseIndex?.byId.get(priorityCourseId);
+      if (course) addOption(course);
+    }
+
+    canonicalCourses.forEach(addOption);
+  }
+
+  function handleCourseInputChange() {
+    const value = document.getElementById('subject').value;
+    const match = findCourseFromInput(value);
+    currentCourseId = match ? match.id : null;
+  }
+
+  async function submitCourseRequest() {
+    const name = prompt('What is the exact course name?');
+    if (!name) return;
+    const school = prompt('Which school do you attend?');
+    if (!school) return;
+
+    try {
+      await addDoc(collection(db, COURSE_REQUESTS_COLLECTION), {
+        name: name.trim(),
+        school: school.trim(),
+        userId: currentUser?.uid || null,
+        userEmail: currentUser?.email || null,
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
+      msg.textContent = 'Thanks! Your course request was sent for review.';
+      msg.classList.remove('error');
+      msg.classList.add('ok');
+    } catch (error) {
+      console.error('Failed to submit course request', error);
+      msg.textContent = 'Unable to submit course request. Please try again later.';
+      msg.classList.add('error');
+    }
+  }
+
+  if (subjectInput) {
+    subjectInput.addEventListener('change', handleCourseInputChange);
+    subjectInput.addEventListener('input', () => {
+      currentCourseId = null;
+    });
+  }
+
+  if (requestCourseBtn) {
+    requestCourseBtn.addEventListener('click', submitCourseRequest);
+  }
+
   // Check authentication
   onAuth(auth, async (user) => {
     if (!user) {
@@ -120,6 +282,8 @@
       return;
     }
     currentUser = user;
+
+    coursesPromise = loadCoursesFromFirestore();
     
     // Load student data
     await loadStudentData();
@@ -139,6 +303,11 @@
 
       const student = studentDoc.data();
 
+      await (coursesPromise || loadCoursesFromFirestore());
+      const matchedCourse = findCourseFromInput(student.subject || student.subjectId);
+      currentCourseId = matchedCourse ? matchedCourse.id : null;
+      renderCourseOptions(currentCourseId);
+
       // Verify ownership
       if (student.userId !== currentUser.uid) {
         alert("You don't have permission to edit this student");
@@ -150,10 +319,12 @@
       document.getElementById("student-name").value = student.studentName || "";
       document.getElementById("birthdate").value = student.birthdate || "";
       document.getElementById("pronouns").value = student.pronouns || "";
-      document.getElementById("subject").value = student.subject || "";
+      document.getElementById("subject").value = matchedCourse?.label || student.subject || "";
       document.getElementById("school").value = student.school || "";
       document.getElementById("relationship").value = student.relationship || "";
       document.getElementById("notes").value = student.notes || "";
+
+      handleCourseInputChange();
 
       msg.textContent = "";
     } catch (err) {
@@ -178,7 +349,14 @@
       studentName: document.getElementById("student-name").value.trim(),
       birthdate: document.getElementById("birthdate").value,
       pronouns: document.getElementById("pronouns").value || null,
-      subject: document.getElementById("subject").value.trim() || null,
+      subject: (() => {
+        const match = findCourseFromInput(document.getElementById("subject").value.trim());
+        return match ? match.label : (document.getElementById("subject").value.trim() || null);
+      })(),
+      subjectId: (() => {
+        const match = findCourseFromInput(document.getElementById("subject").value.trim());
+        return match ? match.id : null;
+      })(),
       school: document.getElementById("school").value.trim() || null,
       relationship: document.getElementById("relationship").value || null,
       notes: document.getElementById("notes").value.trim(),

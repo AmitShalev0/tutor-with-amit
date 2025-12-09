@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Course Picker Demo</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="container">
+  <h1>Course Picker Demo</h1>
+  <p>This page shows the reusable course picker. Attach the <code>data-course-picker</code> attribute to auto-initialize.</p>
+
+  <div id="demo-picker" data-course-picker></div>
+
+  <pre id="picker-output"></pre>
+
+  <script src="course-picker.js"></script>
+  <script>
+    const output = document.getElementById('picker-output');
+    const picker = window.CoursePicker.init('#demo-picker', {
+      defaultLevel: 'high-school',
+      onChange: (payload) => {
+        output.textContent = JSON.stringify(payload, null, 2);
+      }
+    });
+
+    if (picker) {
+      output.textContent = JSON.stringify(picker.getValue(), null, 2);
+    }
+  </script>
+</body>
+</html>

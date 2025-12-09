@@ -812,6 +812,18 @@ function setupBookingForm(settingsOverride) {
     }
   }
 
+  function setAvailabilitySource(options = {}) {
+    const scriptUrl = (typeof options.scriptUrl === 'string' && (options.scriptUrl.startsWith('http://') || options.scriptUrl.startsWith('https://')))
+      ? options.scriptUrl
+      : APPS_SCRIPT_URL;
+    const calendarId = (typeof options.calendarId === 'string' && options.calendarId.trim()) ? options.calendarId.trim() : null;
+    currentAvailabilitySource = { scriptUrl, calendarId };
+    currentWeekOffset = 0;
+    loadAvailability();
+  }
+
+  window.setBookingCalendarSource = setAvailabilitySource;
+
   function getMondayForOffset(offset = currentWeekOffset) {
     const base = new Date();
     const day = base.getDay();
@@ -1161,6 +1173,7 @@ function setupBookingForm(settingsOverride) {
   });
 
   let demoAvailable = { ...baseAvailabilityMap };
+  let currentAvailabilitySource = { scriptUrl: APPS_SCRIPT_URL, calendarId: null };
 
   const getBlocksForDay = (collection, dayIdx) => {
     if (!collection) {
@@ -1519,63 +1532,105 @@ function setupBookingForm(settingsOverride) {
     }
   }
 
+  function buildAvailabilityUrl(includeCallback = false) {
+    const source = currentAvailabilitySource || {};
+    const baseUrl = source.scriptUrl || APPS_SCRIPT_URL;
+    const urlObj = new URL(baseUrl);
+    urlObj.searchParams.set('action', 'getAvailability');
+    urlObj.searchParams.set('weekOffset', currentWeekOffset);
+    if (source.calendarId) {
+      urlObj.searchParams.set('calendarId', source.calendarId);
+    }
+    let callbackName = null;
+    if (includeCallback) {
+      callbackName = 'handleAvailabilityResponse' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      urlObj.searchParams.set('callback', callbackName);
+    }
+    return { url: urlObj.toString(), callbackName };
+  }
+
+  async function fetchAvailabilityViaHttp(url) {
+    const response = await fetch(url, {
+      method: 'GET',
+      mode: 'cors',
+      credentials: 'omit',
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const contentType = (response.headers.get('content-type') || '').toLowerCase();
+    if (contentType.includes('application/json')) {
+      return response.json();
+    }
+
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch (parseError) {
+      throw new Error(`Unexpected response format: ${parseError.message}`);
+    }
+  }
+
+  function fetchAvailabilityViaJsonp(url, callbackName) {
+    return new Promise((resolve, reject) => {
+      window[callbackName] = (data) => {
+        console.log('Received availability data (JSONP):', data);
+        delete window[callbackName];
+        resolve(data);
+      };
+
+      const script = document.createElement('script');
+      script.src = url;
+      script.onerror = (error) => {
+        console.error('Script loading error:', error);
+        delete window[callbackName];
+        reject(new Error('Failed to load availability data'));
+      };
+
+      document.head.appendChild(script);
+
+      script.onload = () => {
+        setTimeout(() => {
+          if (script.parentNode) {
+            document.head.removeChild(script);
+          }
+        }, 100);
+      };
+
+      setTimeout(() => {
+        if (window[callbackName]) {
+          console.error('Request timeout after 10 seconds');
+          delete window[callbackName];
+          if (script.parentNode) {
+            document.head.removeChild(script);
+          }
+          reject(new Error('Request timeout'));
+        }
+      }, 10000);
+    });
+  }
+
   async function loadAvailability(retryCount = 0) {
     try {
-      // Use JSONP to avoid CORS issues with Apps Script
-      const callbackName = 'handleAvailabilityResponse' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      const url = `${APPS_SCRIPT_URL}?action=getAvailability&weekOffset=${currentWeekOffset}&callback=${callbackName}`;
-      
-      console.log('Loading availability from:', url, 'Attempt:', retryCount + 1);
-      
-      // Create promise that will be resolved by the JSONP callback
-      const dataPromise = new Promise((resolve, reject) => {
-        // Set up callback function
-        window[callbackName] = (data) => {
-          console.log('Received availability data:', data);
-          delete window[callbackName];
-          resolve(data);
-        };
-        
-        // Create script tag
-        const script = document.createElement('script');
-        script.src = url;
-        script.onerror = (error) => {
-          console.error('Script loading error:', error);
-          delete window[callbackName];
-          reject(new Error('Failed to load availability data'));
-        };
-        
-        // Add to document
-        document.head.appendChild(script);
-        
-        // Clean up after load
-        script.onload = () => {
-          setTimeout(() => {
-            if (script.parentNode) {
-              document.head.removeChild(script);
-            }
-          }, 100);
-        };
-        
-        // Timeout after 15 seconds (increased from 10)
-        setTimeout(() => {
-          if (window[callbackName]) {
-            console.error('Request timeout after 15 seconds');
-            delete window[callbackName];
-            if (script.parentNode) {
-              document.head.removeChild(script);
-            }
-            reject(new Error('Request timeout'));
-          }
-        }, 10000);
-      });
-      
-      const data = await dataPromise;
-      
-      if (!data.success) {
-        throw new Error(data.message || "Failed to load availability");
+      const { url: fetchUrl } = buildAvailabilityUrl(false);
+      console.log('Loading availability from:', fetchUrl, 'Attempt:', retryCount + 1, '(fetch first)');
+
+      let data = null;
+      try {
+        data = await fetchAvailabilityViaHttp(fetchUrl);
+      } catch (fetchError) {
+        console.warn('Fetch availability failed, falling back to JSONP', fetchError);
+        const { url: jsonpUrl, callbackName } = buildAvailabilityUrl(true);
+        data = await fetchAvailabilityViaJsonp(jsonpUrl, callbackName);
       }
-      
+
+      if (!data || !data.success) {
+        throw new Error((data && data.message) || 'Failed to load availability');
+      }
+
       const configuredBlocks = (window.bookingSettings && window.bookingSettings.availabilityBlocks) || {};
 
       // Populate demoAvailable and demoBooked from server response and clamp to configured availability
@@ -1624,7 +1679,7 @@ function setupBookingForm(settingsOverride) {
       updateDayAvailability();
       
     } catch (error) {
-      console.error("Error loading availability:", error);
+      console.error('Error loading availability:', error);
       
       // Retry up to 2 times with exponential backoff
       if (retryCount < 2) {

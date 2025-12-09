@@ -59,6 +59,19 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Canonical courses available to all users
+    match /courses/{courseId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Course requests from students/tutors/hybrids
+    match /courseRequests/{requestId} {
+      allow create: if request.auth != null;
+      allow read: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
     // Tutor location/travel details (readable for map view)
     match /tutors/{tutorId} {
       allow read: if true;

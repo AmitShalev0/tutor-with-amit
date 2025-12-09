@@ -311,6 +311,13 @@
       padding: 16px;
     }
 
+    .form-actions-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
     .btn {
       background: var(--accent);
       color: white;
@@ -825,6 +832,7 @@
         <li><button onclick="showSection('booking-info')" class="nav-btn" data-section="booking-info">⚙️ Booking Info</button></li>
         <li><button onclick="showSection('students')" class="nav-btn" data-section="students">👥 Students</button></li>
         <li><button onclick="showSection('users')" class="nav-btn" data-section="users">🔐 Users</button></li>
+        <li><button onclick="showSection('courses')" class="nav-btn" data-section="courses">📚 Courses</button></li>
         <li><button onclick="showSection('blocked')" class="nav-btn" data-section="blocked">🚫 Blocked Emails</button></li>
         <li><button onclick="showSection('sync')" class="nav-btn" data-section="sync">🔄 Calendar Sync</button></li>
         <li><button onclick="showSection('invoices')" class="nav-btn" data-section="invoices">💰 Invoices</button></li>
@@ -856,16 +864,16 @@
             <p>Registered Users</p>
           </div>
         </div>
-        <p style="color: var(--muted);">Welcome to your admin panel. Use the sidebar to navigate.</p>
+        <p class="help-text">Welcome to your admin panel. Use the sidebar to navigate.</p>
       </section>
 
       <!-- Sessions -->
       <section id="sessions-section" class="admin-section">
         <div class="section-header">
           <h2>Sessions</h2>
-          <div style="display: flex; gap: 0.5rem;">
-            <button class="btn btn-danger" id="delete-selected-sessions-btn" onclick="deleteSelectedSessions()" style="display: none;">Delete Selected (<span id="selected-sessions-count">0</span>)</button>
-            <button class="btn btn-warning" id="bulk-edit-times-btn" onclick="openBulkEditModal()" style="display: none;">Edit Selected Times</button>
+          <div class="section-actions">
+            <button class="btn btn-danger hidden" id="delete-selected-sessions-btn" onclick="deleteSelectedSessions()">Delete Selected (<span id="selected-sessions-count">0</span>)</button>
+            <button class="btn btn-warning hidden" id="bulk-edit-times-btn" onclick="openBulkEditModal()">Edit Selected Times</button>
             <button class="btn" onclick="loadSessions()">🔄 Refresh</button>
           </div>
         </div>
@@ -1030,6 +1038,65 @@
         <div id="users-container" class="loading">Loading users...</div>
       </section>
 
+      <!-- Courses -->
+      <section id="courses-section" class="admin-section">
+        <div class="section-header">
+          <h2>Courses</h2>
+          <div class="section-actions">
+            <button class="btn" onclick="loadCoursesAdmin()">🔄 Refresh</button>
+            <button class="btn" onclick="resetCourseForm(true)">+ New Course</button>
+            <button class="btn btn-danger" id="courses-bulk-delete-btn" onclick="bulkDeleteCourses()" disabled>🗑 Delete Selected</button>
+          </div>
+        </div>
+
+        <form id="course-form" class="card" onsubmit="handleCourseFormSubmit(event)">
+          <input type="hidden" id="course-id" />
+          <input type="hidden" id="course-request-id" />
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="course-name">Course name*</label>
+              <input type="text" id="course-name" required placeholder="e.g. Math 20" />
+            </div>
+            <div class="form-group">
+              <label for="course-subject">Subject</label>
+              <select id="course-subject">
+                <option value="">Select subject...</option>
+                <option value="math">Math</option>
+                <option value="english">English</option>
+                <option value="social">Social</option>
+                <option value="science">Science</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="course-grade">Grade ceiling</label>
+              <input type="number" id="course-grade" min="1" max="12" step="1" placeholder="e.g. 11" />
+            </div>
+            <div class="form-group">
+              <label for="course-school">School</label>
+              <input type="text" id="course-school" placeholder="e.g. U of A, Western Canada High" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="course-description">Description</label>
+            <textarea id="course-description" rows="3" placeholder="Notes or reason (for denied courses)"></textarea>
+          </div>
+          <div class="form-actions form-actions-row">
+            <button type="submit" class="btn" id="course-save-btn">Save Course</button>
+            <button type="button" class="btn btn-secondary" onclick="resetCourseForm(false)">Clear</button>
+          </div>
+          <p id="courses-message" class="form-message" role="status" aria-live="polite"></p>
+        </form>
+
+        <div id="courses-table" class="loading">Loading courses...</div>
+
+        <h3 class="section-subheading">Pending Courses</h3>
+        <div id="pending-courses-table" class="loading">Loading pending course requests...</div>
+
+        <h3 class="section-subheading">Denied Courses</h3>
+        <div id="denied-courses-table" class="loading">Loading denied course requests...</div>
+      </section>
+
       <!-- Blocked Emails -->
       <section id="blocked-section" class="admin-section">
         <div class="section-header">
@@ -1115,7 +1182,7 @@
           <input type="text" id="session-subject" placeholder="e.g. Math 7, Physics 30">
         </div>
 
-        <div style="display: flex; gap: 12px; margin-top: 24px;">
+        <div class="modal-action-row">
           <button type="submit" class="btn">Create Session</button>
           <button type="button" class="btn btn-secondary" onclick="closeAddSessionModal()">Cancel</button>
         </div>
@@ -1151,21 +1218,128 @@
     </div>
   </div>
 
+  <!-- Edit Student Modal -->
+  <div id="student-edit-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Edit Student</h3>
+        <button class="modal-close" onclick="closeStudentEditModal()">×</button>
+      </div>
+      <form id="student-edit-form">
+        <div class="form-group">
+          <label for="admin-student-name">Student's Full Name*</label>
+          <input type="text" id="admin-student-name" name="student_name" placeholder="Alex Johnson" required />
+        </div>
+
+        <div class="form-group">
+          <label for="admin-birthdate">Birthdate</label>
+          <input type="date" id="admin-birthdate" name="birthdate" min="1900-01-01" max="2030-12-31" />
+        </div>
+
+        <div class="form-group">
+          <label for="admin-pronouns">Pronouns</label>
+          <select id="admin-pronouns" name="pronouns">
+            <option value="">Please select pronouns</option>
+            <option value="he/him">He/Him</option>
+            <option value="she/her">She/Her</option>
+            <option value="they/them">They/Them</option>
+            <option value="ze/zir">Ze/Zir</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="admin-student-subject">Main Subject</label>
+          <input type="text" id="admin-student-subject" name="subject" placeholder="Search or choose a course" list="admin-student-subject-options" autocomplete="off" />
+          <datalist id="admin-student-subject-options"></datalist>
+          <p class="help-text" id="admin-student-subject-help">Choose a course from the list or type any subject.</p>
+        </div>
+
+        <div class="form-group">
+          <label for="admin-school">School</label>
+          <input type="text" id="admin-school" name="school" placeholder="e.g. Woodbine Elementary" />
+        </div>
+
+        <div class="form-group">
+          <label for="admin-relationship">Relationship</label>
+          <select id="admin-relationship" name="relationship">
+            <option value="">Select relationship...</option>
+            <option value="dependent">Dependent</option>
+            <option value="self">Self (I'm the student)</option>
+            <option value="sibling">Sibling</option>
+            <option value="friend">Friend</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="admin-notes">Notes</label>
+          <textarea id="admin-notes" name="notes" rows="4" placeholder="Any additional information..."></textarea>
+        </div>
+
+        <p id="student-edit-status" class="form-message" role="status" aria-live="polite"></p>
+
+        <div class="modal-action-row">
+          <button type="button" class="btn btn-secondary" onclick="closeStudentEditModal()">Cancel</button>
+          <button type="submit" class="btn" id="student-edit-save-btn">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script type="module">
     import { auth, db, storage, ref, uploadBytes, getDownloadURL, onAuthStateChanged, signOut, collection, getDocs, getDoc, query, where, orderBy, deleteDoc, doc, updateDoc, setDoc, serverTimestamp } from './firebase-config.js';
+    import { CANONICAL_COURSES, sortCourses, buildCourseIndex, findCourseByLabel } from './course-catalog.js';
     import './role-utils.js';
 
     const ADMIN_UID = 'fUXnvGI024fYp4w1AvKUcbM7p8z2';
+  const COURSES_COLLECTION = 'courses';
+  const COURSE_REQUESTS_COLLECTION = 'courseRequests';
     let currentUser = null;
     let allSessions = [];
     let allStudents = [];
     let currentRenderedSessions = [];
     let currentRenderedSessionIds = [];
     let recurringGroupSessions = new Map();
+  let adminCourses = [];
+  let adminPendingCourses = [];
+  let adminDeniedCourses = [];
     let expandedRecurringGroupIds = new Set();
     let bulkEditSessionIds = [];
     let bulkEditRecurringKey = null;
     let invoiceCache = [];
+    let adminCourseList = [];
+    let adminCourseIndex = null;
+    let adminCoursePromise = null;
+    let currentAdminCourseId = null;
+    let editingStudentId = null;
+    let editingStudentRecord = null;
+    let selectedCourseIds = new Set();
+    const courseForm = document.getElementById('course-form');
+    const courseIdInput = document.getElementById('course-id');
+    const courseRequestIdInput = document.getElementById('course-request-id');
+    const courseNameInput = document.getElementById('course-name');
+    const courseSubjectInput = document.getElementById('course-subject');
+    const courseGradeInput = document.getElementById('course-grade');
+    const courseSchoolInput = document.getElementById('course-school');
+    const courseDescriptionInput = document.getElementById('course-description');
+    const courseSaveBtn = document.getElementById('course-save-btn');
+    const coursesStatus = document.getElementById('courses-message');
+    const coursesBulkDeleteBtn = document.getElementById('courses-bulk-delete-btn');
+
+    const studentEditModal = document.getElementById('student-edit-modal');
+    const studentEditForm = document.getElementById('student-edit-form');
+    const studentEditStatus = document.getElementById('student-edit-status');
+    const adminStudentNameInput = document.getElementById('admin-student-name');
+    const adminBirthdateInput = document.getElementById('admin-birthdate');
+    const adminPronounsSelect = document.getElementById('admin-pronouns');
+    const adminSubjectInput = document.getElementById('admin-student-subject');
+    const adminSubjectOptions = document.getElementById('admin-student-subject-options');
+    const adminSubjectHelp = document.getElementById('admin-student-subject-help');
+    const adminSchoolInput = document.getElementById('admin-school');
+    const adminRelationshipSelect = document.getElementById('admin-relationship');
+    const adminNotesInput = document.getElementById('admin-notes');
+    const studentEditSaveBtn = document.getElementById('student-edit-save-btn');
 
     const INVOICE_STATUS_READY = 'ready';
     const INVOICE_STATUS_SENT = 'sent';
@@ -1247,6 +1421,263 @@
       map.set('tues', '1');
       return map;
     })();
+
+    function getAdminDefaultCourses() {
+      return sortCourses(CANONICAL_COURSES.map((c) => ({ ...c })));
+    }
+
+    function setAdminCourses(list) {
+      adminCourseList = sortCourses(list || []);
+      adminCourseIndex = buildCourseIndex(adminCourseList);
+    }
+
+    async function ensureAdminCoursesLoaded() {
+      if (adminCoursePromise) return adminCoursePromise;
+      adminCoursePromise = (async () => {
+        if (!db || !collection || !getDocs) {
+          setAdminCourses(getAdminDefaultCourses());
+          return adminCourseList;
+        }
+
+        try {
+          const snap = await getDocs(collection(db, COURSES_COLLECTION));
+          const rows = snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+          if (rows.length) {
+            setAdminCourses(rows);
+            return adminCourseList;
+          }
+        } catch (error) {
+          console.warn('Admin courses: using defaults because Firestore fetch failed', error);
+        }
+
+        setAdminCourses(getAdminDefaultCourses());
+        return adminCourseList;
+      })();
+      return adminCoursePromise;
+    }
+
+    function getAdminCourseBySubjectAndLevel(subjectGroup, gradeCeiling) {
+      const candidates = adminCourseList
+        .filter((c) => c.subjectGroup === subjectGroup)
+        .sort((a, b) => (a.gradeCeiling || 0) - (b.gradeCeiling || 0));
+      if (!candidates.length) return null;
+      if (gradeCeiling) {
+        const exact = candidates.find((c) => c.gradeCeiling === gradeCeiling);
+        if (exact) return exact;
+        const lower = candidates.filter((c) => c.gradeCeiling <= gradeCeiling);
+        if (lower.length) return lower[lower.length - 1];
+      }
+      return candidates[candidates.length - 1];
+    }
+
+    function inferAdminCourseFromText(value) {
+      if (!value) return null;
+      const text = value.toString().trim().toLowerCase();
+      if (!text) return null;
+
+      let subjectGroup = null;
+      if (text.includes('math')) subjectGroup = 'math';
+      else if (text.includes('english') || text.includes('ela')) subjectGroup = 'english';
+      else if (text.includes('social')) subjectGroup = 'social';
+      else if (text.includes('science')) subjectGroup = 'science';
+
+      let gradeCeiling = null;
+      if (/gr\s*12|grade\s*12|\b12\b/.test(text)) gradeCeiling = 12;
+      else if (/gr\s*11|grade\s*11|\b11\b/.test(text)) gradeCeiling = 11;
+      else if (/gr\s*10|grade\s*10|\b10\b/.test(text)) gradeCeiling = 10;
+      else if (/jr|junior|grade\s*[7-9]|\b7\b|\b8\b|\b9\b/.test(text)) gradeCeiling = 9;
+      else if (/elem|elementary|k-6|\bk\b|kindergarten|\b[1-6]\b/.test(text)) gradeCeiling = 6;
+
+      if (!subjectGroup) return null;
+      return getAdminCourseBySubjectAndLevel(subjectGroup, gradeCeiling || undefined);
+    }
+
+    function findAdminCourseFromInput(value) {
+      if (!value) return null;
+      const direct = adminCourseIndex ? findCourseByLabel(value, adminCourseIndex) : null;
+      if (direct) return direct;
+      return inferAdminCourseFromText(value);
+    }
+
+    function renderAdminCourseOptions(priorityCourseId = null) {
+      if (!adminSubjectOptions) return;
+      adminSubjectOptions.innerHTML = '';
+      const seen = new Set();
+      const addOption = (course) => {
+        if (!course || seen.has(course.id)) return;
+        seen.add(course.id);
+        const opt = document.createElement('option');
+        opt.value = course.label;
+        adminSubjectOptions.appendChild(opt);
+      };
+
+      if (priorityCourseId) {
+        const course = adminCourseIndex?.byId.get(priorityCourseId);
+        if (course) addOption(course);
+      }
+
+      adminCourseList.forEach(addOption);
+    }
+
+    function handleAdminSubjectChange() {
+      const value = adminSubjectInput ? adminSubjectInput.value : '';
+      const match = findAdminCourseFromInput(value);
+      currentAdminCourseId = match ? match.id : null;
+      if (adminSubjectHelp) {
+        adminSubjectHelp.textContent = match
+          ? `Matched to ${match.label}`
+          : 'Course not in list; will save exactly as typed.';
+      }
+    }
+
+    function showCoursesStatus(message, tone = '') {
+      if (!coursesStatus) return;
+      coursesStatus.textContent = message || '';
+      coursesStatus.className = 'form-message';
+      if (tone === 'ok') {
+        coursesStatus.classList.add('ok');
+      } else if (tone === 'error') {
+        coursesStatus.classList.add('error');
+      }
+    }
+
+    function resetCourseForm(focus = false) {
+      if (courseForm) {
+        courseForm.reset();
+      }
+      if (courseIdInput) courseIdInput.value = '';
+      if (courseRequestIdInput) courseRequestIdInput.value = '';
+      if (courseSaveBtn) {
+        courseSaveBtn.textContent = 'Save Course';
+        courseSaveBtn.disabled = false;
+      }
+      showCoursesStatus('');
+      if (focus && courseNameInput) {
+        courseNameInput.focus();
+      }
+    }
+
+    function populateCourseForm(course = {}, options = {}) {
+      const { requestId = '' } = options;
+      if (courseIdInput) courseIdInput.value = course.id || '';
+      if (courseRequestIdInput) courseRequestIdInput.value = requestId || '';
+      if (courseNameInput) courseNameInput.value = course.label || course.name || '';
+      if (courseSubjectInput) courseSubjectInput.value = course.subjectGroup || '';
+      if (courseGradeInput) courseGradeInput.value = course.gradeCeiling || '';
+      if (courseSchoolInput) courseSchoolInput.value = course.school || '';
+      if (courseDescriptionInput) courseDescriptionInput.value = course.description || course.reason || '';
+      if (courseSaveBtn) courseSaveBtn.textContent = course.id ? 'Update Course' : 'Save Course';
+      showCoursesStatus(course.id ? 'Editing existing course' : 'Creating new course');
+      if (courseNameInput) courseNameInput.focus();
+    }
+
+    function normalizeCourseName(value) {
+      return (value || '').trim();
+    }
+
+    function courseNameExists(name, excludeId = null) {
+      const target = normalizeCourseName(name).toLowerCase();
+      if (!target) return false;
+      return adminCourses.some((c) => {
+        const candidate = normalizeCourseName(c.label || c.name).toLowerCase();
+        if (!candidate) return false;
+        if (excludeId && c.id === excludeId) return false;
+        return candidate === target;
+      });
+    }
+
+    function toggleCourseSelection(courseId, checked, updateSet = true) {
+      if (!courseId) return;
+      if (updateSet) {
+        if (checked) {
+          selectedCourseIds.add(courseId);
+        } else {
+          selectedCourseIds.delete(courseId);
+        }
+      }
+    }
+
+    function updateCourseBulkActions() {
+      const count = selectedCourseIds.size;
+      if (coursesBulkDeleteBtn) {
+        coursesBulkDeleteBtn.disabled = count === 0;
+        coursesBulkDeleteBtn.textContent = count > 0 ? `🗑 Delete Selected (${count})` : '🗑 Delete Selected';
+      }
+    }
+
+    async function handleCourseFormSubmit(event) {
+      if (event) event.preventDefault();
+      if (!courseForm) return;
+
+      const name = normalizeCourseName(courseNameInput?.value || '');
+      const subjectGroup = (courseSubjectInput?.value || '').trim().toLowerCase();
+      const gradeRaw = (courseGradeInput?.value || '').trim();
+      const gradeCeiling = gradeRaw === '' ? NaN : Number(gradeRaw);
+      const school = (courseSchoolInput?.value || '').trim();
+      const description = (courseDescriptionInput?.value || '').trim();
+      const courseId = courseIdInput?.value || '';
+      const requestId = courseRequestIdInput?.value || '';
+
+      if (!name) {
+        showCoursesStatus('Course name is required.', 'error');
+        if (courseNameInput) courseNameInput.focus();
+        return;
+      }
+
+      if (courseNameExists(name, courseId || null)) {
+        showCoursesStatus('A course with that name already exists.', 'error');
+        return;
+      }
+
+      const order = Number.isFinite(gradeCeiling) ? gradeCeiling * 10 : 999;
+      const payload = {
+        name,
+        label: name,
+        subjectGroup: subjectGroup || null,
+        gradeCeiling: Number.isFinite(gradeCeiling) ? gradeCeiling : null,
+        order,
+        school: school || null,
+        description: description || null,
+        updatedAt: serverTimestamp()
+      };
+
+      const targetId = courseId || slugifyLabel(name);
+
+      if (courseSaveBtn) {
+        courseSaveBtn.disabled = true;
+        courseSaveBtn.textContent = 'Saving...';
+      }
+      showCoursesStatus('Saving course...');
+
+      try {
+        const courseRef = doc(db, COURSES_COLLECTION, targetId);
+        await setDoc(courseRef, {
+          ...payload,
+          createdAt: courseId ? undefined : serverTimestamp()
+        }, { merge: true });
+
+        if (requestId) {
+          await updateDoc(doc(db, COURSE_REQUESTS_COLLECTION, requestId), {
+            status: 'approved',
+            approvedCourseId: targetId,
+            resolvedAt: serverTimestamp()
+          });
+        }
+
+        showCoursesStatus('Course saved.', 'ok');
+        resetCourseForm(false);
+        selectedCourseIds.delete(targetId);
+        await loadCoursesAdmin();
+      } catch (error) {
+        console.error('Failed to save course', error);
+        showCoursesStatus('Unable to save course right now.', 'error');
+      } finally {
+        if (courseSaveBtn) {
+          courseSaveBtn.disabled = false;
+          courseSaveBtn.textContent = courseId ? 'Update Course' : 'Save Course';
+        }
+      }
+    }
 
     const ACCOUNT_TYPE_OPTIONS = [
       { value: 'student', label: 'Student Account' },
@@ -1525,6 +1956,74 @@
         default:
           return value || 'Unknown';
       }
+    }
+
+    function slugifyLabel(label) {
+      return (label || '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 80) || 'course-' + Date.now().toString(36);
+    }
+
+    function attachSortableTables(root = document) {
+      const tables = root.querySelectorAll('.data-table table');
+      tables.forEach((table) => {
+        if (table.dataset.sortableAttached === 'true') return;
+        table.dataset.sortableAttached = 'true';
+        const headers = Array.from(table.querySelectorAll('thead th'));
+        headers.forEach((th, index) => {
+          th.style.cursor = 'pointer';
+          th.addEventListener('click', () => {
+            const tbody = table.querySelector('tbody');
+            if (!tbody) return;
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const currentDir = th.dataset.sortDir === 'asc' ? 'desc' : 'asc';
+            headers.forEach((h) => delete h.dataset.sortDir);
+            th.dataset.sortDir = currentDir;
+
+            const isNumeric = rows.every((row) => {
+              const cell = row.children[index];
+              if (!cell) return false;
+              const value = cell.textContent.trim();
+              return value === '' || !Number.isNaN(Number(value.replace(/[^0-9.-]/g, '')));
+            });
+
+            const sorted = rows.sort((a, b) => {
+              const aText = (a.children[index]?.textContent || '').trim();
+              const bText = (b.children[index]?.textContent || '').trim();
+              if (isNumeric) {
+                const aNum = Number(aText.replace(/[^0-9.-]/g, '')) || 0;
+                const bNum = Number(bText.replace(/[^0-9.-]/g, '')) || 0;
+                return currentDir === 'asc' ? aNum - bNum : bNum - aNum;
+              }
+              return currentDir === 'asc'
+                ? aText.localeCompare(bText)
+                : bText.localeCompare(aText);
+            });
+
+            tbody.innerHTML = '';
+            sorted.forEach((row) => tbody.appendChild(row));
+          });
+        });
+      });
+    }
+
+    const adminContentRoot = document.querySelector('.admin-content');
+    if (adminContentRoot) {
+      const tableSortObserver = new MutationObserver(() => attachSortableTables(adminContentRoot));
+      tableSortObserver.observe(adminContentRoot, { childList: true, subtree: true });
+    }
+
+    function sortCoursesAdmin(list = []) {
+      return [...list].sort((a, b) => {
+        const orderA = typeof a.order === 'number' ? a.order : 999;
+        const orderB = typeof b.order === 'number' ? b.order : 999;
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.name || a.label || '').localeCompare(b.name || b.label || '');
+      });
     }
 
     function renderTutorProfileStatus(meta) {
@@ -2913,6 +3412,288 @@
       }
     }
 
+    function renderCoursesTable(courses) {
+      const container = document.getElementById('courses-table');
+      if (!container) return;
+      if (!courses || !courses.length) {
+        container.innerHTML = '<div class="empty-state"><p>No courses available yet.</p></div>';
+        return;
+      }
+
+      let html = '<div class="data-table"><table><thead><tr>';
+      html += '<th><input type="checkbox" id="courses-select-all" /></th>';
+      html += '<th>Name</th><th>Subject</th><th>Grade Ceiling</th><th>School</th><th>Description</th><th>Actions</th>';
+      html += '</tr></thead><tbody>';
+
+      courses.forEach((course) => {
+        const label = course.label || course.name || '-';
+        const subject = course.subjectGroup || '-';
+        const grade = course.gradeCeiling ? `Up to ${course.gradeCeiling}` : '-';
+        const school = course.school || '-';
+        const description = course.description || '-';
+        html += `<tr>
+          <td><input type="checkbox" class="course-row-checkbox" data-course-id="${escapeHtml(course.id)}" ${selectedCourseIds.has(course.id) ? 'checked' : ''}></td>
+          <td>${escapeHtml(label)}</td>
+          <td>${escapeHtml(subject)}</td>
+          <td>${escapeHtml(grade)}</td>
+          <td>${escapeHtml(school)}</td>
+          <td>${escapeHtml(description)}</td>
+          <td>
+            <button class="btn btn-secondary" onclick="adminEditCourse('${course.id}')">Edit</button>
+            <button class="btn btn-danger" onclick="adminDeleteCourse('${course.id}')">Delete</button>
+          </td>
+        </tr>`;
+      });
+
+      html += '</tbody></table></div>';
+      container.innerHTML = html;
+      attachSortableTables(container);
+
+      const selectAll = container.querySelector('#courses-select-all');
+      const rowCheckboxes = Array.from(container.querySelectorAll('.course-row-checkbox'));
+
+      if (selectAll) {
+        selectAll.checked = rowCheckboxes.length > 0 && rowCheckboxes.every((cb) => cb.checked);
+        selectAll.indeterminate = rowCheckboxes.some((cb) => cb.checked) && !selectAll.checked;
+        selectAll.addEventListener('change', (e) => {
+          const checked = e.target.checked;
+          rowCheckboxes.forEach((cb) => {
+            cb.checked = checked;
+            toggleCourseSelection(cb.dataset.courseId, checked, false);
+          });
+          updateCourseBulkActions();
+        });
+      }
+
+      rowCheckboxes.forEach((cb) => {
+        cb.addEventListener('change', (e) => {
+          toggleCourseSelection(e.target.dataset.courseId, e.target.checked, true);
+          updateCourseBulkActions();
+          if (selectAll) {
+            selectAll.checked = rowCheckboxes.length > 0 && rowCheckboxes.every((c) => c.checked);
+            selectAll.indeterminate = rowCheckboxes.some((c) => c.checked) && !selectAll.checked;
+          }
+        });
+      });
+    }
+
+    function renderPendingCourses(requests) {
+      const container = document.getElementById('pending-courses-table');
+      if (!container) return;
+      if (!requests || !requests.length) {
+        container.innerHTML = '<div class="empty-state"><p>No pending course requests.</p></div>';
+        return;
+      }
+
+      let html = '<div class="data-table"><table><thead><tr>';
+      html += '<th>Requested Course</th><th>School</th><th>Description</th><th>Submitted By</th><th>Submitted At</th><th>Actions</th>';
+      html += '</tr></thead><tbody>';
+
+      requests.forEach((req) => {
+        const submittedAt = req.createdAt?.toDate ? req.createdAt.toDate().toLocaleString() : (req.createdAt || '');
+        html += `<tr>
+          <td>${escapeHtml(req.name || '-')}</td>
+          <td>${escapeHtml(req.school || '-')}</td>
+          <td>${escapeHtml(req.description || req.reason || '-')}</td>
+          <td>${escapeHtml(req.userEmail || req.userId || '-')}</td>
+          <td>${escapeHtml(submittedAt)}</td>
+          <td>
+            <button class="btn" onclick="adminApproveCourse('${req.id}')">Approve</button>
+            <button class="btn btn-secondary" onclick="adminDenyCourse('${req.id}')">Deny</button>
+          </td>
+        </tr>`;
+      });
+
+      html += '</tbody></table></div>';
+      container.innerHTML = html;
+      attachSortableTables(container);
+    }
+
+    function renderDeniedCourses(requests) {
+      const container = document.getElementById('denied-courses-table');
+      if (!container) return;
+      if (!requests || !requests.length) {
+        container.innerHTML = '<div class="empty-state"><p>No denied course requests.</p></div>';
+        return;
+      }
+
+      let html = '<div class="data-table"><table><thead><tr>';
+      html += '<th>Course</th><th>School</th><th>Description / Reason</th><th>Submitted By</th><th>Actions</th>';
+      html += '</tr></thead><tbody>';
+
+      requests.forEach((req) => {
+        const reason = req.reason || 'No reason provided';
+        html += `<tr>
+          <td>${escapeHtml(req.name || '-')}</td>
+          <td>${escapeHtml(req.school || '-')}</td>
+          <td>${escapeHtml(req.description || reason)}</td>
+          <td>${escapeHtml(req.userEmail || req.userId || '-')}</td>
+          <td>
+            <button class="btn" onclick="adminApproveCourse('${req.id}')">Approve</button>
+          </td>
+        </tr>`;
+      });
+
+      html += '</tbody></table></div>';
+      container.innerHTML = html;
+      attachSortableTables(container);
+    }
+
+    async function loadCoursesAdmin() {
+      const statusEl = document.getElementById('courses-message');
+      if (statusEl) {
+        statusEl.textContent = '';
+        statusEl.className = 'form-message';
+      }
+
+      try {
+        const coursesSnap = await getDocs(collection(db, COURSES_COLLECTION));
+        adminCourses = coursesSnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+
+        // Auto-add canonical courses that are missing (non-destructive; keeps existing)
+        const existingByLabel = new Map(
+          adminCourses
+            .map((c) => [String(c.label || c.name || '').trim().toLowerCase(), c])
+        );
+        const missingCourses = CANONICAL_COURSES.filter((c) => {
+          const key = String(c.label || c.name || '').trim().toLowerCase();
+          return key && !existingByLabel.has(key);
+        });
+
+        if (missingCourses.length) {
+          await Promise.all(missingCourses.map(async (course) => {
+            const docId = course.id || slugifyLabel(course.label);
+            await setDoc(doc(db, COURSES_COLLECTION, docId), {
+              name: course.label,
+              label: course.label,
+              subjectGroup: course.subjectGroup || null,
+              gradeCeiling: course.gradeCeiling ?? null,
+              order: course.order ?? 999,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+              school: course.school || null,
+              description: course.description || null
+            }, { merge: true });
+            adminCourses.push({ id: docId, ...course });
+          }));
+        }
+
+        adminCourses = sortCoursesAdmin(adminCourses);
+        renderCoursesTable(adminCourses);
+        updateCourseBulkActions();
+
+        const requestsSnap = await getDocs(collection(db, COURSE_REQUESTS_COLLECTION));
+        const requests = requestsSnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+        adminPendingCourses = requests.filter((req) => (req.status || 'pending') !== 'denied' && (req.status || 'pending') !== 'approved');
+        adminDeniedCourses = requests.filter((req) => (req.status || 'pending') === 'denied');
+
+        renderPendingCourses(adminPendingCourses);
+        renderDeniedCourses(adminDeniedCourses);
+      } catch (error) {
+        console.error('Failed to load courses', error);
+        if (statusEl) {
+          statusEl.textContent = 'Unable to load courses right now.';
+          statusEl.classList.add('error');
+        }
+      }
+    }
+
+    window.loadCoursesAdmin = loadCoursesAdmin;
+
+    window.adminAddCourse = () => {
+      resetCourseForm(true);
+      showCoursesStatus('Creating a new course');
+      document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    window.adminEditCourse = (courseId) => {
+      const course = adminCourses.find((c) => c.id === courseId);
+      if (!course) return;
+      populateCourseForm(course);
+      document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    window.adminDeleteCourse = async (courseId) => {
+      const course = adminCourses.find((c) => c.id === courseId);
+      if (!course) return;
+      if (!confirm(`Delete course "${course.label || course.name}"?`)) return;
+      try {
+        await deleteDoc(doc(db, COURSES_COLLECTION, courseId));
+        loadCoursesAdmin();
+      } catch (error) {
+        console.error('Failed to delete course', error);
+        const statusEl = document.getElementById('courses-message');
+        if (statusEl) {
+          statusEl.textContent = 'Unable to delete course right now.';
+          statusEl.classList.add('error');
+        }
+      }
+    };
+
+    window.bulkDeleteCourses = async () => {
+      const ids = Array.from(selectedCourseIds);
+      if (!ids.length) {
+        alert('Select at least one course to delete.');
+        return;
+      }
+      if (!confirm(`Delete ${ids.length} course(s)? This cannot be undone.`)) return;
+
+      try {
+        for (const courseId of ids) {
+          try {
+            await deleteDoc(doc(db, COURSES_COLLECTION, courseId));
+            selectedCourseIds.delete(courseId);
+          } catch (innerErr) {
+            console.error('Failed to delete course', courseId, innerErr);
+          }
+        }
+        await loadCoursesAdmin();
+        updateCourseBulkActions();
+      } catch (error) {
+        console.error('Bulk delete error', error);
+        showCoursesStatus('Unable to delete some courses.', 'error');
+      }
+    };
+
+    window.adminApproveCourse = async (requestId) => {
+      const req = [...adminPendingCourses, ...adminDeniedCourses].find((r) => r.id === requestId);
+      if (!req) return;
+
+      populateCourseForm({
+        name: req.name || '',
+        label: req.name || '',
+        subjectGroup: req.subjectGroup || '',
+        gradeCeiling: req.gradeCeiling || '',
+        school: req.school || '',
+        description: req.description || req.reason || ''
+      }, { requestId });
+      showCoursesStatus('Review and save to approve this request');
+      document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    window.adminDenyCourse = async (requestId) => {
+      const req = adminPendingCourses.find((r) => r.id === requestId);
+      if (!req) return;
+      const reason = prompt('Reason for denial');
+      if (!reason) return;
+      try {
+        await updateDoc(doc(db, COURSE_REQUESTS_COLLECTION, requestId), {
+          status: 'denied',
+          reason: reason.trim(),
+          description: reason.trim(),
+          resolvedAt: serverTimestamp()
+        });
+        loadCoursesAdmin();
+      } catch (error) {
+        console.error('Failed to deny course', error);
+        const statusEl = document.getElementById('courses-message');
+        if (statusEl) {
+          statusEl.textContent = 'Unable to deny course right now.';
+          statusEl.classList.add('error');
+        }
+      }
+    };
+
     // Check authentication
     onAuthStateChanged(auth, (user) => {
       if (!user) {
@@ -2927,6 +3708,7 @@
       }
 
       currentUser = user;
+      ensureAdminCoursesLoaded().then(() => renderAdminCourseOptions()).catch((err) => console.warn('Admin courses load failed', err));
       // Load all data
       loadDashboard();
       loadSessions();
@@ -2934,6 +3716,7 @@
       loadBookingInfoSection();
       loadStudents();
       loadUsers();
+      loadCoursesAdmin();
       loadBlockedEmails();
       loadInvoices();
     });
@@ -2950,6 +3733,8 @@
         loadInvoices();
       } else if (sectionName === 'booking-info') {
         loadBookingInfoSection();
+      } else if (sectionName === 'courses') {
+        loadCoursesAdmin();
       }
     };
 
@@ -5107,6 +5892,150 @@ window.saveSessionChanges = async function (sessionId) {
       renderStudents(filtered);
     };
 
+    window.handleCourseFormSubmit = handleCourseFormSubmit;
+    window.resetCourseForm = resetCourseForm;
+
+    async function getStudentRecord(studentId) {
+      if (!studentId) return null;
+      const cached = allStudents.find((s) => s.id === studentId);
+      if (cached) return cached;
+      const snap = await getDoc(doc(db, 'students', studentId));
+      if (!snap.exists()) return null;
+      return { id: snap.id, ...snap.data() };
+    }
+
+    function populateStudentEditForm(student) {
+      if (!studentEditModal) return;
+      editingStudentId = student.id;
+      editingStudentRecord = student;
+
+      if (studentEditStatus) {
+        studentEditStatus.textContent = '';
+        studentEditStatus.className = 'form-message';
+      }
+
+      if (adminStudentNameInput) adminStudentNameInput.value = student.studentName || '';
+      if (adminBirthdateInput) adminBirthdateInput.value = student.birthdate || '';
+      if (adminPronounsSelect) adminPronounsSelect.value = student.pronouns || '';
+      const matchedCourse = findAdminCourseFromInput(student.subject || student.subjectId);
+      currentAdminCourseId = matchedCourse ? matchedCourse.id : null;
+      if (adminSubjectInput) adminSubjectInput.value = matchedCourse?.label || student.subject || '';
+      if (adminSchoolInput) adminSchoolInput.value = student.school || '';
+      if (adminRelationshipSelect) adminRelationshipSelect.value = student.relationship || '';
+      if (adminNotesInput) adminNotesInput.value = student.notes || '';
+
+      renderAdminCourseOptions(currentAdminCourseId);
+      handleAdminSubjectChange();
+
+      studentEditModal.classList.add('active');
+    }
+
+    window.closeStudentEditModal = () => {
+      editingStudentId = null;
+      editingStudentRecord = null;
+      currentAdminCourseId = null;
+      if (studentEditForm) studentEditForm.reset();
+      if (studentEditStatus) {
+        studentEditStatus.textContent = '';
+        studentEditStatus.className = 'form-message';
+      }
+      if (adminSubjectHelp) {
+        adminSubjectHelp.textContent = 'Choose a course from the list or type any subject.';
+      }
+      if (studentEditModal) studentEditModal.classList.remove('active');
+    };
+
+    window.editStudent = async (studentId) => {
+      try {
+        await ensureAdminCoursesLoaded();
+        const student = await getStudentRecord(studentId);
+        if (!student) {
+          alert('Student not found.');
+          return;
+        }
+        populateStudentEditForm(student);
+      } catch (error) {
+        console.error('Error loading student for edit:', error);
+        alert('Unable to load student for editing. Please try again.');
+      }
+    };
+
+    if (adminSubjectInput) {
+      adminSubjectInput.addEventListener('input', handleAdminSubjectChange);
+      adminSubjectInput.addEventListener('change', handleAdminSubjectChange);
+    }
+
+    if (studentEditForm) {
+      studentEditForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!editingStudentId) {
+          if (studentEditStatus) {
+            studentEditStatus.textContent = 'No student selected.';
+            studentEditStatus.classList.add('error');
+          }
+          return;
+        }
+
+        const subjectRaw = adminSubjectInput ? adminSubjectInput.value.trim() : '';
+        const matchedCourse = findAdminCourseFromInput(subjectRaw);
+
+        const payload = {
+          studentName: adminStudentNameInput ? adminStudentNameInput.value.trim() : '',
+          birthdate: adminBirthdateInput?.value || null,
+          pronouns: adminPronounsSelect?.value || null,
+          subject: matchedCourse ? matchedCourse.label : (subjectRaw || null),
+          subjectId: matchedCourse ? matchedCourse.id : null,
+          school: adminSchoolInput ? (adminSchoolInput.value.trim() || null) : null,
+          relationship: adminRelationshipSelect?.value || null,
+          notes: adminNotesInput ? adminNotesInput.value.trim() : '',
+          updatedAt: serverTimestamp()
+        };
+
+        if (!payload.studentName) {
+          if (studentEditStatus) {
+            studentEditStatus.textContent = 'Student name is required.';
+            studentEditStatus.classList.add('error');
+          }
+          return;
+        }
+
+        if (studentEditStatus) {
+          studentEditStatus.textContent = 'Saving changes...';
+          studentEditStatus.className = 'form-message';
+        }
+        if (studentEditSaveBtn) {
+          studentEditSaveBtn.disabled = true;
+          studentEditSaveBtn.textContent = 'Saving...';
+        }
+
+        try {
+          await updateDoc(doc(db, 'students', editingStudentId), payload);
+          if (studentEditStatus) {
+            studentEditStatus.textContent = 'Student updated successfully!';
+            studentEditStatus.classList.add('ok');
+          }
+          await loadStudents();
+          setTimeout(() => {
+            closeStudentEditModal();
+            if (studentEditSaveBtn) {
+              studentEditSaveBtn.disabled = false;
+              studentEditSaveBtn.textContent = 'Save Changes';
+            }
+          }, 600);
+        } catch (error) {
+          console.error('Error updating student:', error);
+          if (studentEditStatus) {
+            studentEditStatus.textContent = 'Failed to update student. Please try again.';
+            studentEditStatus.classList.add('error');
+          }
+          if (studentEditSaveBtn) {
+            studentEditSaveBtn.disabled = false;
+            studentEditSaveBtn.textContent = 'Save Changes';
+          }
+        }
+      });
+    }
+
     // Users
     window.loadUsers = async (options = {}) => {
       const container = document.getElementById('users-container');
@@ -6517,11 +7446,6 @@ window.saveSessionChanges = async function (sessionId) {
         console.error('Error loading user students:', error);
         container.innerHTML = `<div class="empty-state"><h3>Error loading students</h3><p>${error.message}</p></div>`;
       }
-    };
-
-    window.editStudent = (studentId) => {
-      // Redirect to edit-student.html with the student ID
-      window.location.href = `edit-student.html?id=${studentId}`;
     };
 
     window.deleteStudent = async (studentId) => {

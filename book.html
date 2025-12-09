@@ -86,7 +86,9 @@
 
     <div class="field-row">
       <label>Subject for this session*</label>
-      <input type="text" name="subject" id="subject" placeholder="e.g. Math 7, Physics 30, Chemistry 30 IB..." required />
+      <input type="text" name="subject" id="subject" placeholder="Search or choose a course" list="subject-options" autocomplete="off" required />
+      <datalist id="subject-options"></datalist>
+      <p class="help-text" id="subject-help"></p>
     </div>
 
     <div class="field-row" id="tutor-select-row">
@@ -214,6 +216,8 @@
 
 <!-- Booking logic -->
 <script type="module">
+  import { CANONICAL_COURSES, buildCourseIndex, sortCourses, findCourseByLabel } from './course-catalog.js';
+
   const auth = window.firebaseAuth;
   const db = window.firebaseDb;
   const onAuth = window.firebaseOnAuth;
@@ -256,6 +260,18 @@
   const DEFAULT_TUTOR_DOC_ID = 'fUXnvGI024fYp4w1AvKUcbM7p8z2';
   let tutorDirectoryCache = null;
   let tutorDirectoryPromise = null;
+
+  const COURSES_COLLECTION = 'courses';
+  const COURSE_REQUESTS_COLLECTION = 'courseRequests';
+  let canonicalCourses = [];
+  let courseIndex = null;
+  let courseLabelIndex = new Map();
+  let studentCourseMap = new Map();
+  let currentSubjectId = '';
+  let currentSubjectLabel = '';
+  const subjectInput = document.getElementById("subject");
+  const subjectOptions = document.getElementById("subject-options");
+  const subjectHelp = document.getElementById("subject-help");
 
   function normalizeLookupValue(value) {
     if (value == null) {
@@ -412,6 +428,233 @@
     return fallback;
   }
 
+  function getDefaultCourses() {
+    return sortCourses(CANONICAL_COURSES.map((c) => ({ ...c })));
+  }
+
+  function setCourses(list) {
+    canonicalCourses = sortCourses(list || []);
+    courseIndex = buildCourseIndex(canonicalCourses);
+    courseLabelIndex = new Map(canonicalCourses.map((c) => [((c.label || '').toLowerCase()), c]));
+  }
+
+  async function loadCoursesFromFirestore() {
+    if (!db || !collection || !getDocs) {
+      setCourses(getDefaultCourses());
+      return canonicalCourses;
+    }
+
+    try {
+      const snap = await getDocs(collection(db, COURSES_COLLECTION));
+      const rows = snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+      if (rows.length) {
+        setCourses(rows);
+        return canonicalCourses;
+      }
+    } catch (error) {
+      console.warn('Courses: using defaults because Firestore fetch failed', error);
+    }
+
+    setCourses(getDefaultCourses());
+    return canonicalCourses;
+  }
+
+  function courseById(courseId) {
+    if (!courseId || !courseIndex) return null;
+    return courseIndex.byId.get(courseId) || null;
+  }
+
+  function getCourseBySubjectAndLevel(subjectGroup, gradeCeiling) {
+    if (!subjectGroup || !canonicalCourses.length) return null;
+    const candidates = canonicalCourses
+      .filter((c) => c.subjectGroup === subjectGroup)
+      .sort((a, b) => (a.gradeCeiling || 0) - (b.gradeCeiling || 0));
+    if (!candidates.length) return null;
+    if (gradeCeiling) {
+      const exact = candidates.find((c) => c.gradeCeiling === gradeCeiling);
+      if (exact) return exact;
+      const lower = candidates.filter((c) => c.gradeCeiling <= gradeCeiling);
+      if (lower.length) return lower[lower.length - 1];
+    }
+    return candidates[candidates.length - 1];
+  }
+
+  function inferCourseFromText(value) {
+    if (!value) return null;
+    const text = value.toString().trim().toLowerCase();
+    if (!text) return null;
+
+    let subjectGroup = null;
+    if (text.includes('math')) subjectGroup = 'math';
+    else if (text.includes('english') || text.includes('ela')) subjectGroup = 'english';
+    else if (text.includes('social')) subjectGroup = 'social';
+    else if (text.includes('science')) subjectGroup = 'science';
+
+    let gradeCeiling = null;
+    if (/gr\s*12|grade\s*12|\b12\b/.test(text)) gradeCeiling = 12;
+    else if (/gr\s*11|grade\s*11|\b11\b/.test(text)) gradeCeiling = 11;
+    else if (/gr\s*10|grade\s*10|\b10\b/.test(text)) gradeCeiling = 10;
+    else if (/jr|junior|grade\s*[7-9]|\b7\b|\b8\b|\b9\b/.test(text)) gradeCeiling = 9;
+    else if (/elem|elementary|k-6|\bk\b|kindergarten|\b[1-6]\b/.test(text)) gradeCeiling = 6;
+
+    if (!subjectGroup) return null;
+    return getCourseBySubjectAndLevel(subjectGroup, gradeCeiling || undefined);
+  }
+
+  function findCourseFromInput(rawValue) {
+    if (!rawValue) return null;
+    const direct = courseIndex ? findCourseByLabel(rawValue, courseIndex) : null;
+    if (direct) return direct;
+    return inferCourseFromText(rawValue);
+  }
+
+  function expandCoverageFromSelections(selectionIds = []) {
+    const maxBySubject = new Map();
+    const ids = Array.isArray(selectionIds) ? selectionIds : [selectionIds];
+    ids.forEach((rawId) => {
+      const course = courseById(rawId) || findCourseFromInput(rawId);
+      if (!course || !course.subjectGroup) return;
+      const currentMax = maxBySubject.get(course.subjectGroup) || 0;
+      const ceiling = Number(course.gradeCeiling) || 0;
+      maxBySubject.set(course.subjectGroup, Math.max(currentMax, ceiling));
+    });
+
+    const coverage = new Set();
+    canonicalCourses.forEach((course) => {
+      const ceiling = maxBySubject.get(course.subjectGroup);
+      if (ceiling && course.gradeCeiling <= ceiling) {
+        coverage.add(course.id);
+      }
+    });
+    return coverage;
+  }
+
+  function buildCourseOptions(priorityIds = [], allowedIds = null) {
+    const allowed = allowedIds ? new Set(allowedIds) : null;
+    const seen = new Set();
+    const output = [];
+
+    const addCourse = (courseId) => {
+      const course = courseById(courseId);
+      if (!course) return;
+      if (allowed && !allowed.has(course.id)) return;
+      if (seen.has(course.id)) return;
+      seen.add(course.id);
+      output.push(course);
+    };
+
+    priorityIds.forEach(addCourse);
+    canonicalCourses.forEach((course) => {
+      if (allowed && !allowed.has(course.id)) return;
+      addCourse(course.id);
+    });
+
+    return sortCourses(output);
+  }
+
+  function collectTutorCourseSelections(tutor) {
+    const selections = new Set();
+    const catalogIds = Array.isArray(tutor?.catalogSubjectIds) ? tutor.catalogSubjectIds : [];
+    catalogIds.forEach((id) => {
+      const course = courseById(id) || findCourseFromInput(id);
+      if (course) selections.add(course.id);
+    });
+
+    const offered = Array.isArray(tutor?.subjectsOffered) ? tutor.subjectsOffered : [];
+    offered.forEach((label) => {
+      const course = findCourseFromInput(label);
+      if (course) selections.add(course.id);
+    });
+
+    return Array.from(selections);
+  }
+
+  function getTutorsForSubject(subjectId) {
+    if (!subjectId) return publishedTutors;
+    return publishedTutors.filter((tutor) => tutor.coverageCourseIds instanceof Set && tutor.coverageCourseIds.has(subjectId));
+  }
+
+  function resolveStudentCourse(student) {
+    if (!student) return null;
+    const course = courseById(student.subjectId) || findCourseFromInput(student.subject);
+    studentCourseMap.set(student.id, course ? course.id : null);
+    return course;
+  }
+
+  function refreshStudentCourseMap() {
+    studentCourseMap = new Map();
+    userStudents.forEach((student) => resolveStudentCourse(student));
+  }
+
+  function getPrimaryStudentCourseIds() {
+    const primaryDropdown = studentDropdowns[0];
+    if (!primaryDropdown || !primaryDropdown.value) return [];
+    const courseId = studentCourseMap.get(primaryDropdown.value);
+    return courseId ? [courseId] : [];
+  }
+
+  function getPrimaryStudentId() {
+    const primaryDropdown = studentDropdowns[0];
+    return primaryDropdown && primaryDropdown.value ? primaryDropdown.value : '';
+  }
+
+  function buildSubjectOptionsForContext() {
+    const priorityIds = getPrimaryStudentCourseIds();
+    const selectedTutorId = getSelectedTutorId();
+    const tutor = selectedTutorId ? tutorsById.get(selectedTutorId) : null;
+    const allowedIds = tutor?.coverageCourseIds instanceof Set ? Array.from(tutor.coverageCourseIds) : null;
+    return buildCourseOptions(priorityIds, allowedIds);
+  }
+
+  function renderSubjectDropdown() {
+    if (!subjectOptions) return;
+    const options = buildSubjectOptionsForContext();
+    subjectOptions.innerHTML = '';
+    options.forEach((course) => {
+      const option = document.createElement('option');
+      option.value = course.label;
+      subjectOptions.appendChild(option);
+    });
+
+    const hasStudentCourse = getPrimaryStudentCourseIds().length > 0;
+    if (hasStudentCourse) {
+      if (subjectHelp) {
+        subjectHelp.innerHTML = 'Courses your student is registered for are shown first. Start typing to search.';
+      }
+    } else if (subjectHelp) {
+      const primaryId = getPrimaryStudentId();
+      const editHref = primaryId ? `edit-student.html?id=${encodeURIComponent(primaryId)}` : 'dashboard.html';
+      subjectHelp.innerHTML = `You have not registered courses for this student yet. <a href="${editHref}">Edit Student Profile</a> to add one.`;
+    }
+  }
+
+  function handleSubjectChange() {
+    const value = subjectInput ? subjectInput.value : '';
+    const match = findCourseFromInput(value);
+    if (match) {
+      currentSubjectId = match.id;
+      currentSubjectLabel = match.label;
+    } else {
+      currentSubjectId = '';
+      currentSubjectLabel = value || '';
+    }
+    refreshTutorSelectForSubject();
+  }
+
+  function refreshTutorSelectForSubject() {
+    const subjectId = currentSubjectId || (getPrimaryStudentCourseIds()[0] || '');
+    const favouriteSet = new Set((userProfile?.favoriteTutorIds || []).map((id) => sanitizeTutorId(id)).filter(Boolean));
+    const availableTutors = subjectId ? getTutorsForSubject(subjectId) : publishedTutors;
+    const currentSelection = getSelectedTutorId();
+    const selectionStillValid = currentSelection && availableTutors.some((t) => t.id === currentSelection);
+    const initialSelection = selectionStillValid ? currentSelection : pickInitialTutorSelection(favouriteSet, window.bookingSettings || {}, availableTutors);
+    populateTutorSelect(availableTutors, favouriteSet, initialSelection);
+
+    if (subjectId && availableTutors.length === 0 && subjectHelp) {
+      subjectHelp.innerHTML = 'No published tutors currently cover this course. Please choose another course or check back soon.';
+    }
+  }
+
   function cacheStudentDropdowns() {
     studentDropdowns = STUDENT_DROPDOWN_IDS.map((id) => document.getElementById(id));
     window.bookingStudentDropdowns = studentDropdowns;
@@ -475,6 +718,58 @@
     }
     const value = tutorSelect.value;
     return typeof value === 'string' ? value.trim() : '';
+  }
+
+  function resolveTutorCalendarId(tutor) {
+    if (!tutor) return null;
+    const candidates = [
+      tutor.calendarId,
+      tutor.calendarEmail,
+      tutor.calendarOwner,
+      tutor.calendarOwnerEmail,
+      tutor.googleCalendarId,
+      tutor.email,
+      tutor.ownerEmail,
+      tutor.contactEmail
+    ];
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string') {
+        const trimmed = candidate.trim();
+        if (trimmed) return trimmed;
+      }
+    }
+    return null;
+  }
+
+  function resolveTutorScriptUrl(tutor) {
+    if (!tutor) return null;
+    const candidates = [
+      tutor.calendarScriptUrl,
+      tutor.availabilityScriptUrl,
+      tutor.calendarUrl,
+      tutor.availabilityUrl
+    ];
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string') {
+        const trimmed = candidate.trim();
+        if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+          return trimmed;
+        }
+      }
+    }
+    return null;
+  }
+
+  function syncCalendarSourceToSelection() {
+    const tutorId = getSelectedTutorId();
+    const tutor = tutorId ? tutorsById.get(tutorId) : null;
+    const source = {
+      scriptUrl: resolveTutorScriptUrl(tutor) || APPS_SCRIPT_URL,
+      calendarId: resolveTutorCalendarId(tutor)
+    };
+    if (typeof window.setBookingCalendarSource === 'function') {
+      window.setBookingCalendarSource(source);
+    }
   }
 
   function getTutorNameById(tutorId) {
@@ -606,7 +901,7 @@
     return '';
   }
 
-  async function loadTutorOptions(favoriteIds = [], bookingSettingsPromise = null) {
+  async function loadTutorOptions(favoriteIds = [], bookingSettingsPromise = null, courses = canonicalCourses) {
     if (!tutorSelect || !db) {
       return;
     }
@@ -619,6 +914,13 @@
       const snapshot = await getDocs(tutorQuery);
       publishedTutors = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
       publishedTutors.sort((a, b) => (a.fullName || '').localeCompare(b.fullName || ''));
+
+      // Attach derived coverage for each tutor
+      publishedTutors = publishedTutors.map((tutor) => {
+        const selections = collectTutorCourseSelections(tutor);
+        const coverage = expandCoverageFromSelections(selections);
+        return { ...tutor, coverageCourseIds: coverage };
+      });
 
       tutorsById.clear();
       publishedTutors.forEach((tutor) => {
@@ -668,6 +970,21 @@
   cacheStudentDropdowns();
   attachStudentDropdownListeners();
 
+  if (subjectInput) {
+    subjectInput.addEventListener('change', handleSubjectChange);
+    subjectInput.addEventListener('input', () => {
+      currentSubjectId = '';
+    });
+  }
+
+  if (tutorSelect) {
+    tutorSelect.addEventListener('change', () => {
+      renderSubjectDropdown();
+      refreshTutorSelectForSubject();
+      syncCalendarSourceToSelection();
+    });
+  }
+
   // Check authentication
   onAuth(auth, async (user) => {
     if (!user) {
@@ -710,6 +1027,7 @@
       
       console.log("Loading user data for:", currentUser.uid);
       const bookingSettingsPromise = loadBookingSettingsFromFirestore();
+      const coursesPromise = loadCoursesFromFirestore();
       
       // Load user profile
       const userDoc = await getDoc(doc(db, "users", currentUser.uid));
@@ -729,7 +1047,9 @@
         console.warn("User profile not found in Firestore");
       }
 
-      const tutorOptionsPromise = loadTutorOptions(favoriteTutorIds, bookingSettingsPromise);
+      const coursesLoaded = await coursesPromise;
+
+      const tutorOptionsPromise = loadTutorOptions(favoriteTutorIds, bookingSettingsPromise, coursesLoaded);
 
       // Load students
       console.log("Loading students...");
@@ -747,6 +1067,9 @@
       console.log("Students loaded:", userStudents.length);
 
       displayStudentDropdowns();
+      refreshStudentCourseMap();
+      renderSubjectDropdown();
+      refreshTutorSelectForSubject();
 
       if (typeof setupBookingForm === 'function') {
         const fetchedSettings = await bookingSettingsPromise;
@@ -758,6 +1081,9 @@
       }
 
       await tutorOptionsPromise;
+      refreshTutorSelectForSubject();
+      renderSubjectDropdown();
+      syncCalendarSourceToSelection();
 
     } catch (err) {
       console.error("Error loading user data:", err);
@@ -852,17 +1178,32 @@
     
     // Add change event listener to Student 1 (Primary) to auto-populate subject
     const primaryStudentDropdown = studentDropdowns[0];
-    const subjectInput = document.getElementById("subject");
     
     if (primaryStudentDropdown && subjectInput) {
       primaryStudentDropdown.addEventListener('change', (e) => {
         const selectedStudentId = e.target.value;
         if (selectedStudentId) {
-          const student = userStudents.find(s => s.id === selectedStudentId);
-          if (student && student.subject) {
-            subjectInput.value = student.subject;
+          const student = userStudents.find((s) => s.id === selectedStudentId);
+          if (student) {
+            const course = resolveStudentCourse(student);
+            if (course) {
+              subjectInput.value = course.label;
+              currentSubjectId = course.id;
+              currentSubjectLabel = course.label;
+            } else {
+              subjectInput.value = '';
+              currentSubjectId = '';
+              currentSubjectLabel = '';
+            }
           }
+        } else {
+          subjectInput.value = '';
+          currentSubjectId = '';
+          currentSubjectLabel = '';
         }
+        renderSubjectDropdown();
+        refreshTutorSelectForSubject();
+        handleSubjectChange();
       });
     }
 
@@ -936,6 +1277,14 @@
     
     obj.num_students = selectedStudents.length;
     obj.student_names = selectedStudents.join(", ");
+    const selectedCourse = findCourseFromInput(obj.subject);
+    if (selectedCourse) {
+      obj.subjectId = selectedCourse.id;
+      obj.subject = selectedCourse.label;
+    } else {
+      obj.subjectId = null;
+      // keep the typed subject as-is for legacy/unknown courses
+    }
     obj.session_title = `${obj.subject} – ${selectedStudents.join(", ")}`;
 
     const favouriteTutorSet = new Set(userProfile?.favoriteTutorIds || []);
@@ -1083,6 +1432,7 @@
         students: obj.student_names,
         studentName: obj.student_names,  // Add this for consistency
         subject: obj.subject,
+        subjectId: obj.subjectId || null,
         startTime: startTime,
         endTime: endTime,
         duration: durationHours,

@@ -4,6 +4,7 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { setGlobalOptions } from 'firebase-functions/v2/options';
 import { google } from 'googleapis';
 import crypto from 'node:crypto';
+import { getCoursesFromSource } from './course-sources/index.js';
 import { admin, db } from './firebaseAdmin.js';
 
 const fetchFn = (...args) => {
@@ -785,6 +786,29 @@ export const googleCalendarCallback = onRequest(async (req, res) => {
   } catch (authError) {
     logger.error('Google Calendar callback error', authError);
     res.status(500).send(renderCalendarCallbackPage(null, 'Unable to complete Google Calendar pairing.'));
+  }
+});
+
+export const listCourses = onRequest(async (req, res) => {
+  if (applyCors(req, res)) {
+    return;
+  }
+
+  if (req.method !== 'GET') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  const country = (req.query.country || 'ca').toString().toLowerCase();
+  const subject = (req.query.subject || '').toString().toLowerCase() || null;
+  const level = (req.query.level || '').toString().toLowerCase() || null;
+
+  try {
+    const courses = await getCoursesFromSource({ country, subject: subject || null, level: level || null });
+    res.json({ country, count: courses.length, courses });
+  } catch (error) {
+    logger.error('listCourses failed', error);
+    res.status(500).json({ error: 'Unable to list courses.' });
   }
 });
 

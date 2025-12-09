@@ -1321,6 +1321,62 @@ body.page-edit-mode [data-editable-block]:hover {
   font-size: 0.95rem;
 }
 
+/* Course picker layout */
+.course-picker {
+  border: 1px solid #e1e4e8;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fafbfc;
+  display: grid;
+  gap: 12px;
+}
+
+.course-picker .cp-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.course-picker .cp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.course-picker .cp-field label {
+  font-weight: 600;
+}
+
+.course-picker .cp-select,
+.course-picker .cp-input {
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #d0d7de;
+  background: #fff;
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.course-picker .cp-select:focus,
+.course-picker .cp-input:focus {
+  border-color: #0969da;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.15);
+}
+
+.course-picker .cp-checkbox-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.course-picker .cp-tutor-label {
+  font-weight: 500;
+  cursor: pointer;
+}
+
 .time-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;

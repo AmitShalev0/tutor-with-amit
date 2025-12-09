@@ -6,6 +6,12 @@
   const PAGE_ID = document.body?.dataset?.pageId || "default";
   const EDITABLE_SELECTOR = "[data-editable-block]";
   const SUPPORTED_PAGES = new Set(["home", "book"]);
+  const PAGE_EDIT_SESSION_KEY = `page-editor:${PAGE_ID}`;
+  const urlParams = new URLSearchParams(window.location.search || "");
+  const urlGateEnabled = urlParams.get("editPage") === "1" || urlParams.get("edit") === "1";
+  const sessionGateEnabled = sessionStorage.getItem(PAGE_EDIT_SESSION_KEY) === "1";
+  const gateRequired = PAGE_ID === "book";
+  const editorGateOpen = !gateRequired || urlGateEnabled || sessionGateEnabled;
   const FONT_SIZE_OPTIONS = [
     { key: "normal", label: "Normal", size: "inherit" },
     { key: "small", label: "Small", size: "0.9em" },
@@ -579,7 +585,15 @@
           return;
         }
 
+        if (gateRequired && !editorGateOpen) {
+          teardownEditor();
+          return;
+        }
+
         currentAdminUser = user;
+        if (gateRequired && sessionGateEnabled) {
+          sessionStorage.removeItem(PAGE_EDIT_SESSION_KEY);
+        }
         setupEditor(profile);
       });
     })

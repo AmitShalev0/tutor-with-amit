@@ -364,6 +364,7 @@
     const docFn = window.firestoreDoc;
     const getDocFn = window.firestoreGetDoc;
     const updateDocFn = window.firestoreUpdateDoc;
+    const setDocFn = window.firestoreSetDoc;
     const arrayUnion = window.firestoreArrayUnion;
     const arrayRemove = window.firestoreArrayRemove;
 
@@ -479,7 +480,18 @@
           ? { favoriteTutorIds: arrayRemove(tutorId) }
           : { favoriteTutorIds: arrayUnion(tutorId) };
 
-        await updateDocFn(userRef, payload);
+        try {
+          await updateDocFn(userRef, payload);
+        } catch (error) {
+          const notFound = error && (error.code === 'not-found' || /no document to update/i.test(String(error)));
+          if (notFound && typeof setDocFn === 'function') {
+            // Create a stub user doc so we can store favourites
+            await setDocFn(userRef, { favoriteTutorIds: [] }, { merge: true });
+            await updateDocFn(userRef, payload);
+          } else {
+            throw error;
+          }
+        }
 
         if (isFavourite) {
           favoriteTutorIds.delete(tutorId);
