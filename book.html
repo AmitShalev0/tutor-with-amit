@@ -682,12 +682,15 @@
     return Math.min(Math.max(Math.round(parsed) || 1, 1), STUDENT_DROPDOWN_IDS.length);
   }
 
-  function applyBookingSettingsToStudentSelectors(settings) {
+  function applyBookingSettingsToStudentSelectors(settings, studentCount = null) {
     const limit = getConfiguredStudentLimit(settings || window.bookingSettings || {});
+    const count = Number.isFinite(studentCount) ? Math.max(0, studentCount) : null;
+    const maxVisible = Math.max(1, count == null ? limit : Math.min(limit, Math.max(1, count)));
+
     studentDropdowns.forEach((dropdown, index) => {
       if (!dropdown) return;
       const container = dropdown.closest('.field-row');
-      const withinLimit = index < limit;
+      const withinLimit = index < maxVisible;
       if (withinLimit) {
         dropdown.disabled = false;
         if (container) {
@@ -1075,9 +1078,9 @@
         const fetchedSettings = await bookingSettingsPromise;
         setupBookingForm(fetchedSettings || {});
         bookingFormInitialized = true;
-        applyBookingSettingsToStudentSelectors(window.bookingSettings);
+        applyBookingSettingsToStudentSelectors(window.bookingSettings, userStudents.length);
       } else {
-        applyBookingSettingsToStudentSelectors(window.bookingSettings);
+        applyBookingSettingsToStudentSelectors(window.bookingSettings, userStudents.length);
       }
 
       await tutorOptionsPromise;
@@ -1090,7 +1093,7 @@
       if (!bookingFormInitialized && typeof setupBookingForm === 'function') {
         setupBookingForm();
         bookingFormInitialized = true;
-        applyBookingSettingsToStudentSelectors(window.bookingSettings);
+        applyBookingSettingsToStudentSelectors(window.bookingSettings, userStudents.length);
       }
       alert("Error loading your data: " + err.message + ". Please refresh the page.");
     }
@@ -1143,7 +1146,7 @@
         firstDropdown.innerHTML = '<option value="">No students added yet</option>';
         firstDropdown.disabled = true;
       }
-      applyBookingSettingsToStudentSelectors(window.bookingSettings);
+      applyBookingSettingsToStudentSelectors(window.bookingSettings, userStudents.length);
       return;
     }
 
@@ -1172,7 +1175,7 @@
     });
     
     if (window.bookingSettings) {
-      applyBookingSettingsToStudentSelectors(window.bookingSettings);
+      applyBookingSettingsToStudentSelectors(window.bookingSettings, userStudents.length);
     }
     handleStudentSelectionChange();
     
