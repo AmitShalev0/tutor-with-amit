@@ -12,7 +12,7 @@
 
 <main class="container">
   <div class="page-top-actions">
-    <button type="button" class="btn secondary" onclick="window.location.href='become-student.html'">
+    <button id="hybrid-upgrade-btn" type="button" class="btn secondary" onclick="window.location.href='become-student.html'" hidden>
       Become a student (hybrid account)
     </button>
   </div>
@@ -95,6 +95,33 @@
   const updateDoc = window.firestoreUpdateDoc;
 
   let currentUser = null;
+  const hybridBtn = document.getElementById('hybrid-upgrade-btn');
+
+  function isTutorOnly(userData = {}) {
+    const roles = userData.roles;
+    if (!roles) return false;
+
+    if (typeof roles === 'string') {
+      const lower = roles.toLowerCase();
+      return lower.includes('tutor') && !lower.includes('student') && !lower.includes('hybrid');
+    }
+
+    if (Array.isArray(roles)) {
+      const lower = roles.map((r) => String(r || '').toLowerCase());
+      const hasTutor = lower.some((r) => r.includes('tutor'));
+      const hasStudentOrHybrid = lower.some((r) => r.includes('student') || r.includes('hybrid'));
+      return hasTutor && !hasStudentOrHybrid;
+    }
+
+    if (typeof roles === 'object') {
+      const tutor = roles.tutor === true || (typeof roles.tutor === 'string' && roles.tutor.toLowerCase().includes('active'));
+      const student = roles.student === true || (typeof roles.student === 'string' && roles.student.toLowerCase().includes('active'));
+      const hybrid = roles.hybrid === true || (typeof roles.hybrid === 'string' && roles.hybrid.toLowerCase().includes('active'));
+      return tutor && !student && !hybrid;
+    }
+
+    return false;
+  }
 
   const notificationCheckboxIds = [
     "notifyBookingApproved",
@@ -136,6 +163,13 @@
 
         // Load notification preferences (default to false if not set)
         applyNotificationPreferences(userData);
+
+        // Show hybrid upgrade only for tutor-only accounts
+        if (hybridBtn) {
+          hybridBtn.hidden = !isTutorOnly(userData);
+        }
+      } else if (hybridBtn) {
+        hybridBtn.hidden = true;
       }
 
       // Show profile form
