@@ -1259,6 +1259,12 @@
       return acc;
     }, {});
 
+    const PROFILE_STATUS_OPTIONS = [
+      { value: 'draft', label: 'Draft' },
+      { value: 'review', label: 'In review' },
+      { value: 'published', label: 'Published' }
+    ];
+
     const userDataCache = new Map();
 
     let bookingSettingsCache = null;
@@ -1508,6 +1514,36 @@
       }
     }
 
+    function formatTutorProfileStatus(value) {
+      switch (value) {
+        case 'published':
+          return 'Published';
+        case 'review':
+          return 'In review';
+        case 'draft':
+          return 'Draft';
+        default:
+          return value || 'Unknown';
+      }
+    }
+
+    function renderTutorProfileStatus(meta) {
+      const profileId = meta.profileId || '';
+      const currentValue = meta.profileStatus || 'draft';
+
+      if (!profileId) {
+        return '<span class="status-badge status-pending">No profile</span>';
+      }
+
+      let html = `<select class="role-select" data-current="${escapeHtml(currentValue)}" onchange="window.handleTutorStatusChange('${escapeForInlineScript(profileId)}', this)" aria-label="Profile status for ${escapeHtml(meta.displayName || meta.displayEmail || 'tutor')}">`;
+      PROFILE_STATUS_OPTIONS.forEach((option) => {
+        const selected = option.value === currentValue ? ' selected' : '';
+        html += `<option value="${option.value}"${selected}>${option.label}</option>`;
+      });
+      html += '</select>';
+      return html;
+    }
+
     function buildTutorSummary(tutors) {
       let html = '<div class="users-section-card">';
       html += '<h3 class="section-subheading">Tutor Accounts</h3>';
@@ -1519,7 +1555,7 @@
       }
 
       html += '<div class="data-table"><table><thead><tr>';
-      html += '<th>Name</th><th>Email</th><th>Account Type</th><th>Status</th><th>Joined</th>';
+      html += '<th>Name</th><th>Email</th><th>Account Type</th><th>Account Status</th><th>Profile Status</th><th>Joined</th>';
       html += '</tr></thead><tbody>';
 
       tutors.forEach((meta) => {
@@ -1530,6 +1566,7 @@
           <td>${escapeHtml(meta.displayEmail || '-')}</td>
           <td>${escapeHtml(label)}</td>
           <td>${escapeHtml(status)}</td>
+          <td>${renderTutorProfileStatus(meta)}</td>
           <td>${escapeHtml(meta.joinedDisplay || '-')}</td>
         </tr>`;
       });
@@ -5084,7 +5121,27 @@ window.saveSessionChanges = async function (sessionId) {
       }
 
       try {
-        const snapshot = await getDocs(collection(db, 'users'));
+        const [snapshot, tutorProfilesSnapshot] = await Promise.all([
+          getDocs(collection(db, 'users')),
+          getDocs(collection(db, 'tutorProfiles'))
+        ]);
+
+        const tutorProfileByUserId = new Map();
+        const tutorProfileById = new Map();
+
+        tutorProfilesSnapshot.forEach((docSnap) => {
+          const data = docSnap.data() || {};
+          const record = {
+            profileId: docSnap.id,
+            profileStatus: data.status || 'draft',
+            profileSlug: data.slug || null,
+            userId: data.userId || null
+          };
+          tutorProfileById.set(docSnap.id, record);
+          if (record.userId) {
+            tutorProfileByUserId.set(record.userId, record);
+          }
+        });
 
         if (snapshot.empty) {
           userDataCache.clear();
@@ -5114,6 +5171,8 @@ window.saveSessionChanges = async function (sessionId) {
 
           const roleMeta = analyzeUserRoles(data);
 
+          const profileMeta = tutorProfileById.get(data.tutorProfileId) || tutorProfileByUserId.get(userId) || null;
+
           usersMeta.push({
             id: userId,
             displayName,
@@ -5123,6 +5182,8 @@ window.saveSessionChanges = async function (sessionId) {
             accountType: roleMeta.accountType,
             stateLabel: roleMeta.stateLabel,
             stateNote: roleMeta.note,
+            profileId: profileMeta?.profileId || data.tutorProfileId || null,
+            profileStatus: profileMeta?.profileStatus || null,
             jsSafeId: escapeForInlineScript(userId),
             jsSafeEmail: escapeForInlineScript(displayEmail === '-' ? '' : displayEmail),
             jsSafeName: escapeForInlineScript(displayName || 'User')
@@ -5245,6 +5306,53 @@ window.saveSessionChanges = async function (sessionId) {
       await loadUsers();
       if (successMessage) {
         setUsersStatus(successMessage, 'success');
+      }
+    };
+
+    window.handleTutorStatusChange = async (profileId, target) => {
+      const selectEl = target && target.tagName ? target : null;
+      const newValue = selectEl ? selectEl.value : target;
+      const previousValue = selectEl ? (selectEl.getAttribute('data-current') || '') : '';
+
+      const isValid = PROFILE_STATUS_OPTIONS.some((option) => option.value === newValue);
+      if (!profileId || !isValid) {
+        if (selectEl && previousValue) {
+          selectEl.value = previousValue;
+        }
+        setUsersStatus('Unknown profile status selection.', 'error');
+        return;
+      }
+
+      if (selectEl && newValue === previousValue) {
+        return;
+      }
+
+      if (selectEl) {
+        selectEl.disabled = true;
+      }
+
+      setUsersStatus('Updating tutor profile status...');
+      try {
+        await updateDoc(doc(db, 'tutorProfiles', profileId), {
+          status: newValue,
+          updatedAt: serverTimestamp()
+        });
+
+        if (selectEl) {
+          selectEl.setAttribute('data-current', newValue);
+        }
+
+        setUsersStatus('Tutor profile status updated.', 'success');
+      } catch (error) {
+        console.error('Failed to update tutor profile status', error);
+        if (selectEl && previousValue) {
+          selectEl.value = previousValue;
+        }
+        setUsersStatus('Failed to update tutor profile status. Please try again.', 'error');
+      } finally {
+        if (selectEl) {
+          selectEl.disabled = false;
+        }
       }
     };
 
