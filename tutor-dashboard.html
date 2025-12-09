@@ -2160,11 +2160,16 @@
       let attempt = 0;
 
       while (attempt < 5) {
-        const slugQuery = query(collection(db, 'tutorProfiles'), where('slug', '==', candidate));
-        const snapshot = await getDocs(slugQuery);
-        const conflict = snapshot.docs.find((docSnap) => docSnap.id !== existingId);
-        if (!conflict) {
-          return candidate;
+        try {
+          const slugQuery = query(collection(db, 'tutorProfiles'), where('slug', '==', candidate));
+          const snapshot = await getDocs(slugQuery);
+          const conflict = snapshot.docs.find((docSnap) => docSnap.id !== existingId);
+          if (!conflict) {
+            return candidate;
+          }
+        } catch (error) {
+          console.warn('Tutor Hub: unable to verify slug uniqueness; falling back to random slug.', error);
+          return `${starter}-${Math.random().toString(36).slice(2, 8)}`;
         }
         attempt += 1;
         candidate = `${starter}-${Math.random().toString(36).slice(2, 6)}`;
@@ -2302,62 +2307,80 @@
         return null;
       }
 
-      if (userData.tutorProfileId) {
-        const profileRef = doc(db, 'tutorProfiles', userData.tutorProfileId);
-        const profileSnapshot = await getDoc(profileRef);
-        if (profileSnapshot.exists()) {
-          tutorProfileRef = profileRef;
-          tutorProfileData = profileSnapshot.data();
-          return { ref: profileRef, data: tutorProfileData, userData };
-        }
-      }
+      const createNewProfile = async () => {
+        const slug = await reserveUniqueSlug(userData.fullName || user.displayName || user.email, null);
+        const newProfile = {
+          userId: user.uid,
+          fullName: userData.fullName || user.displayName || '',
+          slug,
+          status: 'draft',
+          headline: '',
+          bio: '',
+          subjectsOffered: [],
+          catalogSubjectIds: [],
+          catalogVersion: COURSE_CATALOG_VERSION_VALUE,
+          photoURL: null,
+          photoPath: null,
+          gradeLevels: [],
+          meetingModes: {
+            online: true,
+            inPerson: false,
+            hybrid: false
+          },
+          placesSettings: {
+            enabled: false,
+            placeId: null,
+            displayAddress: null
+          },
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        };
 
-      const fallbackQuery = query(collection(db, 'tutorProfiles'), where('userId', '==', user.uid));
-      const profilesSnapshot = await getDocs(fallbackQuery);
-      if (!profilesSnapshot.empty) {
-        const docSnap = profilesSnapshot.docs[0];
-        tutorProfileRef = doc(db, 'tutorProfiles', docSnap.id);
-        tutorProfileData = docSnap.data();
-        if (!userData.tutorProfileId) {
-          await updateDoc(userDocRef, { tutorProfileId: docSnap.id });
-        }
-        return { ref: tutorProfileRef, data: tutorProfileData, userData };
-      }
+        const profileDocRef = await addDoc(collection(db, 'tutorProfiles'), newProfile);
+        await updateDoc(userDocRef, { tutorProfileId: profileDocRef.id });
 
-      const slug = await reserveUniqueSlug(userData.fullName || user.displayName || user.email, null);
-      const newProfile = {
-        userId: user.uid,
-        fullName: userData.fullName || user.displayName || '',
-        slug,
-        status: 'draft',
-        headline: '',
-        bio: '',
-        subjectsOffered: [],
-        catalogSubjectIds: [],
-        catalogVersion: COURSE_CATALOG_VERSION_VALUE,
-        photoURL: null,
-        photoPath: null,
-        gradeLevels: [],
-        meetingModes: {
-          online: true,
-          inPerson: false,
-          hybrid: false
-        },
-        placesSettings: {
-          enabled: false,
-          placeId: null,
-          displayAddress: null
-        },
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        tutorProfileRef = profileDocRef;
+        tutorProfileData = newProfile;
+        return { ref: profileDocRef, data: newProfile, userData: { ...userData, tutorProfileId: profileDocRef.id } };
       };
 
-      const profileDocRef = await addDoc(collection(db, 'tutorProfiles'), newProfile);
-      await updateDoc(userDocRef, { tutorProfileId: profileDocRef.id });
+      if (userData.tutorProfileId) {
+        const profileRef = doc(db, 'tutorProfiles', userData.tutorProfileId);
+        try {
+          const profileSnapshot = await getDoc(profileRef);
+          if (profileSnapshot.exists()) {
+            const profileData = profileSnapshot.data();
+            // If the document exists but belongs to someone else or lacks userId, create a new one we own.
+            if (profileData.userId && profileData.userId === user.uid) {
+              tutorProfileRef = profileRef;
+              tutorProfileData = profileData;
+              return { ref: profileRef, data: profileData, userData };
+            }
+          }
+        } catch (error) {
+          // Permission denied or other read issues; fall through to create a fresh profile we own.
+          console.warn('Tutor Hub: unable to read existing tutor profile; creating a new one.', error);
+        }
+      }
 
-      tutorProfileRef = profileDocRef;
-      tutorProfileData = newProfile;
-      return { ref: profileDocRef, data: newProfile, userData: { ...userData, tutorProfileId: profileDocRef.id } };
+      // Fallback: query any profile tied to this userId
+      try {
+        const fallbackQuery = query(collection(db, 'tutorProfiles'), where('userId', '==', user.uid));
+        const profilesSnapshot = await getDocs(fallbackQuery);
+        if (!profilesSnapshot.empty) {
+          const docSnap = profilesSnapshot.docs[0];
+          tutorProfileRef = doc(db, 'tutorProfiles', docSnap.id);
+          tutorProfileData = docSnap.data();
+          if (!userData.tutorProfileId) {
+            await updateDoc(userDocRef, { tutorProfileId: docSnap.id });
+          }
+          return { ref: tutorProfileRef, data: tutorProfileData, userData };}
+      } catch (error) {
+        console.warn('Tutor Hub: unable to query tutor profile; creating a new one.', error);
+      }
+
+      // As a final fallback, create a profile we definitely own.
+      return createNewProfile();
     }
 
     function populateProfile(profile) {
