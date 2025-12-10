@@ -153,10 +153,10 @@
 
     <form id="register-form">
         <label for="full-name">Your Full Name*</label>
-        <input id="full-name" type="text" autocomplete="name" required 
-               pattern="^[a-zA-Z][a-zA-Z'-]* [a-zA-Z][a-zA-Z'-]*$" 
-               title="Full name must be two words, each with only letters, apostrophes, or dashes."
-               placeholder="Jane Smith" />
+         <input id="full-name" type="text" autocomplete="name" required 
+             pattern="^[A-Za-z][A-Za-z'\-]* [A-Za-z][A-Za-z'\-]*$" 
+             title="Full name must be two words, each with only letters, apostrophes, or dashes."
+             placeholder="Jane Smith" />
 
         <label for="email">Email*</label>
         <input id="email" type="email" autocomplete="email" required placeholder="your.email@example.com" />
@@ -264,20 +264,9 @@
 
             const reserveUniqueTutorSlug = async (rawName) => {
                 const baseSlug = normalizeNameForSlug(rawName);
-                let candidate = baseSlug;
-                let attempts = 0;
-
-                // Ensure slug is unique in the tutors collection to avoid profile URL collisions.
-                while (attempts < 5) {
-                    const slugQuery = query(collection(db, "tutorProfiles"), where("slug", "==", candidate));
-                    const slugSnapshot = await getDocs(slugQuery);
-                    if (slugSnapshot.empty) {
-                        return candidate;
-                    }
-                    attempts += 1;
-                    candidate = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
-                }
-                return `${baseSlug}-${Date.now().toString(36)}`;
+                // Client-side uniqueness checks against other tutors are blocked by Firestore rules.
+                // Append a short random suffix to avoid collisions without querying.
+                return `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
             };
 
             // Create Firebase Auth user
