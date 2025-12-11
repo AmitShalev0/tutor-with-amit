@@ -1,0 +1,20 @@
+@media (max-width: 767px) and (prefers-color-scheme: light) {
+  :root {
+    --bg: #ffffff;
+    --surface: #f7fafc;
+    --surface-alt: #eef2f7;
+    --accent: #2b82e6;
+    --text: #0f172a;
+    --muted: #4b5563;
+    --border: #dbe2ec;
+  }
+
+  body {
+    background: #f9fbff;
+    color: var(--text);
+  }
+
+  .container {
+    padding: 0 14px;
+  }
+}

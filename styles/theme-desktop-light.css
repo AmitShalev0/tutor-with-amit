@@ -1,0 +1,16 @@
+@media (min-width: 768px) and (prefers-color-scheme: light) {
+  :root {
+    --bg: #ffffff;
+    --surface: #f5f7fb;
+    --surface-alt: #eef2f7;
+    --accent: #1f7ae0;
+    --text: #0f172a;
+    --muted: #4b5563;
+    --border: #d5dce5;
+  }
+
+  body {
+    background: radial-gradient(circle at top, #f6f8fb 0, #e9edf5 55%);
+    color: var(--text);
+  }
+}
