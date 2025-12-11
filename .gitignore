@@ -1,6 +1,6 @@
 node_modules/
 functions/node_modules/
-config/google-maps-key.json
+# config/google-maps-key.json
 
 functions/.env
 functions/.env.*
