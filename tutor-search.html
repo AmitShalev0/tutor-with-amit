@@ -351,7 +351,7 @@
 
   <script type="module" src="firebase-config.js"></script>
   <script type="module">
-    import { loadGoogleMapsApi } from './maps-utils.js';
+    import { loadGoogleMapsApi, normalizeTutorLocation, viewportToRectanglePath } from './maps-utils.js';
 
     const db = window.firebaseDb;
     const collection = window.firestoreCollection;
@@ -397,6 +397,7 @@
     let infoWindow = null;
     let markers = [];
     let circles = [];
+    let polygons = [];
     let lastMapTutors = [];
     let mapMode = 'markers';
 
@@ -516,6 +517,23 @@
 
     function normalize(text) {
       return (text || '').toLowerCase();
+    }
+
+    function resolveTutorLocation(tutor) {
+      const raw = tutor?.tutorLocation || tutor?.travelInfo || null;
+
+      // If legacy travelInfo has a bare location, wrap it into basePlace for map rendering.
+      const withBasePlace = raw && raw.location && !raw.basePlace
+        ? {
+            ...raw,
+            basePlace: {
+              location: raw.location,
+              formattedAddress: raw.formattedAddress || raw.displayAddress || raw.postalCode || null
+            }
+          }
+        : raw;
+
+      return normalizeTutorLocation(withBasePlace || {});
     }
 
     function getInitials(text) {
@@ -801,30 +819,35 @@
           card.appendChild(grades);
         }
 
-        if (tutor.placesSettings?.enabled) {
-          const placeDetails = tutor.placesSettings.lookup;
-          const displayAddress = placeDetails?.formattedAddress || tutor.placesSettings.displayAddress;
-          if (displayAddress) {
-            const location = document.createElement('p');
-            location.className = 'detail-text location-detail';
+        const normalizedLocation = resolveTutorLocation(tutor);
+        const locationLabel = normalizedLocation.displayLocationLabel
+          || normalizedLocation.basePlace?.formattedAddress
+          || tutor.placesSettings?.displayAddress
+          || null;
+        const locationMapsUrl = normalizedLocation.basePlace?.mapsUrl
+          || tutor.placesSettings?.lookup?.mapsUrl
+          || null;
 
-            const label = document.createElement('strong');
-            label.textContent = 'Location:';
-            location.appendChild(label);
-            location.appendChild(document.createTextNode(` ${displayAddress}`));
+        if (locationLabel) {
+          const location = document.createElement('p');
+          location.className = 'detail-text location-detail';
 
-            if (placeDetails?.mapsUrl) {
-              location.appendChild(document.createElement('br'));
-              const link = document.createElement('a');
-              link.href = placeDetails.mapsUrl;
-              link.target = '_blank';
-              link.rel = 'noopener';
-              link.textContent = 'View on Google Maps';
-              location.appendChild(link);
-            }
+          const label = document.createElement('strong');
+          label.textContent = 'Location:';
+          location.appendChild(label);
+          location.appendChild(document.createTextNode(` ${locationLabel}`));
 
-            card.appendChild(location);
+          if (locationMapsUrl) {
+            location.appendChild(document.createElement('br'));
+            const link = document.createElement('a');
+            link.href = locationMapsUrl;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            link.textContent = 'View on Google Maps';
+            location.appendChild(link);
           }
+
+          card.appendChild(location);
         }
 
         const profileLink = document.createElement('button');
@@ -881,13 +904,16 @@
     function clearMapOverlays() {
       markers.forEach((marker) => marker.setMap(null));
       circles.forEach((circle) => circle.setMap(null));
+      polygons.forEach((poly) => poly.setMap(null));
       markers = [];
       circles = [];
+      polygons = [];
     }
 
     function updateCircleVisibility() {
       const shouldShowCircles = mapMode === 'radius';
       circles.forEach((circle) => circle.setMap(shouldShowCircles ? map : null));
+      polygons.forEach((poly) => poly.setMap(shouldShowCircles ? map : null));
     }
 
     async function renderMap(tutors) {
@@ -931,9 +957,9 @@
       let hasBounds = false;
 
       tutors.forEach((tutor) => {
-        const travelInfo = tutor.travelInfo || tutor.tutorLocation || null;
-        const lat = travelInfo?.location?.lat;
-        const lng = travelInfo?.location?.lng;
+        const location = resolveTutorLocation(tutor);
+        const lat = location?.basePlace?.location?.lat;
+        const lng = location?.basePlace?.location?.lng;
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
           return;
         }
@@ -945,29 +971,61 @@
         const marker = new mapsApi.Marker({
           map,
           position,
-          title: tutor.fullName || travelInfo?.tutorName || 'Tutor'
+          title: tutor.fullName || location?.basePlace?.name || 'Tutor'
         });
         markers.push(marker);
 
-        const radiusKm = Number(travelInfo?.travelRadiusKm) || 0;
-        if (radiusKm > 0) {
+        const radii = [];
+        if (Array.isArray(location?.travelZoneBreaksKm)) {
+          radii.push(...location.travelZoneBreaksKm);
+        }
+        if (Number.isFinite(location?.travelRadiusKm) && location.travelRadiusKm > 0) {
+          radii.push(location.travelRadiusKm);
+        }
+        const sortedRadii = radii
+          .filter((r) => Number.isFinite(r) && r > 0)
+          .sort((a, b) => a - b);
+
+        const palette = ['#22d3ee', '#38bdf8', '#60a5fa', '#a5b4fc'];
+        sortedRadii.forEach((radiusKm, index) => {
+          const color = palette[index % palette.length];
           const circle = new mapsApi.Circle({
             center: position,
             radius: radiusKm * 1000,
-            strokeColor: '#38bdf8',
+            strokeColor: color,
             strokeOpacity: 0.35,
             strokeWeight: 2,
-            fillColor: '#38bdf8',
-            fillOpacity: 0.15,
+            fillColor: color,
+            fillOpacity: Math.max(0.05, 0.18 - index * 0.02),
             map: mapMode === 'radius' ? map : null
           });
           circles.push(circle);
+          bounds.extend(circle.getBounds().getNorthEast());
+          bounds.extend(circle.getBounds().getSouthWest());
+        });
+
+        const rectPath = viewportToRectanglePath(location?.basePlace?.viewport);
+        if (rectPath) {
+          const polygon = new mapsApi.Polygon({
+            paths: rectPath,
+            strokeColor: '#38bdf8',
+            strokeOpacity: 0.4,
+            strokeWeight: 2,
+            fillColor: '#38bdf8',
+            fillOpacity: 0.12,
+            map: mapMode === 'radius' ? map : null
+          });
+          polygons.push(polygon);
+          rectPath.forEach((point) => bounds.extend(point));
         }
 
-        const subjects = Array.isArray(travelInfo?.subjects) && travelInfo.subjects.length
-          ? travelInfo.subjects
+        const subjects = Array.isArray(location?.subjects) && location.subjects.length
+          ? location.subjects
           : (tutor.subjectsOffered || []);
-        const address = travelInfo?.formattedAddress || travelInfo?.postalCode || '';
+        const address = location?.displayLocationLabel
+          || location?.basePlace?.formattedAddress
+          || location?.postalCode
+          || '';
 
         const infoHtml = `
           <div style="min-width:220px;">

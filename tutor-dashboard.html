@@ -126,6 +126,47 @@
           font-size: 0.9rem;
           line-height: 1.4;
         }
+    .location-map-shell {
+      border: 1px solid #1f2937;
+      border-radius: 0.65rem;
+      overflow: hidden;
+      height: 280px;
+      background: #0b1221;
+      margin-bottom: 1rem;
+    }
+    #location-map {
+      width: 100%;
+      height: 100%;
+    }
+    .inline-field-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+      align-items: end;
+    }
+    .range-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .range-row input[type="range"] {
+      width: 100%;
+    }
+    .range-row .range-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+    .pill-help {
+      display: inline-block;
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.18);
+      color: #e5e7eb;
+      font-size: 0.8rem;
+      margin-left: 0.35rem;
+    }
         .verification-card {
           display: flex;
           flex-direction: column;
@@ -549,29 +590,40 @@
         </div>
         <p class="subtle-text">Families can filter tutors based on preferred meeting formats.</p>
 
-        <label><input type="checkbox" id="places-enabled" /> Enable Google Places location</label>
-        <p class="subtle-text">Keep this off until you've added a valid Place ID below. This helps families see where in-person sessions happen.</p>
+        <div class="inline-field-row">
+          <div>
+            <label for="location-search">Base location <span class="pill-help">Autocomplete</span></label>
+            <input type="text" id="location-search" placeholder="Start typing an address or landmark" autocomplete="off" />
+          </div>
+          <div>
+            <label for="location-label">Display location label</label>
+            <input type="text" id="location-label" placeholder="e.g. Beltline, Calgary" />
+          </div>
+        </div>
 
-        <label for="place-id">Google Place ID</label>
-        <input type="text" id="place-id" placeholder="ChIJW-T2Wt7Gt4kRKl2I1CJFUsI" />
+        <div class="range-row">
+          <label for="travel-radius">Travel radius (km)</label>
+          <input type="range" id="travel-radius" min="1" max="50" value="10" step="1" />
+          <div class="range-meta">
+            <span>1 km</span>
+            <span><output id="travel-radius-value">10</output> km</span>
+            <span>50 km</span>
+          </div>
+        </div>
 
-        <label for="place-address">Display address or neighbourhood</label>
-        <input type="text" id="place-address" placeholder="e.g. NW Calgary (Dalhousie)" />
+        <label for="travel-zones">Travel zone breaks (km)</label>
+        <input type="text" id="travel-zones" placeholder="e.g. 5, 10, 20" />
+        <p class="subtle-text">Optional: add comma-separated breakpoints to show concentric travel zones. Values above the travel radius are ignored.</p>
+
+        <div class="location-map-shell" aria-label="Tutor travel area map">
+          <div id="location-map"></div>
+        </div>
 
         <div class="card-footer">
           <button class="btn primary" type="submit">Save Preferences</button>
         </div>
         <p id="meeting-message" class="message-area"></p>
-
-        <div class="help-box">
-          <strong>Need a Place ID?</strong>
-          <ol>
-            <li>Visit <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" rel="noopener">Google's Place ID finder</a>.</li>
-            <li>Search for the location families should arrive at.</li>
-            <li>Copy the <code>Place ID</code> value and paste it above.</li>
-            <li>Add a friendly display name so families know where to meet.</li>
-          </ol>
-        </div>
+        <p id="location-status" class="message-area"></p>
       </form>
 
       <article class="hub-card verification-card" id="verification-card">
@@ -647,6 +699,7 @@
   <script type="module" src="firebase-config.js"></script>
   <script type="module">
     import { COURSE_CATALOG, COURSE_CATALOG_VERSION_VALUE, flattenCatalog, slugifyCourseLabel } from './course-catalog.js';
+    import { loadGoogleMapsApi, normalizeTutorLocation, parseTravelZoneBreaks, viewportToRectanglePath } from './maps-utils.js';
 
     const auth = window.firebaseAuth;
     const onAuth = window.firebaseOnAuth;
@@ -716,9 +769,13 @@
     const modeOnline = document.getElementById('mode-online');
     const modeInPerson = document.getElementById('mode-inperson');
     const modeHybrid = document.getElementById('mode-hybrid');
-    const placesEnabledInput = document.getElementById('places-enabled');
-    const placeIdInput = document.getElementById('place-id');
-    const placeAddressInput = document.getElementById('place-address');
+    const locationSearchInput = document.getElementById('location-search');
+    const locationLabelInput = document.getElementById('location-label');
+    const travelRadiusInput = document.getElementById('travel-radius');
+    const travelRadiusValue = document.getElementById('travel-radius-value');
+    const travelZonesInput = document.getElementById('travel-zones');
+    const locationMapEl = document.getElementById('location-map');
+    const locationStatusEl = document.getElementById('location-status');
 
     const catalogGroups = Array.isArray(COURSE_CATALOG) ? COURSE_CATALOG : [];
     const flatCatalog = flattenCatalog(catalogGroups);
@@ -751,6 +808,15 @@
     let isCalendarBusy = false;
     let isUploadingCertificate = false;
 
+    let mapsApi = null;
+    let locationMap = null;
+    let locationMarker = null;
+    let locationViewportShape = null;
+    let travelOverlays = [];
+    let locationAutocomplete = null;
+    let currentLocationState = null;
+    const mapDefaultCenter = { lat: 51.0447, lng: -114.0719 };
+
     function buildProfileUrl(slug) {
       if (!slug) return null;
       return `${window.location.origin}/tutor-profile.html?slug=${encodeURIComponent(slug)}`;
@@ -774,6 +840,247 @@
       const parts = source.split(/\s+/).filter(Boolean);
       const initials = parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join('');
       return initials || 'TU';
+    }
+
+    function setLocationStatus(message, type = 'neutral') {
+      if (!locationStatusEl) return;
+      locationStatusEl.textContent = message || '';
+      locationStatusEl.classList.remove('ok', 'error');
+      if (!message) return;
+      if (type === 'error') {
+        locationStatusEl.classList.add('error');
+      } else if (type === 'success') {
+        locationStatusEl.classList.add('ok');
+      }
+    }
+
+    function clampTravelRadius(value) {
+      const min = Number(travelRadiusInput?.min) || 1;
+      const max = Number(travelRadiusInput?.max) || 50;
+      if (!Number.isFinite(value)) return min;
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function updateTravelRadiusDisplay() {
+      if (!travelRadiusInput || !travelRadiusValue) return;
+      const radius = clampTravelRadius(Number(travelRadiusInput.value) || 0);
+      travelRadiusInput.value = radius;
+      travelRadiusValue.value = radius;
+      travelRadiusValue.textContent = radius;
+    }
+
+    function clearTravelOverlays() {
+      travelOverlays.forEach((overlay) => overlay.setMap && overlay.setMap(null));
+      travelOverlays = [];
+      if (locationViewportShape) {
+        locationViewportShape.setMap(null);
+        locationViewportShape = null;
+      }
+    }
+
+    async function ensureLocationMap() {
+      if (!locationMapEl) return null;
+      if (!mapsApi) {
+        try {
+          mapsApi = await loadGoogleMapsApi({ libraries: 'places' });
+        } catch (error) {
+          console.error('Google Maps failed to load in Tutor Hub', error);
+          setLocationStatus('Map failed to load. Check your Google Maps API key.', 'error');
+          return null;
+        }
+      }
+
+      if (!locationMap) {
+        locationMap = new mapsApi.Map(locationMapEl, {
+          center: mapDefaultCenter,
+          zoom: 11,
+          mapTypeControl: false,
+          fullscreenControl: false,
+          streetViewControl: false
+        });
+      }
+
+      if (!locationAutocomplete && locationSearchInput) {
+        locationAutocomplete = new mapsApi.places.Autocomplete(locationSearchInput, {
+          fields: ['place_id', 'name', 'formatted_address', 'geometry', 'types', 'url']
+        });
+        locationAutocomplete.addListener('place_changed', () => {
+          const place = locationAutocomplete.getPlace();
+          applyPlaceSelection(place);
+        });
+      }
+
+      return locationMap;
+    }
+
+    function normalizePlaceViewport(geometryViewport) {
+      if (!geometryViewport) return null;
+      try {
+        const ne = geometryViewport.getNorthEast();
+        const sw = geometryViewport.getSouthWest();
+        return {
+          north: ne.lat(),
+          south: sw.lat(),
+          east: ne.lng(),
+          west: sw.lng()
+        };
+      } catch (error) {
+        return normalizeTutorLocation({ viewport: geometryViewport }).basePlace?.viewport || null;
+      }
+    }
+
+    function applyPlaceSelection(place) {
+      if (!place || !place.geometry || !place.geometry.location) {
+        setLocationStatus('Please choose a location from the suggestions.', 'error');
+        return;
+      }
+
+      const location = {
+        basePlace: {
+          placeId: place.place_id || null,
+          name: place.name || place.formatted_address || locationSearchInput?.value || 'Tutor base',
+          primaryType: Array.isArray(place.types) && place.types.length ? place.types[0] : null,
+          formattedAddress: place.formatted_address || place.name || null,
+          mapsUrl: place.url || null,
+          location: {
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng()
+          },
+          viewport: normalizePlaceViewport(place.geometry.viewport)
+        },
+        displayLocationLabel: (locationLabelInput?.value || '').trim() || place.name || place.formatted_address || null,
+        travelRadiusKm: clampTravelRadius(Number(travelRadiusInput?.value) || 0),
+        travelZoneBreaksKm: parseTravelZoneBreaks(travelZonesInput?.value, Number(travelRadiusInput?.value) || undefined).value
+      };
+
+      currentLocationState = location;
+      if (locationLabelInput && !locationLabelInput.value) {
+        locationLabelInput.value = location.displayLocationLabel || '';
+      }
+      void renderLocationOnMap(currentLocationState);
+      setLocationStatus('Location selected. Adjust travel radius and save.', 'success');
+    }
+
+    async function renderLocationOnMap(location) {
+      const map = await ensureLocationMap();
+      if (!map) return;
+      clearTravelOverlays();
+
+      if (!location || !location.basePlace || !location.basePlace.location) {
+        map.setCenter(mapDefaultCenter);
+        map.setZoom(11);
+        if (locationMarker) {
+          locationMarker.setMap(null);
+          locationMarker = null;
+        }
+        return;
+      }
+
+      const position = location.basePlace.location;
+      if (!locationMarker) {
+        locationMarker = new mapsApi.Marker({
+          map,
+          position,
+          title: location.basePlace.name || 'Tutor base'
+        });
+      } else {
+        locationMarker.setPosition(position);
+      }
+
+      const bounds = new mapsApi.LatLngBounds();
+      bounds.extend(position);
+
+      const viewportPath = viewportToRectanglePath(location.basePlace.viewport);
+      if (viewportPath) {
+        locationViewportShape = new mapsApi.Polygon({
+          map,
+          paths: viewportPath,
+          strokeColor: '#38bdf8',
+          strokeOpacity: 0.45,
+          strokeWeight: 2,
+          fillColor: '#38bdf8',
+          fillOpacity: 0.12
+        });
+        viewportPath.forEach((point) => bounds.extend(point));
+      }
+
+      const radii = [];
+      const totalRadius = clampTravelRadius(Number(location.travelRadiusKm) || 0);
+      if (Array.isArray(location.travelZoneBreaksKm)) {
+        radii.push(...location.travelZoneBreaksKm);
+      }
+      if (totalRadius > 0) {
+        radii.push(totalRadius);
+      }
+      const sortedRadii = radii.filter((r) => Number.isFinite(r) && r > 0).sort((a, b) => a - b);
+      const palette = ['#22d3ee', '#38bdf8', '#60a5fa', '#a5b4fc'];
+
+      sortedRadii.forEach((radiusKm, index) => {
+        const color = palette[index % palette.length];
+        const circle = new mapsApi.Circle({
+          map,
+          center: position,
+          radius: radiusKm * 1000,
+          strokeColor: color,
+          strokeOpacity: 0.4,
+          strokeWeight: 2,
+          fillColor: color,
+          fillOpacity: Math.max(0.05, 0.15 - index * 0.02)
+        });
+        travelOverlays.push(circle);
+        bounds.extend(circle.getBounds().getNorthEast());
+        bounds.extend(circle.getBounds().getSouthWest());
+      });
+
+      map.fitBounds(bounds, 48);
+      currentLocationState = {
+        ...location,
+        travelRadiusKm: totalRadius
+      };
+    }
+
+    function syncLocationFromInputs() {
+      if (!currentLocationState?.basePlace) {
+        updateTravelRadiusDisplay();
+        return;
+      }
+      const radius = clampTravelRadius(Number(travelRadiusInput?.value) || currentLocationState.travelRadiusKm || 0);
+      const { value: zones, errors } = parseTravelZoneBreaks(travelZonesInput?.value, radius || undefined);
+      currentLocationState = {
+        ...currentLocationState,
+        displayLocationLabel: (locationLabelInput?.value || '').trim() || currentLocationState.displayLocationLabel || currentLocationState.basePlace?.formattedAddress || null,
+        travelRadiusKm: radius,
+        travelZoneBreaksKm: zones
+      };
+      if (errors.length) {
+        setLocationStatus(errors.join(' '), 'error');
+      } else {
+        setLocationStatus('', 'neutral');
+      }
+      void renderLocationOnMap(currentLocationState);
+    }
+
+    function populateLocationFields(rawLocation) {
+      const normalized = normalizeTutorLocation(rawLocation || {});
+
+      const radius = clampTravelRadius(normalized.travelRadiusKm || Number(travelRadiusInput?.value) || 10);
+      if (travelRadiusInput) {
+        travelRadiusInput.value = radius;
+        updateTravelRadiusDisplay();
+      }
+      if (travelZonesInput) {
+        travelZonesInput.value = (normalized.travelZoneBreaksKm || []).join(', ');
+      }
+      if (locationLabelInput) {
+        locationLabelInput.value = normalized.displayLocationLabel || '';
+      }
+      if (locationSearchInput && normalized.basePlace?.formattedAddress) {
+        locationSearchInput.value = normalized.basePlace.formattedAddress;
+      }
+
+      const hasLocation = normalized.basePlace?.location || radius;
+      currentLocationState = hasLocation ? { ...normalized, travelRadiusKm: radius } : null;
+      void renderLocationOnMap(currentLocationState);
     }
 
     function updatePhotoMessage(message, type = 'neutral') {
@@ -2013,6 +2320,33 @@
       });
     }
 
+    if (travelRadiusInput) {
+      travelRadiusInput.addEventListener('input', () => {
+        updateTravelRadiusDisplay();
+        syncLocationFromInputs();
+      });
+    }
+
+    if (travelZonesInput) {
+      travelZonesInput.addEventListener('change', () => {
+        syncLocationFromInputs();
+      });
+    }
+
+    if (locationLabelInput) {
+      locationLabelInput.addEventListener('input', () => {
+        if (currentLocationState) {
+          syncLocationFromInputs();
+        }
+      });
+    }
+
+    if (locationSearchInput) {
+      locationSearchInput.addEventListener('focus', () => {
+        void ensureLocationMap();
+      });
+    }
+
     if (verificationButtons.stripe) {
       verificationButtons.stripe.addEventListener('click', () => {
         handleStripeAction();
@@ -2332,6 +2666,7 @@
             placeId: null,
             displayAddress: null
           },
+          tutorLocation: null,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         };
@@ -2404,10 +2739,18 @@
       modeInPerson.checked = !!modes.inPerson;
       modeHybrid.checked = !!modes.hybrid;
 
-      const places = profile.placesSettings || {};
-      placesEnabledInput.checked = !!places.enabled;
-      placeIdInput.value = places.placeId || '';
-      placeAddressInput.value = places.displayAddress || '';
+      const locationSource = profile.tutorLocation || null;
+      const fallbackLocation = profile.placesSettings?.placeId
+        ? {
+            basePlace: {
+              placeId: profile.placesSettings.placeId,
+              formattedAddress: profile.placesSettings.displayAddress || null
+            },
+            displayLocationLabel: profile.placesSettings.displayAddress || null
+          }
+        : profile.travelInfo || null;
+      populateLocationFields(locationSource || fallbackLocation || {});
+      void ensureLocationMap();
 
       const profileUrl = buildProfileUrl(profile.slug);
       if (profileUrl) {
@@ -2520,30 +2863,50 @@
         hybrid: modeHybrid.checked
       };
 
-      const placesSettings = {
-        enabled: placesEnabledInput.checked,
-        placeId: placeIdInput.value.trim() || null,
-        displayAddress: placeAddressInput.value.trim() || null
-      };
-
       if (!meetingModes.online && !meetingModes.inPerson && !meetingModes.hybrid) {
         showMessage(meetingMessage, 'Select at least one meeting option.', true);
         return;
       }
 
-      if (placesSettings.enabled && !placesSettings.placeId) {
-        showMessage(meetingMessage, 'Enter a Google Place ID or disable the Places toggle.', true);
+      syncLocationFromInputs();
+
+      const locationPayload = currentLocationState?.basePlace?.location
+        ? {
+            ...currentLocationState,
+            displayLocationLabel: (locationLabelInput?.value || '').trim()
+              || currentLocationState.displayLocationLabel
+              || currentLocationState.basePlace?.formattedAddress
+              || null,
+            travelRadiusKm: clampTravelRadius(currentLocationState.travelRadiusKm || Number(travelRadiusInput?.value) || 0),
+            travelZoneBreaksKm: currentLocationState.travelZoneBreaksKm || [],
+            updatedAt: serverTimestamp()
+          }
+        : null;
+
+      if ((meetingModes.inPerson || meetingModes.hybrid) && !locationPayload) {
+        showMessage(meetingMessage, 'Add a base location for in-person or hybrid sessions.', true);
+        setLocationStatus('Add a base location to show your in-person area.', 'error');
         return;
       }
+
+      const placesSettings = locationPayload?.basePlace?.placeId
+        ? {
+            enabled: true,
+            placeId: locationPayload.basePlace.placeId,
+            displayAddress: locationPayload.displayLocationLabel || locationPayload.basePlace.formattedAddress || null
+          }
+        : { enabled: false, placeId: null, displayAddress: null };
 
       try {
         await updateDoc(tutorProfileRef, {
           meetingModes,
           placesSettings,
+          tutorLocation: locationPayload || null,
           updatedAt: serverTimestamp()
         });
-        tutorProfileData = { ...tutorProfileData, meetingModes, placesSettings };
+        tutorProfileData = { ...tutorProfileData, meetingModes, placesSettings, tutorLocation: locationPayload || null };
         showMessage(meetingMessage, 'Meeting preferences saved.');
+        setLocationStatus(locationPayload ? 'Location saved.' : 'Meeting modes saved.', 'success');
       } catch (error) {
         console.error('Meeting save error', error);
         showMessage(meetingMessage, 'Failed to save meeting preferences.', true);
