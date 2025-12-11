@@ -223,7 +223,6 @@
           <div class="booking-metrics">
             <div><span class="label">First student</span><div class="value" id="home-rate-base">—</div></div>
             <div><span class="label">Each additional student</span><div class="value" id="home-rate-extra">—</div></div>
-            <div><span class="label">Session summary add-on</span><div class="value" id="home-rate-summary">—</div></div>
           </div>
         </article>
         <article class="booking-card">
@@ -363,7 +362,6 @@
     const bookingFields = {
       rateBase: document.getElementById("home-rate-base"),
       rateExtra: document.getElementById("home-rate-extra"),
-      rateSummary: document.getElementById("home-rate-summary"),
       sessionMin: document.getElementById("home-session-min"),
       sessionMax: document.getElementById("home-session-max"),
       sessionMaxStudents: document.getElementById("home-session-max-students"),
@@ -380,7 +378,6 @@
       minSessionMinutes: 60,
       baseSessionCost: 50,
       extraStudentCost: 20,
-      sessionSummaryAddOn: 10,
       recurringMaxAdvanceWeeks: 12,
       availability: {
         "0": [],
@@ -545,7 +542,6 @@
         minSessionMinutes: Number.isFinite(base.minSessionMinutes) ? base.minSessionMinutes : DEFAULT_BOOKING_SETTINGS.minSessionMinutes,
         baseSessionCost: Number.isFinite(base.baseSessionCost) ? base.baseSessionCost : DEFAULT_BOOKING_SETTINGS.baseSessionCost,
         extraStudentCost: Number.isFinite(base.extraStudentCost) ? base.extraStudentCost : DEFAULT_BOOKING_SETTINGS.extraStudentCost,
-        sessionSummaryAddOn: Number.isFinite(base.sessionSummaryAddOn) ? base.sessionSummaryAddOn : DEFAULT_BOOKING_SETTINGS.sessionSummaryAddOn,
         recurringMaxAdvanceWeeks: Number.isFinite(base.recurringMaxAdvanceWeeks) ? base.recurringMaxAdvanceWeeks : DEFAULT_BOOKING_SETTINGS.recurringMaxAdvanceWeeks,
         currency: typeof base.currency === "string" && base.currency.trim() ? base.currency.trim().toUpperCase() : DEFAULT_BOOKING_SETTINGS.currency,
         calendarDisplay: {
@@ -639,7 +635,6 @@
       const safe = normalizeBookingSettings(settings || {});
       bookingFields.rateBase.textContent = formatCurrency(safe.baseSessionCost, safe.currency);
       bookingFields.rateExtra.textContent = formatCurrency(safe.extraStudentCost, safe.currency);
-      bookingFields.rateSummary.textContent = formatCurrency(safe.sessionSummaryAddOn, safe.currency);
       bookingFields.sessionMin.textContent = formatDurationMinutes(safe.minSessionMinutes);
       bookingFields.sessionMax.textContent = formatDurationMinutes(safe.maxHoursPerSession * 60);
       bookingFields.sessionMaxStudents.textContent = safe.maxStudentsPerSession;

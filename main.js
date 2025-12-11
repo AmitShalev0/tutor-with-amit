@@ -100,7 +100,6 @@ const DEFAULT_BOOKING_SETTINGS = {
   bufferMinutes: 15,
   baseSessionCost: 50,
   extraStudentCost: 20,
-  sessionSummaryAddOn: 10,
   recurringMaxAdvanceWeeks: 12,
   availability: {
     '0': [],
@@ -281,7 +280,6 @@ function normalizeBookingSettingsInput(settings = {}) {
   merged.bufferMinutes = Number.isFinite(bufferVal) ? Math.min(Math.max(Math.round(bufferVal), 0), 240) : DEFAULT_BOOKING_SETTINGS.bufferMinutes;
   merged.baseSessionCost = Math.max(0, Number(settings.baseSessionCost ?? merged.baseSessionCost));
   merged.extraStudentCost = Math.max(0, Number(settings.extraStudentCost ?? merged.extraStudentCost));
-  merged.sessionSummaryAddOn = Math.max(0, Number(settings.sessionSummaryAddOn ?? merged.sessionSummaryAddOn));
   merged.recurringMaxAdvanceWeeks = clamp(settings.recurringMaxAdvanceWeeks, merged.recurringMaxAdvanceWeeks, 1, 52);
 
   if (settings.availability && typeof settings.availability === 'object') {
@@ -542,7 +540,6 @@ function setupBookingForm(settingsOverride) {
   window.bookingSettings = bookingSettings;
   const baseRatePerHour = bookingSettings.baseSessionCost;
   const extraStudentRatePerHour = bookingSettings.extraStudentCost;
-  const summaryAddOnFee = bookingSettings.sessionSummaryAddOn;
   const availabilityBlocks = bookingSettings.availabilityBlocks;
   const maxSessionHours = bookingSettings.maxHoursPerSession;
   const maxRecurringWeeks = bookingSettings.recurringMaxAdvanceWeeks;
@@ -616,7 +613,6 @@ function setupBookingForm(settingsOverride) {
   const recurringRow = document.getElementById("recurring-end-row");
   const recurringEndSel = document.getElementById("recurring-end");
   const costDisplay = document.getElementById("cost-display");
-  const includeSummaryCb = document.getElementById("include-summary");
 
   // Add validation for input fields
   setupInputValidation(form);
@@ -637,7 +633,6 @@ function setupBookingForm(settingsOverride) {
     }
     const durationSelect = document.getElementById("duration-hours");
     const duration = parseFloat(durationSelect?.value || String(durationChoiceFallback));
-    const includeSummary = includeSummaryCb ? includeSummaryCb.checked : false;
     const discountSlider = document.getElementById("income-slider");
     const discountAmountSpan = document.getElementById("discount-amount");
     
@@ -666,12 +661,9 @@ function setupBookingForm(settingsOverride) {
     const discountPerHour = discountSteps * 10;
     const discountAmount = discountPerHour * duration;
     
-    // Standard rates: $50 for first student, $20 for each additional student
-    const summaryFee = includeSummary ? summaryAddOnFee : 0;
-    
     // Calculate standard cost
     const costPerHour = baseRatePerHour + ((numStudents - 1) * extraStudentRatePerHour);
-    const standardTotal = (costPerHour * duration) + summaryFee;
+    const standardTotal = (costPerHour * duration);
     
     // Apply discount
     const discountedTotal = standardTotal - discountAmount;
@@ -684,11 +676,6 @@ function setupBookingForm(settingsOverride) {
     if (costDisplay) {
       costDisplay.textContent = `Total Cost: $${discountedTotal.toFixed(2)} per session`;
     }
-  }
-
-  // Listen for summary checkbox changes
-  if (includeSummaryCb) {
-    includeSummaryCb.addEventListener('change', updateCost);
   }
 
   // Listen for sliding scale toggle
@@ -2137,16 +2124,14 @@ function setupBookingForm(settingsOverride) {
     
     // Calculate and include final cost
     const duration = parseFloat(obj.duration_hours || "1");
-    const includeSummary = obj.include_summary === "on";
     const slidingScaleEnabled = obj.sliding_scale_toggle === "on";
     const discountSlider = document.getElementById("income-slider");
     
     // Calculate base cost
     const baseRate = 50;
     const additionalRate = 20;
-    const summaryFee = includeSummary ? 10 : 0;
     const costPerHour = baseRate + ((num - 1) * additionalRate);
-    const standardTotal = (costPerHour * duration) + summaryFee;
+    const standardTotal = (costPerHour * duration);
     
     // Apply discount if sliding scale enabled
     let finalCost = standardTotal;

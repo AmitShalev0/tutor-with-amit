@@ -643,6 +643,7 @@
         <p class="subtle-text" id="calendar-status-text">Pair your Google Calendar to automatically add confirmed sessions and avoid double bookings.</p>
         <div class="inline-controls">
           <button class="btn secondary" type="button" id="calendar-pair-btn">Pair Google Calendar</button>
+          <button class="btn secondary" type="button" id="teams-pair-btn">Connect Microsoft Teams</button>
         </div>
         <p id="calendar-message" class="message-area"></p>
       </article>
@@ -705,6 +706,7 @@
     const linkedinDisconnectBtn = document.getElementById('linkedin-disconnect-btn');
     const linkedinMessage = document.getElementById('linkedin-message');
     const calendarPairBtn = document.getElementById('calendar-pair-btn');
+    const teamsPairBtn = document.getElementById('teams-pair-btn');
     const calendarStatusText = document.getElementById('calendar-status-text');
     const calendarMessage = document.getElementById('calendar-message');
     const verificationMessage = document.getElementById('verification-message');
@@ -771,6 +773,7 @@
     let latestCertificate = null;
     let isStripeBusy = false;
     let isCalendarBusy = false;
+    let isTeamsBusy = false;
     let isUploadingCertificate = false;
 
     let mapsApi = null;
@@ -1363,11 +1366,37 @@
       };
     }
 
+    function deriveTeamsStatus(userData = currentUserData) {
+      const teams = userData?.microsoft || userData?.calendar?.microsoft || null;
+      const connected = teams?.connected === true;
+      const email = teams?.email || null;
+      const syncedAt = teams?.syncedAt || teams?.updatedAt || null;
+
+      if (connected) {
+        const lastSync = syncedAt ? formatLinkedInTimestamp(syncedAt) : null;
+        return {
+          state: 'connected',
+          helperText: email ? `Microsoft Teams connected (${email})${lastSync ? ` · ${lastSync}` : ''}` : 'Microsoft Teams connected.',
+          buttonLabel: 'Reconnect Microsoft Teams'
+        };
+      }
+
+      return {
+        state: 'disconnected',
+        helperText: 'Connect Microsoft Teams to auto-generate meeting links for online bookings.',
+        buttonLabel: 'Connect Microsoft Teams'
+      };
+    }
+
     function renderCalendarStatus(userData = currentUserData) {
       if (!calendarStatusText || !calendarPairBtn) return;
-      const status = deriveCalendarStatus(userData);
-      calendarStatusText.textContent = status.helperText;
-      calendarPairBtn.textContent = status.buttonLabel;
+      const googleStatus = deriveCalendarStatus(userData);
+      const teamsStatus = deriveTeamsStatus(userData);
+      calendarStatusText.textContent = `${googleStatus.helperText}  •  ${teamsStatus.helperText}`;
+      calendarPairBtn.textContent = googleStatus.buttonLabel;
+      if (teamsPairBtn) {
+        teamsPairBtn.textContent = teamsStatus.buttonLabel;
+      }
     }
 
     function deriveCertificateStatus(userData = currentUserData, certificateRecord = latestCertificate) {
@@ -1615,6 +1644,40 @@
       const popup = openCenteredPopup(data.url, 'googleCalendarAuth');
       if (!popup) {
         throw new Error('Please enable pop-ups to continue with Google Calendar.');
+      }
+      return popup;
+    }
+
+    async function startMicrosoftTeamsAuth() {
+      if (!functionsBase) {
+        throw new Error('Microsoft Teams integration is not configured yet.');
+      }
+      if (!currentUser) {
+        throw new Error('You must be signed in to connect Microsoft Teams.');
+      }
+
+      const token = await currentUser.getIdToken();
+      const response = await fetch(`${functionsBase}/startMicrosoftTeamsAuth`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Unable to start Microsoft Teams connection.');
+      }
+
+      if (!data?.url) {
+        throw new Error('Microsoft Teams connect URL was not returned.');
+      }
+
+      const popup = openCenteredPopup(data.url, 'microsoftTeamsAuth');
+      if (!popup) {
+        throw new Error('Please enable pop-ups to continue with Microsoft Teams.');
       }
       return popup;
     }
@@ -1915,19 +1978,20 @@
       }
 
       const data = event.data || {};
-      if (data.provider !== 'google-calendar') {
+      if (data.provider !== 'google-calendar' && data.provider !== 'microsoft-teams') {
         return;
       }
 
       const { payload, errorMessage } = data;
 
       if (errorMessage) {
-        setCalendarMessage(typeof errorMessage === 'string' ? errorMessage : 'Google Calendar pairing cancelled.', 'error');
+        const label = data.provider === 'microsoft-teams' ? 'Microsoft Teams connection cancelled.' : 'Google Calendar pairing cancelled.';
+        setCalendarMessage(typeof errorMessage === 'string' ? errorMessage : label, 'error');
         return;
       }
 
       if (!payload) {
-        setCalendarMessage('Google Calendar pairing did not return any data.', 'error');
+        setCalendarMessage('Connection did not return any data.', 'error');
         return;
       }
 
@@ -1935,18 +1999,32 @@
         currentUserData = {};
       }
 
-      const calendarPayload = payload.calendar || payload;
-      currentUserData.calendar = {
-        ...(currentUserData.calendar || {}),
-        google: {
-          ...(calendarPayload || {}),
-          connected: true,
-          syncedAt: calendarPayload?.syncedAt || new Date().toISOString()
-        }
-      };
+      if (data.provider === 'google-calendar') {
+        const calendarPayload = payload.calendar || payload;
+        currentUserData.calendar = {
+          ...(currentUserData.calendar || {}),
+          google: {
+            ...(calendarPayload || {}),
+            connected: true,
+            syncedAt: calendarPayload?.syncedAt || new Date().toISOString()
+          }
+        };
+        renderCalendarStatus(currentUserData);
+        setCalendarMessage('Google Calendar paired.', 'success');
+        reloadUserData();
+        return;
+      }
 
+      // microsoft-teams
+      const teamsPayload = payload.microsoft || payload;
+      currentUserData.microsoft = {
+        ...(currentUserData.microsoft || {}),
+        ...(teamsPayload || {}),
+        connected: true,
+        syncedAt: teamsPayload?.syncedAt || new Date().toISOString()
+      };
       renderCalendarStatus(currentUserData);
-      setCalendarMessage('Google Calendar paired.', 'success');
+      setCalendarMessage('Microsoft Teams connected.', 'success');
       reloadUserData();
     }
 
@@ -2473,6 +2551,24 @@
         } finally {
           isCalendarBusy = false;
           calendarPairBtn.disabled = false;
+        }
+      });
+    }
+
+    if (teamsPairBtn) {
+      teamsPairBtn.addEventListener('click', async () => {
+        if (isTeamsBusy) return;
+        try {
+          isTeamsBusy = true;
+          teamsPairBtn.disabled = true;
+          setCalendarMessage('Opening Microsoft Teams...', 'neutral');
+          await startMicrosoftTeamsAuth();
+        } catch (error) {
+          console.error('Tutor Hub Microsoft Teams connect error', error);
+          setCalendarMessage(error.message || 'Unable to start Microsoft Teams connection.', 'error');
+        } finally {
+          isTeamsBusy = false;
+          teamsPairBtn.disabled = false;
         }
       });
     }

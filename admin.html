@@ -1003,11 +1003,6 @@
             </div>
 
             <div class="form-group">
-              <label for="booking-summary-add-on">Session summary add-on</label>
-              <input type="number" id="booking-summary-add-on" name="summaryAddOn" min="0" step="0.01">
-            </div>
-
-            <div class="form-group">
               <label for="booking-recurring-weeks">Max weeks in advance for recurring sessions</label>
               <input type="number" id="booking-recurring-weeks" name="recurringWeeks" min="1" max="52" step="1" required>
             </div>
@@ -1437,7 +1432,6 @@
     const TUTOR_RATE_CONFIG = {
       baseRatePerHour: 50,
       additionalStudentPerHour: 20,
-      sessionSummaryAddOn: 10,
       currency: 'CAD'
     };
 
@@ -1462,7 +1456,6 @@
       minSessionMinutes: 60,
       baseSessionCost: 50,
       extraStudentCost: 20,
-      sessionSummaryAddOn: 10,
       recurringMaxAdvanceWeeks: 12,
       courses: [],
       availability: getDefaultAvailabilityTemplate(),
@@ -2445,7 +2438,6 @@
         minSessionMinutes,
         baseSessionCost: parseNumber(raw.baseSessionCost, DEFAULT_BOOKING_SETTINGS.baseSessionCost, { min: 0, precision: 2 }),
         extraStudentCost: parseNumber(raw.extraStudentCost, DEFAULT_BOOKING_SETTINGS.extraStudentCost, { min: 0, precision: 2 }),
-        sessionSummaryAddOn: parseNumber(raw.sessionSummaryAddOn, DEFAULT_BOOKING_SETTINGS.sessionSummaryAddOn, { min: 0, precision: 2 }),
         recurringMaxAdvanceWeeks: parseNumber(raw.recurringMaxAdvanceWeeks, DEFAULT_BOOKING_SETTINGS.recurringMaxAdvanceWeeks, { min: 1, max: 52, step: 1 }),
         courses,
         availability,
@@ -2540,7 +2532,6 @@
       minDuration: document.getElementById('booking-min-duration'),
       baseRate: document.getElementById('booking-base-rate'),
       extraRate: document.getElementById('booking-extra-rate'),
-      summaryAddOn: document.getElementById('booking-summary-add-on'),
       recurringWeeks: document.getElementById('booking-recurring-weeks'),
       courses: document.getElementById('booking-courses')
     } : null;
@@ -2609,7 +2600,6 @@
       bookingSettingsInputs.minDuration.value = settings.minSessionMinutes;
       bookingSettingsInputs.baseRate.value = settings.baseSessionCost;
       bookingSettingsInputs.extraRate.value = settings.extraStudentCost;
-      bookingSettingsInputs.summaryAddOn.value = settings.sessionSummaryAddOn;
       bookingSettingsInputs.recurringWeeks.value = settings.recurringMaxAdvanceWeeks;
       bookingSettingsInputs.courses.value = (settings.courses || []).join('\n');
 
@@ -2708,7 +2698,6 @@
         const minSessionMinutes = Number(bookingSettingsInputs.minDuration.value || DEFAULT_BOOKING_SETTINGS.minSessionMinutes);
         const baseRate = Number(bookingSettingsInputs.baseRate.value || DEFAULT_BOOKING_SETTINGS.baseSessionCost);
         const extraRate = Number(bookingSettingsInputs.extraRate.value || DEFAULT_BOOKING_SETTINGS.extraStudentCost);
-        const summaryAddOn = Number(bookingSettingsInputs.summaryAddOn.value || DEFAULT_BOOKING_SETTINGS.sessionSummaryAddOn);
         const recurringWeeks = Number(bookingSettingsInputs.recurringWeeks.value || DEFAULT_BOOKING_SETTINGS.recurringMaxAdvanceWeeks);
 
         if (!Number.isFinite(maxStudents) || maxStudents < 1) {
@@ -2728,9 +2717,6 @@
         }
         if (!Number.isFinite(extraRate) || extraRate < 0) {
           throw new Error('Cost per additional student must be zero or higher.');
-        }
-        if (!Number.isFinite(summaryAddOn) || summaryAddOn < 0) {
-          throw new Error('Session summary add-on must be zero or higher.');
         }
         if (!Number.isFinite(recurringWeeks) || recurringWeeks < 1) {
           throw new Error('Recurring sessions must be allowed at least one week in advance.');
@@ -2777,7 +2763,6 @@
           minSessionMinutes: Math.min(Math.max(Math.round(minSessionMinutes / 15) * 15, 30), Math.round(maxHours * 60)),
           baseSessionCost: Number(baseRate.toFixed(2)),
           extraStudentCost: Number(extraRate.toFixed(2)),
-          sessionSummaryAddOn: Number(summaryAddOn.toFixed(2)),
           recurringMaxAdvanceWeeks: Math.min(Math.max(Math.round(recurringWeeks), 1), 52),
           courses: coursesList,
           availability: availabilityPayload,
@@ -3160,10 +3145,6 @@
         additionalStudentPerSession: TUTOR_RATE_CONFIG.additionalStudentPerSession ?? TUTOR_RATE_CONFIG.additionalStudentPerHour,
         currency: TUTOR_RATE_CONFIG.currency
       };
-
-      if (TUTOR_RATE_CONFIG.sessionSummaryAddOn != null) {
-        billing.sessionSummaryAddOn = TUTOR_RATE_CONFIG.sessionSummaryAddOn;
-      }
 
       const payload = {
         uid: currentUser.uid,

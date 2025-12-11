@@ -505,6 +505,11 @@
               </div>
               <p class="helper-text">Families can filter tutors based on preferred meeting formats.</p>
 
+              <p id="office-address-hint" class="helper-text" hidden>
+                When “Tutor’s office” is enabled, choose your exact office address in “Base location”.
+                This address is included in approval emails and calendar invites.
+              </p>
+
               <div class="inline-field-row">
                 <div class="input-group">
                   <label for="location-search">Base location <span class="pill-help">Autocomplete</span></label>
@@ -846,6 +851,7 @@
     const modeOnline = document.getElementById('mode-online');
     const modeOffice = document.getElementById('mode-office');
     const modeTravel = document.getElementById('mode-travel');
+    const officeAddressHintEl = document.getElementById('office-address-hint');
     const locationSearchInput = document.getElementById('location-search');
     const locationLabelInput = document.getElementById('location-label');
     const travelEnabledToggle = document.getElementById('travel-enabled');
@@ -859,6 +865,11 @@
     const addonRowsEl = document.getElementById('addon-rows');
     const addonEmptyEl = document.getElementById('addon-empty');
     const addAddonBtn = document.getElementById('add-addon-btn');
+
+    // Bind add-on handlers as early as possible.
+    // (attachAddOnButtonHandlers is a function declaration and is hoisted.)
+    attachAddOnButtonHandlers();
+    document.addEventListener('DOMContentLoaded', attachAddOnButtonHandlers, { once: true });
 
     const zonePricingSection = document.getElementById('zone-pricing-section');
     const zonePricingRows = document.getElementById('zone-pricing-rows');
@@ -1615,7 +1626,24 @@
       const hasLocation = normalized.basePlace?.location || radius;
       currentLocationState = hasLocation ? { ...normalized, travelRadiusKm: radius, travelEnabled: travelEnabledFromData } : null;
       applyTravelVisibility({ skipSync: true });
+      syncOfficeAddressRequirements();
       void renderLocationOnMap(currentLocationState);
+    }
+
+    function syncOfficeAddressRequirements() {
+      const officeEnabled = !!modeOffice?.checked;
+      if (officeAddressHintEl) {
+        officeAddressHintEl.hidden = !officeEnabled;
+      }
+      if (locationSearchInput) {
+        if (officeEnabled) {
+          locationSearchInput.required = true;
+          locationSearchInput.setAttribute('aria-required', 'true');
+        } else {
+          locationSearchInput.required = false;
+          locationSearchInput.removeAttribute('aria-required');
+        }
+      }
     }
 
     function formatCurrency(amount, currency) {
@@ -1795,6 +1823,30 @@
     function handleAddOnAddClick() {
       const newAddOn = { id: `addon-${Date.now()}`, label: '', priceDelta: 0 };
       addAddonRowToEditor(newAddOn);
+    }
+
+    function attachAddOnButtonHandlers() {
+      if (attachAddOnButtonHandlers._attached) return;
+      attachAddOnButtonHandlers._attached = true;
+
+      const handler = (event) => {
+        const target = event?.target;
+        const btn = target && target.closest ? target.closest('.addon-add-btn, #add-addon-btn') : null;
+        if (!btn) return;
+        event.preventDefault();
+        handleAddOnAddClick();
+      };
+
+      // Capture-phase pointer handler is the most reliable across click blockers.
+      document.addEventListener('pointerup', handler, true);
+
+      if (addAddonBtn) {
+        addAddonBtn.disabled = false;
+        addAddonBtn.addEventListener('pointerup', (event) => {
+          event.preventDefault();
+          handleAddOnAddClick();
+        });
+      }
     }
 
     function renderAddOnRows(addOns = []) {
@@ -2080,6 +2132,15 @@
         throw new Error('Add a base location for in-person or travel sessions.');
       }
 
+      const officeAddress = meetingModes.tutorsOffice
+        ? (locationPayload?.basePlace?.formattedAddress || '').trim()
+        : '';
+      if (meetingModes.tutorsOffice) {
+        if (!officeAddress || !locationPayload?.basePlace?.placeId) {
+          throw new Error('Tutor’s office requires an exact address. Please select a full address from the Base location autocomplete.');
+        }
+      }
+
       const placesSettings = locationPayload?.basePlace?.placeId
         ? {
             enabled: true,
@@ -2113,7 +2174,8 @@
         bookingSettings,
         meetingModes,
         tutorLocation: locationPayload,
-        placesSettings
+        placesSettings,
+        officeAddress
       };
     }
 
@@ -2242,77 +2304,16 @@
       if (resetBtn) resetBtn.disabled = true;
       setEditStatus('Saving booking info...');
       try {
-        const { bookingSettings, meetingModes, tutorLocation, placesSettings } = buildUpdatePayload();
+        const { bookingSettings, meetingModes, tutorLocation, placesSettings, officeAddress } = buildUpdatePayload();
         const profileRef = doc(db, TUTOR_PROFILES_COLLECTION, targetTutorProfileId);
         await setDoc(profileRef, {
           bookingSettings,
           meetingModes,
           tutorLocation,
           placesSettings,
+          officeAddress,
           updatedAt: serverTimestamp()
         }, { merge: true });
-
-      [modeOnline, modeOffice, modeTravel].forEach((checkbox) => {
-        if (checkbox) {
-          checkbox.addEventListener('change', () => {
-            if (checkbox === modeTravel && travelEnabledToggle && checkbox.checked) {
-              travelEnabledToggle.checked = true;
-            }
-            applyTravelVisibility();
-          });
-        }
-      });
-
-      if (travelEnabledToggle) {
-        travelEnabledToggle.addEventListener('change', () => applyTravelVisibility());
-      }
-
-      if (travelRadiusInput) {
-        travelRadiusInput.addEventListener('input', () => {
-          updateTravelRadiusDisplay();
-          syncLocationFromInputs();
-        });
-      }
-
-      if (travelZonesInput) {
-        travelZonesInput.addEventListener('change', () => {
-          syncLocationFromInputs();
-        });
-      }
-
-      if (addAddonBtn) {
-        addAddonBtn.disabled = false;
-        addAddonBtn.addEventListener('click', (event) => {
-          event.preventDefault();
-          handleAddOnAddClick();
-        });
-      }
-
-      // Fallback delegation in case the direct listener misses (e.g., re-rendered button)
-      document.addEventListener('click', (event) => {
-        const target = event.target;
-        if (target && target.closest && target.closest('.addon-add-btn')) {
-          event.preventDefault();
-          handleAddOnAddClick();
-        }
-      });
-
-      if (locationLabelInput) {
-        locationLabelInput.addEventListener('input', () => {
-          if (currentLocationState) {
-            syncLocationFromInputs();
-          }
-        });
-      }
-
-      if (locationSearchInput) {
-        locationSearchInput.addEventListener('focus', () => {
-          void ensureLocationMap();
-        });
-      }
-
-      updateTravelRadiusDisplay();
-      applyTravelVisibility({ skipSync: true });
         const refreshed = await fetchTutorBookingSettings(targetTutorProfileId, siteSettingsCache || DEFAULT_BOOKING_SETTINGS);
         if (refreshed) {
           lastLoadedSettings = refreshed;
@@ -2345,6 +2346,55 @@
     if (resetBtn) {
       resetBtn.addEventListener('click', resetEditor);
     }
+
+    // --- UI wiring ---
+    [modeOnline, modeOffice, modeTravel].forEach((checkbox) => {
+      if (!checkbox) {
+        return;
+      }
+      checkbox.addEventListener('change', () => {
+        syncOfficeAddressRequirements();
+        if (checkbox === modeTravel && travelEnabledToggle && checkbox.checked) {
+          travelEnabledToggle.checked = true;
+        }
+        applyTravelVisibility();
+      });
+    });
+
+    if (travelEnabledToggle) {
+      travelEnabledToggle.addEventListener('change', () => applyTravelVisibility());
+    }
+
+    if (travelRadiusInput) {
+      travelRadiusInput.addEventListener('input', () => {
+        updateTravelRadiusDisplay();
+        syncLocationFromInputs();
+      });
+    }
+
+    if (travelZonesInput) {
+      travelZonesInput.addEventListener('change', () => {
+        syncLocationFromInputs();
+      });
+    }
+
+    if (locationLabelInput) {
+      locationLabelInput.addEventListener('input', () => {
+        if (currentLocationState) {
+          syncLocationFromInputs();
+        }
+      });
+    }
+
+    if (locationSearchInput) {
+      locationSearchInput.addEventListener('focus', () => {
+        void ensureLocationMap();
+      });
+    }
+
+    updateTravelRadiusDisplay();
+    applyTravelVisibility({ skipSync: true });
+    syncOfficeAddressRequirements();
 
     setupCollapsibles();
 

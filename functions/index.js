@@ -28,16 +28,190 @@ const googleOAuthClientId = defineString('GOOGLE_OAUTH_CLIENT_ID');
 const googleOAuthClientSecret = defineString('GOOGLE_OAUTH_CLIENT_SECRET');
 const googleOAuthRedirectUri = defineString('GOOGLE_OAUTH_REDIRECT_URI');
 
+const microsoftClientId = defineString('MICROSOFT_CLIENT_ID');
+const microsoftClientSecret = defineString('MICROSOFT_CLIENT_SECRET');
+const microsoftRedirectUri = defineString('MICROSOFT_REDIRECT_URI');
+const microsoftTenant = defineString('MICROSOFT_TENANT', { default: 'common' });
+
 const STATE_COLLECTION = 'linkedinAuthStates';
 const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const LINKEDIN_SCOPES = ['openid', 'profile', 'r_profile_basicinfo'];
 const CALENDAR_STATE_COLLECTION = 'calendarAuthStates';
 const CALENDAR_STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const MICROSOFT_STATE_COLLECTION = 'microsoftAuthStates';
+const MICROSOFT_STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const CALENDAR_SCOPES = [
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/userinfo.email',
   'openid'
 ];
+
+// Online meeting creation requires these.
+const MICROSOFT_SCOPES = [
+  'openid',
+  'profile',
+  'offline_access',
+  'User.Read',
+  'OnlineMeetings.ReadWrite'
+];
+
+function normalizeMeetingMode(raw) {
+  if (!raw) {
+    return null;
+  }
+  const value = String(raw).trim();
+  if (!value) {
+    return null;
+  }
+  const lowered = value.toLowerCase();
+  if (lowered === 'online') return 'online';
+  if (lowered === 'tutorsoffice' || lowered === "tutor's office" || lowered === 'office') return 'tutorsOffice';
+  if (lowered === 'travel' || lowered === 'traveltome' || lowered === 'travel_to_me') return 'travel';
+  return value;
+}
+
+async function refreshMicrosoftAccessTokenIfNeeded(uid) {
+  const privateRef = db.collection('users').doc(uid).collection('private').doc('microsoft');
+  const snap = await privateRef.get();
+  if (!snap.exists) {
+    return null;
+  }
+  const current = snap.data() || {};
+  const accessToken = current.accessToken || null;
+  const refreshToken = current.refreshToken || null;
+  const expiresAt = typeof current.expiresAt === 'number' ? current.expiresAt : null;
+
+  const needsRefresh = !accessToken || !expiresAt || (Date.now() + (5 * 60 * 1000) >= expiresAt);
+  if (!needsRefresh) {
+    return { accessToken, tokenType: current.tokenType || 'Bearer' };
+  }
+
+  if (!refreshToken) {
+    return null;
+  }
+
+  const config = ensureMicrosoftOAuthConfig();
+  const params = new URLSearchParams({
+    client_id: config.clientId,
+    client_secret: config.clientSecret,
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+    redirect_uri: config.redirectUri
+  });
+
+  const response = await fetchFn(`https://login.microsoftonline.com/${encodeURIComponent(config.tenant || 'common')}/oauth2/v2.0/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString()
+  });
+
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = json?.error_description || json?.error || 'Microsoft token refresh failed.';
+    throw new Error(message);
+  }
+
+  const expiresInSec = Number(json.expires_in || 0);
+  const newExpiresAt = expiresInSec ? Date.now() + (expiresInSec * 1000) : null;
+
+  await privateRef.set({
+    accessToken: json.access_token || null,
+    refreshToken: json.refresh_token || refreshToken,
+    tokenType: json.token_type || 'Bearer',
+    scope: json.scope || current.scope || MICROSOFT_SCOPES.join(' '),
+    expiresAt: newExpiresAt,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+
+  return { accessToken: json.access_token || null, tokenType: json.token_type || 'Bearer' };
+}
+
+async function createTeamsOnlineMeeting({ accessToken, startDateTime, endDateTime, subject }) {
+  const body = {
+    startDateTime,
+    endDateTime,
+    subject: subject || 'Tutoring Session'
+  };
+  const response = await fetchFn('https://graph.microsoft.com/v1.0/me/onlineMeetings', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = json?.error?.message || 'Microsoft Graph meeting creation failed.';
+    throw new Error(message);
+  }
+  return {
+    id: json.id || null,
+    joinUrl: json.joinWebUrl || null
+  };
+}
+
+function buildTeamsSeriesKey({ tutorUid, guardianEmail, subject, startTime, recurringSeriesStart, recurringSeriesEnd }) {
+  const raw = [tutorUid || '', guardianEmail || '', subject || '', startTime || '', recurringSeriesStart || '', recurringSeriesEnd || ''].join('|');
+  return crypto.createHash('sha256').update(raw).digest('hex');
+}
+
+async function getOrCreateTeamsMeetingForSeries({ tutorUid, seriesKey, startDateTime, endDateTime, subject }) {
+  const seriesRef = db.collection('teamsMeetingSeries').doc(seriesKey);
+  const existing = await seriesRef.get();
+  if (existing.exists) {
+    const data = existing.data() || {};
+    if (data.joinUrl && data.meetingId && data.tutorUid === tutorUid) {
+      return { meetingId: data.meetingId, joinUrl: data.joinUrl, reused: true };
+    }
+  }
+
+  const token = await refreshMicrosoftAccessTokenIfNeeded(tutorUid);
+  if (!token?.accessToken) {
+    throw new Error('Tutor Microsoft Teams is not connected (missing access token).');
+  }
+
+  const created = await createTeamsOnlineMeeting({
+    accessToken: token.accessToken,
+    startDateTime,
+    endDateTime,
+    subject
+  });
+
+  await seriesRef.set({
+    tutorUid,
+    meetingId: created.id,
+    joinUrl: created.joinUrl,
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+
+  return { meetingId: created.id, joinUrl: created.joinUrl, reused: false };
+}
+
+async function resolveTutorOfficeAddress(bookingData) {
+  const tutorProfileId = bookingData?.tutorProfileId || bookingData?.tutorProfileID || bookingData?.tutorProfile || null;
+  if (tutorProfileId) {
+    const profileSnap = await db.collection('tutorProfiles').doc(String(tutorProfileId)).get();
+    if (profileSnap.exists) {
+      const profile = profileSnap.data() || {};
+      const direct = profile.officeAddress || null;
+      const formatted = profile?.tutorLocation?.basePlace?.formattedAddress || null;
+      return direct || formatted || null;
+    }
+  }
+
+  const tutorUid = bookingData?.tutorUid || bookingData?.tutorId || null;
+  if (tutorUid) {
+    const tutorSnap = await db.collection('tutors').doc(String(tutorUid)).get();
+    if (tutorSnap.exists) {
+      const data = tutorSnap.data() || {};
+      return data.officeAddress || null;
+    }
+  }
+
+  return null;
+}
 
 function getAllowedOrigins() {
   return appOriginsParam
@@ -115,6 +289,20 @@ function ensureGoogleOAuthConfig() {
   };
   if (!config.clientId || !config.clientSecret || !config.redirectUri) {
     throw new Error('Missing Google OAuth configuration. Set google_oauth_client_id, google_oauth_client_secret, and google_oauth_redirect_uri.');
+  }
+  return config;
+}
+
+function ensureMicrosoftOAuthConfig() {
+  const config = {
+    clientId: microsoftClientId.value(),
+    clientSecret: microsoftClientSecret.value(),
+    redirectUri: microsoftRedirectUri.value(),
+    tenant: microsoftTenant.value() || 'common'
+  };
+
+  if (!config.clientId || !config.clientSecret || !config.redirectUri) {
+    throw new Error('Missing Microsoft OAuth configuration. Set MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and MICROSOFT_REDIRECT_URI.');
   }
   return config;
 }
@@ -231,6 +419,13 @@ async function createCalendarState(state, uid) {
   });
 }
 
+async function createMicrosoftState(state, uid) {
+  await db.collection(MICROSOFT_STATE_COLLECTION).doc(state).set({
+    uid,
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+}
+
 async function consumeCalendarState(state) {
   const ref = db.collection(CALENDAR_STATE_COLLECTION).doc(state);
   const snapshot = await ref.get();
@@ -245,6 +440,97 @@ async function consumeCalendarState(state) {
   }
   await ref.delete().catch((error) => logger.warn('Failed to delete calendar state doc', error));
   return data;
+}
+
+async function consumeMicrosoftState(state) {
+  const ref = db.collection(MICROSOFT_STATE_COLLECTION).doc(state);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) {
+    return null;
+  }
+  const data = snapshot.data();
+  const createdAt = data?.createdAt?.toDate?.();
+  if (!createdAt || Date.now() - createdAt.getTime() > MICROSOFT_STATE_TTL_MS) {
+    await ref.delete().catch((error) => logger.warn('Failed to delete expired Microsoft state', error));
+    return null;
+  }
+  await ref.delete().catch((error) => logger.warn('Failed to delete Microsoft state doc', error));
+  return data;
+}
+
+function renderMicrosoftCallbackPage(payload, errorMessage = null) {
+  const safePayload = JSON.stringify(payload || {}).replace(/</g, '\\u003c');
+  const safeError = errorMessage ? JSON.stringify(errorMessage).replace(/</g, '\\u003c') : 'null';
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Microsoft Teams Pairing</title>
+  </head>
+  <body>
+    <script>
+      (function() {
+        const payload = ${safePayload};
+        const errorMessage = ${safeError};
+        if (window.opener && typeof window.opener.postMessage === 'function') {
+          window.opener.postMessage({ provider: 'microsoft-teams', payload, errorMessage }, '*');
+        }
+        window.close();
+      })();
+    </script>
+    <p>You can close this window.</p>
+  </body>
+</html>`;
+}
+
+function buildMicrosoftAuthorizeUrl({ tenant, clientId, redirectUri, state, scopes }) {
+  const params = new URLSearchParams({
+    client_id: clientId,
+    response_type: 'code',
+    redirect_uri: redirectUri,
+    response_mode: 'query',
+    scope: (scopes || []).join(' '),
+    state
+  });
+  return `https://login.microsoftonline.com/${encodeURIComponent(tenant || 'common')}/oauth2/v2.0/authorize?${params.toString()}`;
+}
+
+async function exchangeMicrosoftCodeForTokens({ tenant, clientId, clientSecret, redirectUri, code }) {
+  const params = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: redirectUri
+  });
+
+  const response = await fetchFn(`https://login.microsoftonline.com/${encodeURIComponent(tenant || 'common')}/oauth2/v2.0/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString()
+  });
+
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = json?.error_description || json?.error || 'Microsoft token exchange failed.';
+    throw new Error(message);
+  }
+  return json;
+}
+
+async function fetchMicrosoftMe(accessToken) {
+  const response = await fetchFn('https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName', {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error('Unable to fetch Microsoft profile.');
+  }
+  return json;
 }
 
 async function fetchLinkedInToken({ code, redirectUri, clientId, clientSecret }) {
@@ -786,6 +1072,257 @@ export const googleCalendarCallback = onRequest(async (req, res) => {
   } catch (authError) {
     logger.error('Google Calendar callback error', authError);
     res.status(500).send(renderCalendarCallbackPage(null, 'Unable to complete Google Calendar pairing.'));
+  }
+});
+
+export const startMicrosoftTeamsAuth = onRequest(async (req, res) => {
+  if (applyCors(req, res)) {
+    return;
+  }
+
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) {
+    res.status(401).json({ error: 'Authorization token required.' });
+    return;
+  }
+
+  let uid;
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    uid = decoded.uid;
+  } catch (error) {
+    logger.warn('Failed to verify ID token for Microsoft Teams start', error);
+    res.status(401).json({ error: 'Invalid or expired token.' });
+    return;
+  }
+
+  let config;
+  try {
+    config = ensureMicrosoftOAuthConfig();
+  } catch (error) {
+    logger.error('Microsoft OAuth config error', error);
+    res.status(500).json({ error: error.message });
+    return;
+  }
+
+  const state = randomState();
+  await createMicrosoftState(state, uid);
+
+  const url = buildMicrosoftAuthorizeUrl({
+    tenant: config.tenant,
+    clientId: config.clientId,
+    redirectUri: config.redirectUri,
+    state,
+    scopes: MICROSOFT_SCOPES
+  });
+
+  res.json({ url, state, expiresIn: MICROSOFT_STATE_TTL_MS / 1000 });
+});
+
+export const microsoftTeamsCallback = onRequest(async (req, res) => {
+  if (applyCors(req, res)) {
+    return;
+  }
+
+  const { state, code, error, error_description: errorDescription } = req.query;
+
+  if (!state) {
+    res.status(400).send(renderMicrosoftCallbackPage(null, 'Missing state.'));
+    return;
+  }
+
+  const stateData = await consumeMicrosoftState(state);
+  if (!stateData?.uid) {
+    res.status(400).send(renderMicrosoftCallbackPage(null, 'Invalid or expired pairing attempt.'));
+    return;
+  }
+
+  if (error) {
+    const message = errorDescription || error;
+    res.status(400).send(renderMicrosoftCallbackPage(null, message));
+    return;
+  }
+
+  if (!code) {
+    res.status(400).send(renderMicrosoftCallbackPage(null, 'Missing authorization code.'));
+    return;
+  }
+
+  let config;
+  try {
+    config = ensureMicrosoftOAuthConfig();
+  } catch (configError) {
+    logger.error('Microsoft OAuth config error', configError);
+    res.status(500).send(renderMicrosoftCallbackPage(null, 'Server configuration error.'));
+    return;
+  }
+
+  try {
+    const tokens = await exchangeMicrosoftCodeForTokens({
+      tenant: config.tenant,
+      clientId: config.clientId,
+      clientSecret: config.clientSecret,
+      redirectUri: config.redirectUri,
+      code
+    });
+
+    const expiresInSec = Number(tokens.expires_in || 0);
+    const expiresAt = expiresInSec ? Date.now() + (expiresInSec * 1000) : null;
+
+    let me = null;
+    try {
+      me = await fetchMicrosoftMe(tokens.access_token);
+    } catch (meError) {
+      logger.warn('Failed to fetch Microsoft /me profile', meError);
+    }
+
+    const microsoftSummary = {
+      connected: true,
+      tenant: config.tenant,
+      scopes: tokens.scope || MICROSOFT_SCOPES.join(' '),
+      microsoftUserId: me?.id || null,
+      email: me?.mail || me?.userPrincipalName || null,
+      displayName: me?.displayName || null,
+      syncedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    // Store secrets in a private subcollection to avoid exposing refresh tokens to clients.
+    await db.collection('users').doc(stateData.uid)
+      .collection('private').doc('microsoft')
+      .set({
+        accessToken: tokens.access_token || null,
+        refreshToken: tokens.refresh_token || null,
+        tokenType: tokens.token_type || 'Bearer',
+        scope: tokens.scope || MICROSOFT_SCOPES.join(' '),
+        expiresAt,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+    const userRef = db.collection('users').doc(stateData.uid);
+    await userRef.set({
+      microsoft: microsoftSummary
+    }, { merge: true });
+
+    const userDoc = await userRef.get();
+    const tutorProfileId = userDoc.exists ? userDoc.data().tutorProfileId : null;
+    if (tutorProfileId) {
+      await db.collection('tutorProfiles').doc(tutorProfileId).set({
+        microsoft: {
+          connected: true,
+          microsoftUserId: microsoftSummary.microsoftUserId,
+          email: microsoftSummary.email,
+          displayName: microsoftSummary.displayName,
+          syncedAt: admin.firestore.FieldValue.serverTimestamp()
+        }
+      }, { merge: true });
+    }
+
+    res.status(200).send(renderMicrosoftCallbackPage({ microsoft: { ...microsoftSummary, syncedAt: new Date().toISOString() } }, null));
+  } catch (authError) {
+    logger.error('Microsoft Teams callback error', authError);
+    res.status(500).send(renderMicrosoftCallbackPage(null, 'Unable to complete Microsoft Teams pairing.'));
+  }
+});
+
+export const onBookingApprovedCreateTeamsMeeting = onDocumentUpdated('bookings/{bookingId}', async (event) => {
+  const before = event.data?.before?.data?.() || null;
+  const after = event.data?.after?.data?.() || null;
+  if (!after) {
+    return;
+  }
+
+  const beforeApproval = (before?.approvalStatus || before?.status || '').toString().toLowerCase();
+  const afterApproval = (after?.approvalStatus || after?.status || '').toString().toLowerCase();
+
+  // Only act on transitions into approved.
+  const becameApproved = (beforeApproval !== 'approved') && (afterApproval === 'approved');
+  if (!becameApproved) {
+    return;
+  }
+
+  // Idempotency: if we already wrote a meeting link, skip.
+  if (after?.meetingLink || after?.teamsMeetingLink || after?.onlineMeetingUrl) {
+    return;
+  }
+
+  const meetingMode = normalizeMeetingMode(after?.meetingMode || after?.meeting_mode || after?.locationChoice || after?.location_choice);
+  if (meetingMode && meetingMode !== 'online') {
+    // For now only create Teams meetings for online sessions.
+    const resolvedLocation = meetingMode === 'tutorsOffice'
+      ? await resolveTutorOfficeAddress(after)
+      : (after?.travelAddress || after?.travel_address || after?.location || null);
+
+    await event.data.after.ref.set({
+      resolvedLocation: resolvedLocation || null,
+      resolvedMeetingMode: meetingMode,
+      meetingProvider: null,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    return;
+  }
+
+  const tutorUid = after?.tutorUid || after?.tutorId || null;
+  if (!tutorUid || tutorUid === 'unassigned') {
+    logger.warn('Booking approved but tutorUid missing; skipping Teams creation', { bookingId: event.params.bookingId });
+    return;
+  }
+
+  const sessionDate = after?.sessionDate || after?.selected_date || null;
+  const startTime = after?.startTime || after?.selected_start || null;
+  const endTime = after?.endTime || null;
+  if (!sessionDate || !startTime || !endTime) {
+    logger.warn('Booking missing sessionDate/startTime/endTime; skipping Teams creation', { bookingId: event.params.bookingId });
+    return;
+  }
+
+  // Treat times as local naive and encode as ISO with no timezone offset.
+  const startDateTime = `${sessionDate}T${startTime}:00`;
+  const endDateTime = `${sessionDate}T${endTime}:00`;
+
+  const guardianEmail = (after?.guardianEmail || after?.email || '').toString().trim().toLowerCase();
+  const subject = (after?.subject || after?.sessionTitle || 'Tutoring Session').toString();
+  const seriesKey = buildTeamsSeriesKey({
+    tutorUid: String(tutorUid),
+    guardianEmail,
+    subject,
+    startTime,
+    recurringSeriesStart: after?.recurringSeriesStart || null,
+    recurringSeriesEnd: after?.recurringSeriesEnd || null
+  });
+
+  try {
+    const meeting = await getOrCreateTeamsMeetingForSeries({
+      tutorUid: String(tutorUid),
+      seriesKey,
+      startDateTime,
+      endDateTime,
+      subject
+    });
+
+    await event.data.after.ref.set({
+      meetingProvider: 'microsoft-teams',
+      meetingLink: meeting.joinUrl || null,
+      teamsMeetingId: meeting.meetingId || null,
+      teamsSeriesKey: seriesKey,
+      teamsMeetingReused: meeting.reused === true,
+      resolvedMeetingMode: 'online',
+      resolvedLocation: meeting.joinUrl ? 'Online (Microsoft Teams)' : 'Online',
+      meetingCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  } catch (error) {
+    logger.error('Failed to create Teams meeting on approval', { bookingId: event.params.bookingId, error: error?.message || error });
+    await event.data.after.ref.set({
+      meetingProvider: 'microsoft-teams',
+      meetingCreateError: error?.message || String(error),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
   }
 });
 

@@ -147,13 +147,6 @@
       </select>
     </div>
 
-    <div class="field-row checkbox-row">
-      <label>
-        <input type="checkbox" id="include-summary" name="include_summary" title="Include summary of the session and relevant homework" />
-        Include summary of the session and relevant homework
-      </label>
-    </div>
-
     <div class="field-row">
       <label>Questions / Comments</label>
       <textarea name="questions" id="questions" rows="4" title="Questions / Comments"></textarea>
@@ -762,21 +755,17 @@
 
     // Calculate final cost
     const duration = parseFloat(obj.duration_hours || "1");
-    const includeSummary = obj.include_summary === "on";
     const slidingScaleEnabled = obj.sliding_scale_toggle === "on";
     const discountSlider = document.getElementById("income-slider");
     
     const fallbackSettings = (typeof DEFAULT_BOOKING_SETTINGS !== 'undefined')
       ? DEFAULT_BOOKING_SETTINGS
-      : { baseSessionCost: 50, extraStudentCost: 20, sessionSummaryAddOn: 10 };
+      : { baseSessionCost: 50, extraStudentCost: 20 };
     const activeSettings = window.bookingSettings || fallbackSettings;
     const baseRate = Number(activeSettings.baseSessionCost) || fallbackSettings.baseSessionCost;
     const additionalRate = Number(activeSettings.extraStudentCost) || fallbackSettings.extraStudentCost;
-    const summaryFee = includeSummary
-      ? (Number(activeSettings.sessionSummaryAddOn) || fallbackSettings.sessionSummaryAddOn)
-      : 0;
     const costPerHour = baseRate + ((selectedStudents.length - 1) * additionalRate);
-    const standardTotal = (costPerHour * duration) + summaryFee;
+    const standardTotal = (costPerHour * duration);
     
     let finalCost = standardTotal;
     if (slidingScaleEnabled && discountSlider) {

@@ -11,6 +11,11 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
       allow read, write: if isAdmin();
+
+      // Private user secrets (OAuth refresh tokens, etc.)
+      match /private/{docId} {
+        allow read, write: if isAdmin();
+      }
     }
     
     // Users can manage their own students
