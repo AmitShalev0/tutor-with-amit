@@ -97,6 +97,7 @@ const DEFAULT_BOOKING_SETTINGS = {
   maxStudentsPerSession: 4,
   maxHoursPerSession: 2,
   minSessionMinutes: 60,
+  bufferMinutes: 15,
   baseSessionCost: 50,
   extraStudentCost: 20,
   sessionSummaryAddOn: 10,
@@ -276,6 +277,8 @@ function normalizeBookingSettingsInput(settings = {}) {
     const fallbackRounded = Math.round((merged.minSessionMinutes ?? DEFAULT_BOOKING_SETTINGS.minSessionMinutes) / 15) * 15;
     merged.minSessionMinutes = Math.min(Math.max(fallbackRounded, 30), maxDurationMinutes);
   }
+  const bufferVal = Number(settings.bufferMinutes ?? merged.bufferMinutes ?? DEFAULT_BOOKING_SETTINGS.bufferMinutes ?? 15);
+  merged.bufferMinutes = Number.isFinite(bufferVal) ? Math.min(Math.max(Math.round(bufferVal), 0), 240) : DEFAULT_BOOKING_SETTINGS.bufferMinutes;
   merged.baseSessionCost = Math.max(0, Number(settings.baseSessionCost ?? merged.baseSessionCost));
   merged.extraStudentCost = Math.max(0, Number(settings.extraStudentCost ?? merged.extraStudentCost));
   merged.sessionSummaryAddOn = Math.max(0, Number(settings.sessionSummaryAddOn ?? merged.sessionSummaryAddOn));
@@ -543,6 +546,7 @@ function setupBookingForm(settingsOverride) {
   const availabilityBlocks = bookingSettings.availabilityBlocks;
   const maxSessionHours = bookingSettings.maxHoursPerSession;
   const maxRecurringWeeks = bookingSettings.recurringMaxAdvanceWeeks;
+  const bufferMinutes = Math.max(0, Number(bookingSettings.bufferMinutes) || 0);
   const defaultCalendarDisplay = DEFAULT_BOOKING_SETTINGS.calendarDisplay || { startHour: 8, endHour: 20, visibleDays: ['0', '1', '2', '3', '4'] };
   const calendarDisplay = bookingSettings.calendarDisplay || defaultCalendarDisplay;
   const maxSessionMinutes = Math.max(60, Math.round(maxSessionHours * 60));
@@ -1142,7 +1146,7 @@ function setupBookingForm(settingsOverride) {
   // Each booking is [startMin, endMin] relative to day (0=Mon) and minute-of-day.
   // Example: Tuesday (1) has a booking 14:00-15:00
   // This will be populated by loadAvailability() from Apps Script
-  let demoBooked = {
+  let demoBooked = applyBufferToBooked({
     0: [],
     1: [],
     2: [],
@@ -1150,7 +1154,7 @@ function setupBookingForm(settingsOverride) {
     4: [],
     5: [],
     6: [],
-  };
+  }, bufferMinutes);
 
   // To let updateDurationOptions look at available blocks we keep demoAvailable
   // in an outer variable and fill it later in loadAvailability().
@@ -1174,6 +1178,27 @@ function setupBookingForm(settingsOverride) {
 
   let demoAvailable = { ...baseAvailabilityMap };
   let currentAvailabilitySource = { scriptUrl: APPS_SCRIPT_URL, calendarId: null };
+
+  function applyBufferToBooked(bookedMap, buffer) {
+    const safeBuffer = Math.max(0, Number(buffer) || 0);
+    const result = {};
+    Object.entries(bookedMap || {}).forEach(([key, slots]) => {
+      if (!Array.isArray(slots)) {
+        return;
+      }
+      result[key] = slots
+        .map(([start, end]) => {
+          const s = Number(start);
+          const e = Number(end);
+          if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) {
+            return null;
+          }
+          return [s, e + safeBuffer];
+        })
+        .filter(Boolean);
+    });
+    return result;
+  }
 
   const getBlocksForDay = (collection, dayIdx) => {
     if (!collection) {
@@ -1635,7 +1660,7 @@ function setupBookingForm(settingsOverride) {
 
       // Populate demoAvailable and demoBooked from server response and clamp to configured availability
       demoAvailable = clampAvailabilityToConfig(data.available || {}, configuredBlocks);
-      demoBooked = data.booked || {};
+      demoBooked = applyBufferToBooked(data.booked || {}, bufferMinutes);
 
       const allDayKeys = new Set([
         ...Object.keys(configuredBlocks || {}),
@@ -1713,7 +1738,7 @@ function setupBookingForm(settingsOverride) {
         5: [],
         6: [[11 * 60, 16 * 60]],
       };
-      demoBooked = {
+      demoBooked = applyBufferToBooked({
         0: [],
         1: [],
         2: [],
@@ -1721,7 +1746,7 @@ function setupBookingForm(settingsOverride) {
         4: [],
         5: [],
         6: [],
-      };
+      }, bufferMinutes);
       
       // Still update week display
       const today = new Date();

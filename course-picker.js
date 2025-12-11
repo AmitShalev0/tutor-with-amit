@@ -21,8 +21,8 @@
     { id: 'jr-social', label: 'Jr high Social', subjectGroup: 'social', gradeCeiling: 9 },
     { id: 'jr-science', label: 'Jr high Science', subjectGroup: 'science', gradeCeiling: 9 },
     { id: 'gr10-math', label: 'Math 10', subjectGroup: 'math', gradeCeiling: 10 },
-    { id: 'gr11-math', label: 'Math 11', subjectGroup: 'math', gradeCeiling: 11 },
-    { id: 'gr12-math', label: 'Math 12', subjectGroup: 'math', gradeCeiling: 12 },
+    { id: 'gr11-math', label: 'Math 20', subjectGroup: 'math', gradeCeiling: 11 },
+    { id: 'gr12-math', label: 'Math 30', subjectGroup: 'math', gradeCeiling: 12 },
     { id: 'gr10-english', label: 'English 10', subjectGroup: 'english', gradeCeiling: 10 },
     { id: 'gr11-english', label: 'English 11', subjectGroup: 'english', gradeCeiling: 11 },
     { id: 'gr12-english', label: 'English 12', subjectGroup:  'english', gradeCeiling: 12 },
@@ -105,12 +105,32 @@
     }
 
     async loadCourses() {
-      const customCourses = Array.isArray(this.options.catalog)
-        ? this.options.catalog
-        : (global.CANONICAL_COURSES || []);
+      const customCourses = Array.isArray(this.options.catalog) ? this.options.catalog : [];
+      let baseCourses = customCourses;
 
-      this.allCourses = (customCourses.length ? customCourses : DEFAULT_COURSES)
-        .map(normalizeCourse);
+      if (!baseCourses.length && Array.isArray(global.ALL_COURSES)) {
+        baseCourses = global.ALL_COURSES;
+      }
+
+      if (!baseCourses.length && Array.isArray(global.CANONICAL_COURSES)) {
+        baseCourses = global.CANONICAL_COURSES;
+      }
+
+      if (!baseCourses.length && typeof import === 'function') {
+        try {
+          const module = await import('./courses-data.js');
+          baseCourses = module.ALL_COURSES || module.CANONICAL_COURSES || [];
+        } catch (error) {
+          // Non-fatal; fall back to local catalog.
+          console.warn('course picker failed to load shared courses-data.js', error);
+        }
+      }
+
+      if (!baseCourses.length) {
+        baseCourses = DEFAULT_COURSES;
+      }
+
+      this.allCourses = baseCourses.map(normalizeCourse);
 
       const fetcher = this.options.fetchCourses;
       if (typeof fetcher === 'function') {

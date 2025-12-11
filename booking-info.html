@@ -272,6 +272,11 @@
             <input type="number" id="edit-min-duration" min="30" step="15" />
           </div>
           <div class="input-group">
+            <label for="edit-buffer-minutes">Time after session (minutes)</label>
+            <input type="number" id="edit-buffer-minutes" min="0" max="240" step="1" />
+            <p class="helper-text">Blocks this many minutes after each session on your booking calendar. Default 15.</p>
+          </div>
+          <div class="input-group">
             <label for="edit-base-rate">Cost per session (first student)</label>
             <input type="number" id="edit-base-rate" min="0" step="0.01" />
           </div>
@@ -467,6 +472,10 @@
             <dd id="session-max">—</dd>
           </div>
           <div>
+            <dt>Time after session</dt>
+            <dd id="session-buffer">—</dd>
+          </div>
+          <div>
             <dt>Maximum students per session</dt>
             <dd id="session-max-students">—</dd>
           </div>
@@ -525,6 +534,7 @@
       maxStudentsPerSession: 4,
       maxHoursPerSession: 2,
       minSessionMinutes: 60,
+      bufferMinutes: 15,
       baseSessionCost: 50,
       extraStudentCost: 20,
       sessionSummaryAddOn: 10,
@@ -562,6 +572,7 @@
       maxStudents: document.getElementById('edit-max-students'),
       maxHours: document.getElementById('edit-max-hours'),
       minDuration: document.getElementById('edit-min-duration'),
+      bufferMinutes: document.getElementById('edit-buffer-minutes'),
       baseRate: document.getElementById('edit-base-rate'),
       extraRate: document.getElementById('edit-extra-rate'),
       summaryAddOn: document.getElementById('edit-summary-add-on'),
@@ -587,6 +598,7 @@
       summaryAddOn: document.getElementById('rate-summary'),
       minDuration: document.getElementById('session-min'),
       maxDuration: document.getElementById('session-max'),
+      bufferMinutes: document.getElementById('session-buffer'),
       maxStudents: document.getElementById('session-max-students'),
       recurringWeeks: document.getElementById('session-recurring'),
       calendarHours: document.getElementById('calendar-hours'),
@@ -870,6 +882,7 @@
       normalized.maxStudentsPerSession = clampNumber(raw.maxStudentsPerSession, normalized.maxStudentsPerSession, { min: 1, max: 8, roundNearest: 1 });
       normalized.maxHoursPerSession = clampNumber(raw.maxHoursPerSession, normalized.maxHoursPerSession, { min: 1, max: 6, precision: 2 });
       normalized.minSessionMinutes = clampNumber(raw.minSessionMinutes, normalized.minSessionMinutes, { min: 30, max: Math.round(normalized.maxHoursPerSession * 60), roundNearest: 15 });
+      normalized.bufferMinutes = clampNumber(raw.bufferMinutes, normalized.bufferMinutes, { min: 0, max: 240, roundNearest: 1 });
       normalized.baseSessionCost = clampNumber(raw.baseSessionCost, normalized.baseSessionCost, { min: 0, precision: 2 });
       normalized.extraStudentCost = clampNumber(raw.extraStudentCost, normalized.extraStudentCost, { min: 0, precision: 2 });
       normalized.sessionSummaryAddOn = clampNumber(raw.sessionSummaryAddOn, normalized.sessionSummaryAddOn, { min: 0, precision: 2 });
@@ -1072,6 +1085,7 @@
       editInputs.maxStudents.value = safe.maxStudentsPerSession;
       editInputs.maxHours.value = safe.maxHoursPerSession;
       editInputs.minDuration.value = safe.minSessionMinutes;
+      editInputs.bufferMinutes.value = safe.bufferMinutes ?? DEFAULT_BOOKING_SETTINGS.bufferMinutes;
       editInputs.baseRate.value = safe.baseSessionCost;
       editInputs.extraRate.value = safe.extraStudentCost;
       editInputs.summaryAddOn.value = safe.sessionSummaryAddOn;
@@ -1128,6 +1142,7 @@
       const maxStudents = Number(editInputs.maxStudents.value || DEFAULT_BOOKING_SETTINGS.maxStudentsPerSession);
       const maxHours = Number(editInputs.maxHours.value || DEFAULT_BOOKING_SETTINGS.maxHoursPerSession);
       const minSessionMinutes = Number(editInputs.minDuration.value || DEFAULT_BOOKING_SETTINGS.minSessionMinutes);
+      const bufferMinutes = Number(editInputs.bufferMinutes.value || DEFAULT_BOOKING_SETTINGS.bufferMinutes);
       const baseRate = Number(editInputs.baseRate.value || DEFAULT_BOOKING_SETTINGS.baseSessionCost);
       const extraRate = Number(editInputs.extraRate.value || DEFAULT_BOOKING_SETTINGS.extraStudentCost);
       const summaryAddOn = Number(editInputs.summaryAddOn.value || DEFAULT_BOOKING_SETTINGS.sessionSummaryAddOn);
@@ -1144,6 +1159,9 @@
       }
       if (minSessionMinutes > maxHours * 60) {
         throw new Error('Minimum session length cannot exceed the maximum hours per session.');
+      }
+      if (!Number.isFinite(bufferMinutes) || bufferMinutes < 0) {
+        throw new Error('Time after session must be zero or higher.');
       }
       if (!Number.isFinite(baseRate) || baseRate < 0) {
         throw new Error('Cost per session must be zero or higher.');
@@ -1189,6 +1207,7 @@
         maxStudentsPerSession: Math.min(Math.max(Math.round(maxStudents), 1), 8),
         maxHoursPerSession: Math.min(Math.max(Number(maxHours.toFixed(2)), 1), 6),
         minSessionMinutes: Math.min(Math.max(Math.round(minSessionMinutes / 15) * 15, 30), Math.round(maxHours * 60)),
+        bufferMinutes: Math.min(Math.max(Math.round(bufferMinutes), 0), 240),
         baseSessionCost: Number(baseRate.toFixed(2)),
         extraStudentCost: Number(extraRate.toFixed(2)),
         sessionSummaryAddOn: Number(summaryAddOn.toFixed(2)),
@@ -1212,6 +1231,7 @@
       fieldEls.summaryAddOn.textContent = formatCurrency(settings.sessionSummaryAddOn, settings.currency);
       fieldEls.minDuration.textContent = formatDurationMinutes(settings.minSessionMinutes);
       fieldEls.maxDuration.textContent = formatDurationMinutes(settings.maxHoursPerSession * 60);
+      fieldEls.bufferMinutes.textContent = `${Math.round(settings.bufferMinutes ?? DEFAULT_BOOKING_SETTINGS.bufferMinutes)} min`;
       fieldEls.maxStudents.textContent = settings.maxStudentsPerSession;
       fieldEls.recurringWeeks.textContent = `${settings.recurringMaxAdvanceWeeks} week${settings.recurringMaxAdvanceWeeks === 1 ? '' : 's'}`;
       fieldEls.calendarHours.textContent = formatHourRange(settings.calendarDisplay.startHour, settings.calendarDisplay.endHour);
