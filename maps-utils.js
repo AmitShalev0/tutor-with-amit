@@ -219,6 +219,7 @@ export function normalizeTutorLocation(raw = {}) {
 
   const { value: travelZoneBreaksKm } = parseTravelZoneBreaks(raw.travelZoneBreaksKm ?? raw.travelZones ?? [], travelRadiusKm || undefined);
   const radiusPricing = normalizeRadiusPricing(raw.radiusPricing || [], travelRadiusKm || 0);
+  const travelEnabled = raw.travelEnabled !== false && (travelRadiusKm > 0 || travelZoneBreaksKm.length > 0);
 
   return {
     basePlace: basePlace
@@ -233,6 +234,7 @@ export function normalizeTutorLocation(raw = {}) {
         }
       : null,
     displayLocationLabel: raw.displayLocationLabel || raw.displayAddress || raw.label || null,
+    travelEnabled,
     travelRadiusKm,
     travelZoneBreaksKm,
     radiusPricing,

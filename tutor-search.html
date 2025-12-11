@@ -250,34 +250,116 @@
       color: #f8fafc;
       padding: 0.6rem 0.75rem;
     }
-    .map-display-modes {
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      border-radius: 0.75rem;
-      padding: 0.75rem 1rem;
-      display: flex;
-      gap: 1rem;
-      align-items: center;
-      color: #cbd5f5;
-    }
-    .map-display-modes legend {
-      padding: 0 0.4rem;
-      font-size: 0.85rem;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #94a3b8;
-    }
-    .map-display-modes label {
-      display: inline-flex;
-      gap: 0.35rem;
-      align-items: center;
-      cursor: pointer;
-      font-weight: 400;
-    }
     .tutor-map {
       width: 100%;
       height: 420px;
       border-radius: 0.75rem;
       overflow: hidden;
+    }
+
+    .map-canvas-shell {
+      position: relative;
+    }
+
+    .map-profile-card {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      max-width: 360px;
+      background: #ffffff;
+      color: #0f172a;
+      border-radius: 12px;
+      box-shadow: 0 14px 38px rgba(15, 23, 42, 0.22);
+      border: 1px solid #e2e8f0;
+      padding: 14px 16px 16px;
+      display: none;
+      gap: 12px;
+      z-index: 2;
+    }
+
+    .map-profile-card.visible {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      column-gap: 12px;
+      row-gap: 6px;
+      align-items: start;
+    }
+
+    .map-profile-card .card-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 999px;
+      overflow: hidden;
+      border: 2px solid #bfdbfe;
+      background: #e2e8f0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .map-profile-card .card-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .map-profile-card .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      grid-column: 1 / -1;
+    }
+
+    .map-profile-card .card-close {
+      background: transparent;
+      border: none;
+      color: #475569;
+      cursor: pointer;
+      font-size: 1.1rem;
+      line-height: 1;
+      padding: 4px;
+    }
+
+    .map-profile-card h3 {
+      margin: 0;
+      font-size: 1.05rem;
+      color: #0f172a;
+    }
+
+    .map-profile-card .card-rate {
+      margin: 0;
+      font-weight: 700;
+      color: #0ea5e9;
+    }
+
+    .map-profile-card .card-meta {
+      margin: 0;
+      color: #0f172a;
+      grid-column: 2 / -1;
+      font-size: 0.95rem;
+      line-height: 1.35;
+    }
+
+    .map-profile-card .card-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      grid-column: 1 / -1;
+      margin-top: 6px;
+    }
+
+    @media (max-width: 720px) {
+      .map-profile-card {
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        top: auto;
+        max-width: none;
+      }
     }
   </style>
 </head>
@@ -318,13 +400,11 @@
             <button id="postal-search-button" class="btn secondary" type="button">Center map</button>
           </div>
         </div>
-        <fieldset class="map-display-modes">
-          <legend>Display</legend>
-          <label><input type="radio" name="map-display-mode" value="markers" checked /> Markers only</label>
-          <label><input type="radio" name="map-display-mode" value="radius" /> Include travel radius</label>
-        </fieldset>
       </div>
-      <div id="tutor-map" class="tutor-map"></div>
+      <div class="map-canvas-shell">
+        <div id="tutor-map" class="tutor-map"></div>
+        <div id="map-profile-card" class="map-profile-card" hidden></div>
+      </div>
       <p id="map-error" class="error-state" hidden></p>
     </section>
 
@@ -378,9 +458,9 @@
     const errorState = document.getElementById('error-state');
     const mapContainer = document.getElementById('tutor-map');
     const mapError = document.getElementById('map-error');
+    const mapProfileCard = document.getElementById('map-profile-card');
     const postalSearchInput = document.getElementById('postal-search');
     const postalSearchButton = document.getElementById('postal-search-button');
-    const mapDisplayRadios = Array.from(document.querySelectorAll('input[name="map-display-mode"]'));
 
     let allTutors = [];
     let currentUser = null;
@@ -389,18 +469,36 @@
     const favoriteMutations = new Set();
     const placeCache = new Map();
     const inflightPlaces = new Map();
-    const defaultCenter = { lat: 51.0447, lng: -114.0719 };
+    const fallbackCenter = { lat: 51.0447, lng: -114.0719 };
+    let defaultCenter = { ...fallbackCenter };
     const mapsApiPromise = loadGoogleMapsApi({ libraries: 'places' });
     let mapsApi = null;
     let map = null;
     let geocoder = null;
-    let infoWindow = null;
     let markers = [];
     let circles = [];
     let polygons = [];
     let lastMapTutors = [];
-    let mapMode = 'markers';
     const MAX_TRAVEL_RADIUS_KM = 20;
+
+    const userLocationPromise = (async () => {
+      if (!('geolocation' in navigator)) return null;
+      return new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => resolve(null),
+          { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
+        );
+      });
+    })().then((coords) => {
+      if (coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lng)) {
+        defaultCenter = coords;
+        if (map && !lastMapTutors.length) {
+          map.setCenter(defaultCenter);
+        }
+      }
+      return coords;
+    });
 
     async function loadUserFavorites(uid) {
       if (!uid || !docFn || !getDocFn) {
@@ -543,6 +641,128 @@
       const parts = source.split(/\s+/).filter(Boolean);
       const initials = parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join('');
       return initials || 'TU';
+    }
+
+    function loadImage(url) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.referrerPolicy = 'no-referrer';
+        img.onload = () => resolve(img);
+        img.onerror = (error) => reject(error);
+        img.src = url;
+      });
+    }
+
+    async function buildMarkerIcon(tutor, mapsApiRef) {
+      if (!tutor) return null;
+
+      const sizePx = 64;
+      const center = sizePx / 2;
+      const radius = center - 2;
+      const canvas = document.createElement('canvas');
+      canvas.width = sizePx;
+      canvas.height = sizePx;
+      const ctx = canvas.getContext('2d');
+
+      const drawInitials = () => {
+        ctx.fillStyle = '#0ea5e9';
+        ctx.font = 'bold 22px Inter, system-ui, -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(getInitials(tutor.fullName || tutor.headline || 'Tutor'), center, center);
+      };
+
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(center, center, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#0ea5e9';
+      ctx.stroke();
+
+      const photoUrl = tutor.photoURL || null;
+      if (photoUrl) {
+        try {
+          const img = await loadImage(photoUrl);
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(center, center, radius - 2, 0, Math.PI * 2);
+          ctx.closePath();
+          ctx.clip();
+          ctx.drawImage(img, 0, 0, sizePx, sizePx);
+          ctx.restore();
+        } catch (error) {
+          console.warn('Marker photo failed to load, falling back to initials', error);
+          drawInitials();
+        }
+      } else {
+        drawInitials();
+      }
+
+      return {
+        url: canvas.toDataURL('image/png'),
+        scaledSize: mapsApiRef ? new mapsApiRef.Size(sizePx, sizePx) : undefined,
+        anchor: mapsApiRef ? new mapsApiRef.Point(center, center) : undefined
+      };
+    }
+
+    function getTutorBaseRate(tutor) {
+      const candidates = [
+        tutor?.bookingSettings?.baseSessionCost,
+        tutor?.baseSessionCost,
+        tutor?.baseRate,
+        tutor?.rate,
+        tutor?.hourlyRate
+      ];
+      const found = candidates.find((value) => Number.isFinite(Number(value)) && Number(value) >= 0);
+      const numeric = Number(found);
+      return Number.isFinite(numeric) ? numeric : null;
+    }
+
+    function formatCurrency(amount, currency = 'CAD') {
+      if (!Number.isFinite(amount)) return null;
+      try {
+        return new Intl.NumberFormat('en-CA', { style: 'currency', currency, maximumFractionDigits: 2 }).format(amount);
+      } catch (error) {
+        return `$${amount.toFixed(2)}`;
+      }
+    }
+
+    function hideMapProfileCard() {
+      if (!mapProfileCard) return;
+      mapProfileCard.innerHTML = '';
+      mapProfileCard.hidden = true;
+      mapProfileCard.classList.remove('visible');
+    }
+
+    function renderMapProfileCard(payload) {
+      if (!mapProfileCard || !payload) return;
+      const { title, rateHtml, subjectsText, address, profileUrl, tutorId, favoriteText } = payload;
+      const avatarHtml = payload.avatarHtml || '';
+
+      mapProfileCard.innerHTML = `
+        <div class="card-header">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span class="card-avatar">${avatarHtml}</span>
+            <div>
+              <h3>${title}</h3>
+              ${rateHtml || ''}
+            </div>
+          </div>
+          <button type="button" class="card-close" aria-label="Close">×</button>
+        </div>
+        ${subjectsText ? `<p class="card-meta"><strong>Subjects:</strong> ${subjectsText}</p>` : ''}
+        ${address ? `<p class="card-meta">${address}</p>` : ''}
+        <div class="card-actions">
+          <button type="button" class="btn secondary" data-card-profile="${profileUrl || ''}">View Profile</button>
+          <button type="button" class="btn secondary favorite-btn" data-card-fav="${tutorId || ''}">${favoriteText || '☆ Favourite'}</button>
+          <button type="button" class="btn primary" data-card-book="${tutorId || ''}">Book Session</button>
+        </div>
+      `;
+
+      mapProfileCard.hidden = false;
+      mapProfileCard.classList.add('visible');
     }
 
     async function fetchPlaceDetails(placeId) {
@@ -904,17 +1124,64 @@
 
     function clearMapOverlays() {
       markers.forEach((marker) => marker.setMap(null));
+      markers = [];
+      clearTravelOverlays();
+    }
+
+    function clearTravelOverlays() {
       circles.forEach((circle) => circle.setMap(null));
       polygons.forEach((poly) => poly.setMap(null));
-      markers = [];
       circles = [];
       polygons = [];
     }
 
-    function updateCircleVisibility() {
-      const shouldShowCircles = mapMode === 'radius';
-      circles.forEach((circle) => circle.setMap(shouldShowCircles ? map : null));
-      polygons.forEach((poly) => poly.setMap(shouldShowCircles ? map : null));
+    function drawTravelOverlays({ location, position }) {
+      if (!mapsApi || !location || !position) return;
+      clearTravelOverlays();
+
+      const meetingModes = location.meetingModes || null; // placeholder if needed later
+      const travelAllowed = location.travelEnabled !== false;
+      const radii = [];
+      if (travelAllowed && Array.isArray(location.travelZoneBreaksKm)) {
+        radii.push(...location.travelZoneBreaksKm);
+      }
+      if (travelAllowed && Number.isFinite(location.travelRadiusKm) && location.travelRadiusKm > 0) {
+        radii.push(location.travelRadiusKm);
+      }
+      const sortedRadii = radii
+        .filter((r) => Number.isFinite(r) && r > 0)
+        .map((r) => Math.min(r, MAX_TRAVEL_RADIUS_KM))
+        .sort((a, b) => a - b);
+
+      const palette = ['#22d3ee', '#38bdf8', '#60a5fa', '#a5b4fc'];
+      sortedRadii.forEach((radiusKm, index) => {
+        const color = palette[index % palette.length];
+        const circle = new mapsApi.Circle({
+          center: position,
+          radius: radiusKm * 1000,
+          strokeColor: color,
+          strokeOpacity: 0.35,
+          strokeWeight: 2,
+          fillColor: color,
+          fillOpacity: Math.max(0.05, 0.18 - index * 0.02),
+          map
+        });
+        circles.push(circle);
+      });
+
+      const rectPath = viewportToRectanglePath(location?.basePlace?.viewport);
+      if (rectPath) {
+        const polygon = new mapsApi.Polygon({
+          paths: rectPath,
+          strokeColor: '#38bdf8',
+          strokeOpacity: 0.4,
+          strokeWeight: 2,
+          fillColor: '#38bdf8',
+          fillOpacity: 0.12,
+          map
+        });
+        polygons.push(polygon);
+      }
     }
 
     async function renderMap(tutors) {
@@ -941,85 +1208,41 @@
           streetViewControl: false,
           fullscreenControl: false
         });
-        infoWindow = new mapsApi.InfoWindow();
         geocoder = new mapsApi.Geocoder();
       }
 
       clearMapOverlays();
+      hideMapProfileCard();
 
       if (!Array.isArray(tutors) || tutors.length === 0) {
         map.setCenter(defaultCenter);
         map.setZoom(11);
-        updateCircleVisibility();
         return;
       }
 
       const bounds = new mapsApi.LatLngBounds();
       let hasBounds = false;
 
-      tutors.forEach((tutor) => {
+      for (const tutor of tutors) {
         const location = resolveTutorLocation(tutor);
         const lat = location?.basePlace?.location?.lat;
         const lng = location?.basePlace?.location?.lng;
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-          return;
+          continue;
         }
 
         const position = { lat, lng };
         hasBounds = true;
         bounds.extend(position);
 
+        const markerIcon = await buildMarkerIcon(tutor, mapsApi);
         const marker = new mapsApi.Marker({
           map,
           position,
-          title: tutor.fullName || location?.basePlace?.name || 'Tutor'
+          title: tutor.fullName || location?.basePlace?.name || 'Tutor',
+          icon: markerIcon || undefined
         });
         markers.push(marker);
-
-        const radii = [];
-        if (Array.isArray(location?.travelZoneBreaksKm)) {
-          radii.push(...location.travelZoneBreaksKm);
-        }
-        if (Number.isFinite(location?.travelRadiusKm) && location.travelRadiusKm > 0) {
-          radii.push(location.travelRadiusKm);
-        }
-        const sortedRadii = radii
-          .filter((r) => Number.isFinite(r) && r > 0)
-          .map((r) => Math.min(r, MAX_TRAVEL_RADIUS_KM))
-          .sort((a, b) => a - b);
-
-        const palette = ['#22d3ee', '#38bdf8', '#60a5fa', '#a5b4fc'];
-        sortedRadii.forEach((radiusKm, index) => {
-          const color = palette[index % palette.length];
-          const circle = new mapsApi.Circle({
-            center: position,
-            radius: radiusKm * 1000,
-            strokeColor: color,
-            strokeOpacity: 0.35,
-            strokeWeight: 2,
-            fillColor: color,
-            fillOpacity: Math.max(0.05, 0.18 - index * 0.02),
-            map: mapMode === 'radius' ? map : null
-          });
-          circles.push(circle);
-          bounds.extend(circle.getBounds().getNorthEast());
-          bounds.extend(circle.getBounds().getSouthWest());
-        });
-
-        const rectPath = viewportToRectanglePath(location?.basePlace?.viewport);
-        if (rectPath) {
-          const polygon = new mapsApi.Polygon({
-            paths: rectPath,
-            strokeColor: '#38bdf8',
-            strokeOpacity: 0.4,
-            strokeWeight: 2,
-            fillColor: '#38bdf8',
-            fillOpacity: 0.12,
-            map: mapMode === 'radius' ? map : null
-          });
-          polygons.push(polygon);
-          rectPath.forEach((point) => bounds.extend(point));
-        }
 
         const subjects = Array.isArray(location?.subjects) && location.subjects.length
           ? location.subjects
@@ -1028,22 +1251,34 @@
           || location?.basePlace?.formattedAddress
           || location?.postalCode
           || '';
+        const rateAmount = getTutorBaseRate(tutor);
+        const rateHtml = Number.isFinite(rateAmount)
+          ? `<p style="margin:0 0 6px 0; color:#0f172a; font-weight:600;">From ${formatCurrency(rateAmount, tutor.bookingSettings?.currency || 'CAD')}/hr</p>`
+          : '';
+        const profileSlug = tutor.slug || '';
+        const publicUrl = profileSlug ? buildTutorHomeUrl(profileSlug) : 'home.html';
 
-        const infoHtml = `
-          <div style="min-width:220px;">
-            <h3 style="margin:0 0 0.4rem 0; font-size:1.05rem; color:#0f172a;">${marker.getTitle()}</h3>
-            ${subjects.length ? `<p style="margin:0 0 0.35rem 0;">Subjects: ${subjects.join(', ')}</p>` : ''}
-            ${address ? `<p style=\"margin:0;\">${address}</p>` : ''}
-          </div>
-        `;
+        const hasPhoto = Boolean(tutor.photoURL);
+        const avatarHtml = hasPhoto
+          ? `<img src="${tutor.photoURL}" alt="${marker.getTitle()} profile photo" />`
+          : getInitials(marker.getTitle());
 
         marker.addListener('click', () => {
-          infoWindow.setContent(infoHtml);
-          infoWindow.open({ anchor: marker, map });
+          const isFavourite = tutor.id ? favoriteTutorIds.has(tutor.id) : false;
+          const favoriteText = isFavourite ? '★ Favourite' : '☆ Favourite';
+          drawTravelOverlays({ location: { ...location, travelEnabled: location.travelEnabled !== false }, position });
+          renderMapProfileCard({
+            title: marker.getTitle(),
+            rateHtml,
+            subjectsText: subjects.join(', '),
+            address,
+            profileUrl: publicUrl,
+            tutorId: tutor.id || '',
+            favoriteText,
+            avatarHtml
+          });
         });
-      });
-
-      updateCircleVisibility();
+      }
 
       if (hasBounds) {
         map.fitBounds(bounds, 60);
@@ -1161,19 +1396,6 @@
         }
       });
 
-    mapDisplayRadios.forEach((radio) => {
-      radio.addEventListener('change', () => {
-        if (!radio.checked) {
-          return;
-        }
-        mapMode = radio.value === 'radius' ? 'radius' : 'markers';
-        updateCircleVisibility();
-        if (mapMode === 'radius' && !map && lastMapTutors.length) {
-          void renderMap(lastMapTutors);
-        }
-      });
-    });
-
     if (postalSearchButton) {
       postalSearchButton.addEventListener('click', () => {
         void centerMapOnPostalCode();
@@ -1185,6 +1407,41 @@
         if (event.key === 'Enter') {
           event.preventDefault();
           void centerMapOnPostalCode();
+        }
+      });
+    }
+
+    if (mapProfileCard) {
+      mapProfileCard.addEventListener('click', (event) => {
+        const closeBtn = event.target.closest('.card-close');
+        if (closeBtn) {
+          hideMapProfileCard();
+          clearTravelOverlays();
+          return;
+        }
+
+        const profileBtn = event.target.closest('[data-card-profile]');
+        if (profileBtn) {
+          const url = profileBtn.dataset.cardProfile;
+          if (url) {
+            window.location.href = url;
+          }
+          return;
+        }
+
+        const favBtn = event.target.closest('[data-card-fav]');
+        if (favBtn) {
+          const tutorId = favBtn.dataset.cardFav;
+          if (tutorId) {
+            void handleFavoriteClick(tutorId);
+          }
+          return;
+        }
+
+        const bookBtn = event.target.closest('[data-card-book]');
+        if (bookBtn) {
+          const tutorId = bookBtn.dataset.cardBook;
+          handleBookClick(tutorId);
         }
       });
     }

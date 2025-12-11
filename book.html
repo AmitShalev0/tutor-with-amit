@@ -159,11 +159,37 @@
       </select>
     </div>
 
-    <div class="field-row checkbox-row">
-      <label>
-        <input type="checkbox" id="include-summary" name="include_summary" title="Include summary of the session and relevant homework" />
-        Include summary of the session and relevant homework
-      </label>
+    <div class="field-row">
+      <label>Meeting mode*</label>
+      <div class="checkbox-row" id="meeting-mode-options">
+        <label><input type="radio" name="meeting_mode" value="online" id="meeting-mode-online" required /> Online</label>
+        <label><input type="radio" name="meeting_mode" value="tutorsOffice" id="meeting-mode-office" /> Tutor's office</label>
+        <label><input type="radio" name="meeting_mode" value="travel" id="meeting-mode-travel" /> Travel to me</label>
+      </div>
+      <p class="help-text" id="meeting-mode-help" data-editable-block="meetingModeHelp">Choose where the session will take place. Travel requires your address so we can confirm distance and cost.</p>
+    </div>
+
+    <div class="field-row hidden" id="travel-fields">
+      <label>Your address (for travel sessions)*</label>
+      <input type="text" name="travel_address" id="travel-address" placeholder="123 Main St, City" />
+      <p class="help-text" id="travel-help">Enter the full address for travel sessions. Travel surcharge updates after you pick a tutor.</p>
+      <div class="input-row">
+        <div class="input-grow">
+          <label>Notes for location</label>
+          <input type="text" name="travel_instructions" id="travel-instructions" placeholder="Gate code, parking, etc." />
+        </div>
+        <div class="input-grow">
+          <label>Estimated travel surcharge</label>
+          <input type="text" id="travel-surcharge-display" value="$0" title="Estimated travel surcharge" readonly />
+          <input type="hidden" id="travel-surcharge-value" name="travel_surcharge" value="0" />
+        </div>
+      </div>
+    </div>
+
+    <div class="field-row" id="add-ons-row">
+      <label>Optional add-ons</label>
+      <div id="add-on-checkboxes" class="checkbox-column"></div>
+      <p class="help-text" id="add-ons-help">Add-ons are set per tutor and update when you choose a tutor.</p>
     </div>
 
     <div class="field-row">
@@ -218,6 +244,7 @@
 <!-- Booking logic -->
 <script type="module">
   import { CANONICAL_COURSES, buildCourseIndex, sortCourses, findCourseByLabel } from './course-catalog.js';
+  import { loadGoogleMapsApi, haversineDistanceKm, normalizeTutorLocation } from './maps-utils.js';
 
   const auth = window.firebaseAuth;
   const db = window.firebaseDb;
@@ -252,6 +279,20 @@
   const tutorSelect = document.getElementById("tutor-select");
   const tutorSelectRow = document.getElementById("tutor-select-row");
   const tutorSelectHelp = document.getElementById("tutor-select-help");
+  const meetingModeInputs = Array.from(document.querySelectorAll('input[name="meeting_mode"]'));
+  const travelFields = document.getElementById('travel-fields');
+  const travelAddressInput = document.getElementById('travel-address');
+  const travelInstructionsInput = document.getElementById('travel-instructions');
+  const travelSurchargeInput = document.getElementById('travel-surcharge-value');
+  const travelSurchargeDisplay = document.getElementById('travel-surcharge-display');
+  const travelHelp = document.getElementById('travel-help');
+  const addOnContainer = document.getElementById('add-on-checkboxes');
+  const addOnsHelp = document.getElementById('add-ons-help');
+  let activeAddOns = [];
+  let mapsApiPromise = null;
+  let travelAutocomplete = null;
+  let travelCoords = null;
+  let travelDistanceKm = null;
   const urlParams = new URLSearchParams(window.location.search);
   const tutorsById = new Map();
   const preselectedTutorQuery = sanitizeTutorId(urlParams.get('tutor'));
@@ -295,6 +336,292 @@
       }
     }
     return null;
+  }
+
+  function normalizeAddOns(rawAddOns = []) {
+    if (!Array.isArray(rawAddOns)) return [];
+    return rawAddOns
+      .map((addOn, index) => {
+        if (!addOn) return null;
+        const label = (addOn.label || addOn.name || '').trim();
+        if (!label) return null;
+        const priceDelta = Number(addOn.priceDelta ?? addOn.price ?? 0);
+        const id = (addOn.id || `addon-${index + 1}`).toString();
+        return {
+          id,
+          label,
+          priceDelta: Number.isFinite(priceDelta) ? Number(priceDelta.toFixed(2)) : 0,
+          defaultSelected: Boolean(addOn.defaultSelected)
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function getSelectedMeetingMode() {
+    const checked = meetingModeInputs.find((input) => input.checked && !input.disabled);
+    return checked ? checked.value : '';
+  }
+
+  function syncMeetingModeVisibility() {
+    const mode = getSelectedMeetingMode();
+    const isTravel = mode === 'travel';
+    if (travelFields) {
+      travelFields.classList.toggle('hidden', !isTravel);
+    }
+    if (travelAddressInput) {
+      travelAddressInput.required = isTravel;
+    }
+    if (!isTravel && travelSurchargeInput) {
+      travelSurchargeInput.value = 0;
+      if (travelSurchargeDisplay) {
+        travelSurchargeDisplay.value = '$0.00';
+      }
+    }
+    if (typeof window.recalculateBookingCost === 'function') {
+      window.recalculateBookingCost();
+    }
+  }
+
+  function applyMeetingModeAvailability(settings = {}) {
+    const rawModes = settings.meetingModes || {};
+    const modes = {
+      online: rawModes.online !== false,
+      tutorsOffice: rawModes.tutorsOffice !== false,
+      travel: rawModes.travel === true || rawModes.travel === undefined ? true : Boolean(rawModes.travel)
+    };
+    const allowedInputs = [];
+    meetingModeInputs.forEach((input) => {
+      const allowed = Boolean(modes[input.value]);
+      input.disabled = !allowed;
+      if (!allowed) {
+        input.checked = false;
+      } else {
+        allowedInputs.push(input);
+      }
+    });
+    const current = getSelectedMeetingMode();
+    if (!current && allowedInputs.length) {
+      allowedInputs[0].checked = true;
+    }
+    syncMeetingModeVisibility();
+  }
+
+  function renderAddOnsFromSettings(settings = {}) {
+    if (!addOnContainer) return;
+    addOnContainer.innerHTML = '';
+    const normalized = normalizeAddOns(settings.addOns || []);
+    activeAddOns = normalized;
+    if (!normalized.length) {
+      if (addOnsHelp) {
+        addOnsHelp.textContent = 'No add-ons available for this session.';
+      }
+      if (typeof window.recalculateBookingCost === 'function') {
+        window.recalculateBookingCost();
+      }
+      return;
+    }
+    normalized.forEach((addOn, index) => {
+      const safeId = (addOn.id || `addon-${index + 1}`).replace(/[^a-zA-Z0-9_-]/g, '-');
+      const label = document.createElement('label');
+      label.className = 'checkbox-row';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.id = `addon-${safeId}`;
+      cb.name = `addon_${safeId}`;
+      cb.dataset.addonId = safeId;
+      cb.dataset.priceDelta = addOn.priceDelta;
+      cb.checked = Boolean(addOn.defaultSelected);
+      label.appendChild(cb);
+      const priceLabel = Number(addOn.priceDelta) >= 0
+        ? `+$${Number(addOn.priceDelta).toFixed(2)}`
+        : `-$${Math.abs(Number(addOn.priceDelta)).toFixed(2)}`;
+      label.appendChild(document.createTextNode(` ${addOn.label} (${priceLabel})`));
+      addOnContainer.appendChild(label);
+    });
+    if (typeof window.recalculateBookingCost === 'function') {
+      window.recalculateBookingCost();
+    }
+  }
+
+  function setTravelCoords(latLng) {
+    if (latLng && Number.isFinite(latLng.lat) && Number.isFinite(latLng.lng)) {
+      travelCoords = { lat: Number(latLng.lat), lng: Number(latLng.lng) };
+    } else {
+      travelCoords = null;
+    }
+  }
+
+  function formatMoney(amount) {
+    const value = Number(amount);
+    if (!Number.isFinite(value)) return '$0.00';
+    return `$${value.toFixed(2)}`;
+  }
+
+  async function ensureMapsApi() {
+    if (!mapsApiPromise) {
+      mapsApiPromise = loadGoogleMapsApi({ libraries: 'places' });
+    }
+    return mapsApiPromise;
+  }
+
+  async function initTravelAutocomplete() {
+    if (!travelAddressInput || travelAutocomplete) return;
+    try {
+      const maps = await ensureMapsApi();
+      travelAutocomplete = new maps.places.Autocomplete(travelAddressInput, {
+        fields: ['place_id', 'geometry', 'formatted_address', 'name']
+      });
+      travelAutocomplete.addListener('place_changed', () => {
+        const place = travelAutocomplete.getPlace();
+        const location = place?.geometry?.location;
+        if (location) {
+          setTravelCoords({ lat: location.lat(), lng: location.lng() });
+        } else {
+          setTravelCoords(null);
+        }
+        void updateTravelSurcharge();
+      });
+    } catch (error) {
+      console.warn('Travel autocomplete unavailable', error);
+      if (travelHelp) {
+        travelHelp.textContent = 'Enter your address for travel sessions (autocomplete unavailable).';
+      }
+    }
+  }
+
+  async function geocodeTravelAddress() {
+    if (!travelAddressInput) return null;
+    const address = travelAddressInput.value?.trim();
+    if (!address) {
+      setTravelCoords(null);
+      return null;
+    }
+    try {
+      const maps = await ensureMapsApi();
+      const geocoder = new maps.Geocoder();
+      const result = await new Promise((resolve) => {
+        geocoder.geocode({ address }, (results, status) => {
+          if (status === 'OK' && results?.[0]?.geometry?.location) {
+            const loc = results[0].geometry.location;
+            resolve({ lat: loc.lat(), lng: loc.lng(), formattedAddress: results[0].formatted_address });
+          } else {
+            resolve(null);
+          }
+        });
+      });
+      if (result) {
+        setTravelCoords({ lat: result.lat, lng: result.lng });
+        if (!travelAddressInput.value.includes(result.formattedAddress)) {
+          travelAddressInput.value = result.formattedAddress;
+        }
+      } else {
+        setTravelCoords(null);
+      }
+      return result;
+    } catch (error) {
+      console.warn('Geocoding failed', error);
+      setTravelCoords(null);
+      return null;
+    }
+  }
+
+  function getTutorTravelLocation(tutorId) {
+    const tutor = tutorsById.get(tutorId || '');
+    if (!tutor) return null;
+    if (tutor.normalizedLocation) return tutor.normalizedLocation;
+    const normalized = normalizeTutorLocation(tutor.tutorLocation || tutor.location || {});
+    tutor.normalizedLocation = normalized;
+    return normalized;
+  }
+
+  function computeTravelSurchargeForDistance(distanceKm, location) {
+    if (!location) return { surcharge: 0, allowed: false, reason: 'no-location' };
+    const travelRadius = Number(location.travelRadiusKm) || 0;
+    const pricing = Array.isArray(location.radiusPricing) ? location.radiusPricing : [];
+    const withinRadius = travelRadius > 0 ? distanceKm <= travelRadius : true;
+    if (!withinRadius) {
+      return { surcharge: 0, allowed: false, reason: 'outside-radius', travelRadius };
+    }
+    if (!pricing.length) {
+      return { surcharge: 0, allowed: true, reason: 'no-pricing' };
+    }
+    let matched = pricing.find((entry) => Number.isFinite(entry.upToKm) && distanceKm <= entry.upToKm);
+    if (!matched) {
+      matched = pricing[pricing.length - 1];
+    }
+    const surcharge = Number.isFinite(matched?.priceDelta) ? matched.priceDelta : 0;
+    return { surcharge, allowed: true, reason: 'priced', upToKm: matched?.upToKm };
+  }
+
+  function updateTravelUiMessage(message, isError = false) {
+    if (!travelHelp) return;
+    travelHelp.textContent = message;
+    travelHelp.classList.toggle('error', isError);
+  }
+
+  async function updateTravelSurcharge() {
+    const mode = getSelectedMeetingMode();
+    if (mode !== 'travel') {
+      travelDistanceKm = null;
+      if (travelSurchargeInput) travelSurchargeInput.value = 0;
+      if (travelSurchargeDisplay) travelSurchargeDisplay.value = '$0.00';
+      if (typeof window.setBookingPricingContext === 'function') {
+        window.setBookingPricingContext({ travelSurcharge: 0 });
+      }
+      return;
+    }
+
+    const tutorId = getSelectedTutorId();
+    const location = tutorId ? getTutorTravelLocation(tutorId) : null;
+    if (!location || !location.travelEnabled || !location.basePlace?.location) {
+      travelDistanceKm = null;
+      updateTravelUiMessage('Travel is not available for this tutor.');
+      if (travelSurchargeInput) travelSurchargeInput.value = 0;
+      if (travelSurchargeDisplay) travelSurchargeDisplay.value = '$0.00';
+      if (typeof window.setBookingPricingContext === 'function') {
+        window.setBookingPricingContext({ travelSurcharge: 0 });
+      }
+      return;
+    }
+
+    if (!travelCoords) {
+      await geocodeTravelAddress();
+    }
+    if (!travelCoords) {
+      travelDistanceKm = null;
+      updateTravelUiMessage('Enter your address to confirm travel availability and cost.', true);
+      if (typeof window.setBookingPricingContext === 'function') {
+        window.setBookingPricingContext({ travelSurcharge: 0 });
+      }
+      return;
+    }
+
+    const distanceKm = haversineDistanceKm(travelCoords, location.basePlace.location);
+    travelDistanceKm = distanceKm;
+    const result = computeTravelSurchargeForDistance(distanceKm, location);
+    if (!result.allowed) {
+      updateTravelUiMessage(`Outside travel radius (${distanceKm.toFixed(1)} km). Max ${result.travelRadius || location.travelRadiusKm || 0} km.`, true);
+      if (travelSurchargeInput) travelSurchargeInput.value = 0;
+      if (travelSurchargeDisplay) travelSurchargeDisplay.value = '$0.00';
+      if (typeof window.setBookingPricingContext === 'function') {
+        window.setBookingPricingContext({ travelSurcharge: 0 });
+      }
+      return;
+    }
+
+    const surcharge = Number(result.surcharge) || 0;
+    if (travelSurchargeInput) {
+      travelSurchargeInput.value = surcharge;
+    }
+    if (travelSurchargeDisplay) {
+      travelSurchargeDisplay.value = formatMoney(surcharge);
+    }
+    const zoneText = result.upToKm ? `up to ${result.upToKm} km` : 'within travel radius';
+    updateTravelUiMessage(`Travel distance: ${distanceKm.toFixed(1)} km, ${zoneText}.`);
+
+    if (typeof window.setBookingPricingContext === 'function') {
+      window.setBookingPricingContext({ travelSurcharge: surcharge });
+    }
   }
 
   async function loadTutorDirectory() {
@@ -923,7 +1250,8 @@
       publishedTutors = publishedTutors.map((tutor) => {
         const selections = collectTutorCourseSelections(tutor);
         const coverage = expandCoverageFromSelections(selections);
-        return { ...tutor, coverageCourseIds: coverage };
+        const normalizedLocation = normalizeTutorLocation(tutor.tutorLocation || tutor.location || {});
+        return { ...tutor, coverageCourseIds: coverage, normalizedLocation };
       });
 
       tutorsById.clear();
@@ -986,8 +1314,28 @@
       renderSubjectDropdown();
       refreshTutorSelectForSubject();
       syncCalendarSourceToSelection();
+      void updateTravelSurcharge();
     });
   }
+
+  meetingModeInputs.forEach((input) => {
+    input.addEventListener('change', () => {
+      syncMeetingModeVisibility();
+      void updateTravelSurcharge();
+    });
+  });
+  syncMeetingModeVisibility();
+
+  if (travelAddressInput) {
+    travelAddressInput.addEventListener('blur', () => {
+      setTravelCoords(null);
+      void updateTravelSurcharge();
+    });
+    travelAddressInput.addEventListener('input', () => {
+      setTravelCoords(null);
+    });
+  }
+  void initTravelAutocomplete();
 
   // Check authentication
   onAuth(auth, async (user) => {
@@ -1080,6 +1428,15 @@
         setupBookingForm(fetchedSettings || {});
         bookingFormInitialized = true;
         applyBookingSettingsToStudentSelectors(window.bookingSettings, userStudents.length);
+        const settingsForUi = fetchedSettings || window.bookingSettings || {};
+        applyMeetingModeAvailability(settingsForUi);
+        renderAddOnsFromSettings(settingsForUi);
+        if (typeof window.setBookingPricingContext === 'function') {
+          window.setBookingPricingContext({
+            baseSessionCost: settingsForUi.baseSessionCost,
+            extraStudentCost: settingsForUi.extraStudentCost
+          });
+        }
       } else {
         applyBookingSettingsToStudentSelectors(window.bookingSettings, userStudents.length);
       }
@@ -1087,6 +1444,9 @@
       await tutorOptionsPromise;
       refreshTutorSelectForSubject();
       renderSubjectDropdown();
+      applyMeetingModeAvailability(window.bookingSettings || {});
+      renderAddOnsFromSettings(window.bookingSettings || {});
+      void updateTravelSurcharge();
       syncCalendarSourceToSelection();
 
     } catch (err) {
@@ -1095,6 +1455,9 @@
         setupBookingForm();
         bookingFormInitialized = true;
         applyBookingSettingsToStudentSelectors(window.bookingSettings, userStudents.length);
+        const settingsForUi = window.bookingSettings || {};
+        applyMeetingModeAvailability(settingsForUi);
+        renderAddOnsFromSettings(settingsForUi);
       }
       alert("Error loading your data: " + err.message + ". Please refresh the page.");
     }
@@ -1323,7 +1686,8 @@
       'Name': obj.guardian_full_name,
       'Date': obj.selected_date,
       'Start Time': obj.selected_start,
-      'Students': obj.student_names
+      'Students': obj.student_names,
+      'Meeting mode': getSelectedMeetingMode()
     };
     
     const missingFields = [];
@@ -1333,6 +1697,12 @@
       }
     }
     
+    const meetingMode = getSelectedMeetingMode();
+    const isTravelMode = meetingMode === 'travel';
+    if (isTravelMode && (!obj.travel_address || !obj.travel_address.trim())) {
+      missingFields.push('Travel address');
+    }
+
     if (missingFields.length > 0) {
       msg.textContent = `Please fill in all required fields: ${missingFields.join(", ")}`;
       msg.classList.add("error");
@@ -1345,21 +1715,34 @@
 
     // Calculate final cost
     const duration = parseFloat(obj.duration_hours || "1");
-    const includeSummary = obj.include_summary === "on";
+    const selectedAddOns = activeAddOns.filter((addOn) => {
+      const safeId = (addOn.id || addOn.label || '').replace(/[^a-zA-Z0-9_-]/g, '-');
+      return formData.get(`addon_${safeId}`) === 'on';
+    }).map((addOn) => ({
+      id: addOn.id,
+      label: addOn.label,
+      priceDelta: Number(addOn.priceDelta) || 0
+    }));
+    obj.add_ons = selectedAddOns.map((addOn) => addOn.label).join(', ');
+    obj.add_on_details = selectedAddOns;
+    obj.meeting_mode = meetingMode || 'online';
+    obj.travel_surcharge = Number(travelSurchargeInput?.value || 0) || 0;
+    obj.travel_required = isTravelMode ? 'yes' : 'no';
+    obj.travel_distance_km = Number.isFinite(travelDistanceKm) ? Number(travelDistanceKm.toFixed(2)) : '';
     const slidingScaleEnabled = obj.sliding_scale_toggle === "on";
     const discountSlider = document.getElementById("income-slider");
     
     const fallbackSettings = (typeof DEFAULT_BOOKING_SETTINGS !== 'undefined')
       ? DEFAULT_BOOKING_SETTINGS
-      : { baseSessionCost: 50, extraStudentCost: 20, sessionSummaryAddOn: 10 };
+      : { baseSessionCost: 50, extraStudentCost: 20 };
     const activeSettings = window.bookingSettings || fallbackSettings;
-    const baseRate = Number(activeSettings.baseSessionCost) || fallbackSettings.baseSessionCost;
-    const additionalRate = Number(activeSettings.extraStudentCost) || fallbackSettings.extraStudentCost;
-    const summaryFee = includeSummary
-      ? (Number(activeSettings.sessionSummaryAddOn) || fallbackSettings.sessionSummaryAddOn)
-      : 0;
+    const pricingContext = window.bookingPricingContext || {};
+    const baseRate = Number(pricingContext.baseSessionCost ?? activeSettings.baseSessionCost ?? fallbackSettings.baseSessionCost);
+    const additionalRate = Number(pricingContext.extraStudentCost ?? activeSettings.extraStudentCost ?? fallbackSettings.extraStudentCost);
+    const addOnTotal = selectedAddOns.reduce((sum, addOn) => sum + (Number(addOn.priceDelta) || 0), 0);
+    const travelSurcharge = Number(obj.travel_surcharge) || 0;
     const costPerHour = baseRate + ((selectedStudents.length - 1) * additionalRate);
-    const standardTotal = (costPerHour * duration) + summaryFee;
+    const standardTotal = (costPerHour * duration) + addOnTotal + travelSurcharge;
     
     let finalCost = standardTotal;
     if (slidingScaleEnabled && discountSlider) {
@@ -1457,6 +1840,12 @@
         guardianEmail: userProfile?.email || currentUser.email,
         guardianPhone: userProfile?.phone || "",
         guardianName: userProfile?.fullName || currentUser.displayName || "",
+        meetingMode: obj.meeting_mode || 'online',
+        travelAddress: obj.travel_address || '',
+        travelInstructions: obj.travel_instructions || '',
+        travelSurcharge: Number(obj.travel_surcharge) || 0,
+        travelDistanceKm: Number.isFinite(Number(obj.travel_distance_km)) ? Number(obj.travel_distance_km) : null,
+        addOns: selectedAddOns,
         createdAt: new Date().toISOString(),
         source: "WEBSITE_BOOKING_FORM",
         cost: obj.final_cost,

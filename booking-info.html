@@ -162,6 +162,56 @@
       margin-top: 0;
       margin-bottom: 1rem;
     }
+    .collapsible-group {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .collapsible {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1rem 1.25rem;
+      background: var(--surface-alt);
+    }
+    .collapsible + .collapsible {
+      margin-top: 0.35rem;
+    }
+    .collapsible-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      cursor: pointer;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    .collapsible-header h3 {
+      margin: 0;
+    }
+    .collapsible-toggle {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.35rem 0.6rem;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+    .collapsible-body {
+      margin-top: 0.85rem;
+    }
+    .collapsible[data-collapsed="true"] .collapsible-body {
+      display: none;
+    }
+    .collapsible[data-collapsed="true"] .collapsible-toggle::after {
+      content: 'Show';
+      margin-left: 0.5rem;
+      color: var(--accent);
+    }
+    .collapsible[data-collapsed="false"] .collapsible-toggle::after {
+      content: 'Hide';
+      margin-left: 0.5rem;
+      color: var(--accent);
+    }
     .edit-grid {
       display: grid;
       gap: 1rem;
@@ -171,6 +221,10 @@
       display: block;
       font-weight: 600;
       margin-bottom: 0.35rem;
+    }
+    .input-grow {
+      flex: 1;
+      min-width: 140px;
     }
     .input-group input,
     .input-group textarea {
@@ -195,6 +249,46 @@
       color: var(--muted);
       font-size: 0.9rem;
       margin: 0.2rem 0 0;
+    }
+    .addon-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .addon-row {
+      display: grid;
+      grid-template-columns: 1.4fr 0.8fr auto;
+      gap: 0.75rem;
+      align-items: center;
+    }
+    @media (max-width: 640px) {
+      .addon-row {
+        grid-template-columns: 1fr;
+      }
+    }
+    .addon-row .remove-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.45rem 0.65rem;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .addon-row .remove-btn:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+    .addon-add-btn {
+      margin-top: 0.75rem;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      background: rgba(79, 157, 255, 0.12);
+      color: var(--accent);
     }
     .day-chips {
       display: flex;
@@ -228,6 +322,96 @@
       margin: 1.25rem 0;
     }
 
+    .edit-subsection {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .inline-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .inline-controls label {
+      display: inline-flex;
+      gap: 0.45rem;
+      align-items: center;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .inline-field-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
+      align-items: end;
+    }
+
+    .range-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .range-row input[type="range"] {
+      width: 100%;
+    }
+
+    .range-row .range-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .location-map-shell {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      height: 280px;
+      background: var(--surface-alt);
+    }
+
+    #location-map {
+      width: 100%;
+      height: 100%;
+    }
+
+    .pill-help {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.2);
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin-left: 0.35rem;
+    }
+
+    .message-area {
+      margin: 0.35rem 0;
+      font-size: 0.95rem;
+    }
+
+    .message-area.ok {
+      color: #22c55e;
+    }
+
+    .message-area.error {
+      color: #ef4444;
+    }
+
+    .zone-pricing-section h3 {
+      margin: 0 0 0.35rem 0;
+    }
+
+    .zone-pricing-section .helper-text {
+      margin: 0 0 0.75rem 0;
+    }
+
     @media (max-width: 640px) {
       .info-card dl div,
       .availability-list li {
@@ -258,179 +442,255 @@
     <section id="booking-edit-section" class="edit-card" hidden>
       <h2>Edit Booking Settings</h2>
       <form id="booking-edit-form">
-        <div class="edit-grid">
-          <div class="input-group">
-            <label for="edit-max-students">Max students per session</label>
-            <input type="number" id="edit-max-students" min="1" max="8" step="1" />
-          </div>
-          <div class="input-group">
-            <label for="edit-max-hours">Max hours per session</label>
-            <input type="number" id="edit-max-hours" min="1" max="6" step="0.25" />
-          </div>
-          <div class="input-group">
-            <label for="edit-min-duration">Minimum session length (minutes)</label>
-            <input type="number" id="edit-min-duration" min="30" step="15" />
-          </div>
-          <div class="input-group">
-            <label for="edit-buffer-minutes">Time after session (minutes)</label>
-            <input type="number" id="edit-buffer-minutes" min="0" max="240" step="1" />
-            <p class="helper-text">Blocks this many minutes after each session on your booking calendar. Default 15.</p>
-          </div>
-          <div class="input-group">
-            <label for="edit-base-rate">Cost per session (first student)</label>
-            <input type="number" id="edit-base-rate" min="0" step="0.01" />
-          </div>
-          <div class="input-group">
-            <label for="edit-extra-rate">Cost per additional student</label>
-            <input type="number" id="edit-extra-rate" min="0" step="0.01" />
-          </div>
-          <div class="input-group">
-            <label for="edit-summary-add-on">Session summary add-on</label>
-            <input type="number" id="edit-summary-add-on" min="0" step="0.01" />
-          </div>
-          <div class="input-group">
-            <label for="edit-recurring-weeks">Max weeks in advance (recurring)</label>
-            <input type="number" id="edit-recurring-weeks" min="1" max="52" step="1" />
-          </div>
-        </div>
+        <div class="collapsible-group">
+          <section id="booking-settings-section" class="edit-subsection collapsible" data-collapsed="false">
+            <div class="collapsible-header" data-toggle="collapse" data-target="booking-settings-body">
+              <h3>Booking settings</h3>
+              <button type="button" class="collapsible-toggle" aria-controls="booking-settings-body"></button>
+            </div>
+            <div id="booking-settings-body" class="collapsible-body">
+              <div class="edit-grid">
+                <div class="input-group">
+                  <label for="edit-max-students">Max students per session</label>
+                  <input type="number" id="edit-max-students" min="1" max="8" step="1" />
+                </div>
+                <div class="input-group">
+                  <label for="edit-max-hours">Max hours per session</label>
+                  <input type="number" id="edit-max-hours" min="1" max="6" step="0.25" />
+                </div>
+                <div class="input-group">
+                  <label for="edit-min-duration">Minimum session length (minutes)</label>
+                  <input type="number" id="edit-min-duration" min="30" step="15" />
+                </div>
+                <div class="input-group">
+                  <label for="edit-buffer-minutes">Time after session (minutes)</label>
+                  <input type="number" id="edit-buffer-minutes" min="0" max="240" step="1" />
+                  <p class="helper-text">Blocks this many minutes after each session on your booking calendar. Default 15.</p>
+                </div>
+                <div class="input-group">
+                  <label for="edit-base-rate">Cost per session (first student)</label>
+                  <input type="number" id="edit-base-rate" min="0" step="0.01" />
+                </div>
+                <div class="input-group">
+                  <label for="edit-extra-rate">Cost per additional student</label>
+                  <input type="number" id="edit-extra-rate" min="0" step="0.01" />
+                </div>
+                <div class="input-group">
+                  <label for="edit-recurring-weeks">Max weeks in advance (recurring)</label>
+                  <input type="number" id="edit-recurring-weeks" min="1" max="52" step="1" />
+                </div>
+              </div>
 
-        <div class="divider"></div>
+              <div class="divider"></div>
+              <div class="input-group">
+                <label>Optional add-ons <span class="badge">Checkboxes</span></label>
+                <p class="helper-text">Families see these as optional checkboxes during booking. Use positive or negative amounts for surcharges or discounts.</p>
+                <div id="addon-rows" class="addon-rows"></div>
+                <p id="addon-empty" class="helper-text">No add-ons yet. Add your first one below.</p>
+                <button type="button" class="btn secondary addon-add-btn" id="add-addon-btn">Add add-on</button>
+              </div>
+            </div>
+          </section>
 
-        <div class="edit-grid">
-          <div class="input-group">
-            <label>Calendar visible hours</label>
-            <div class="field-row">
-              <div class="input-group" style="flex:1; min-width:140px;">
-                <label for="edit-calendar-start" class="muted-note">Start</label>
-                <input type="time" id="edit-calendar-start" step="3600" />
-              </div>
-              <div class="input-group" style="flex:1; min-width:140px;">
-                <label for="edit-calendar-end" class="muted-note">End</label>
-                <input type="time" id="edit-calendar-end" step="3600" />
-              </div>
+          <section id="travel-edit-section" class="edit-subsection collapsible" data-collapsed="false">
+            <div class="collapsible-header" data-toggle="collapse" data-target="travel-settings-body">
+              <h3>Meeting preferences &amp; travel</h3>
+              <button type="button" class="collapsible-toggle" aria-controls="travel-settings-body"></button>
             </div>
-            <p class="helper-text">Times must be on the hour (e.g., 09:00).</p>
-          </div>
-          <div class="input-group">
-            <label>Calendar days shown</label>
-            <div class="day-chips" id="edit-calendar-days">
-              <label class="day-chip"><input type="checkbox" value="0" /> Mon</label>
-              <label class="day-chip"><input type="checkbox" value="1" /> Tue</label>
-              <label class="day-chip"><input type="checkbox" value="2" /> Wed</label>
-              <label class="day-chip"><input type="checkbox" value="3" /> Thu</label>
-              <label class="day-chip"><input type="checkbox" value="4" /> Fri</label>
-              <label class="day-chip"><input type="checkbox" value="5" /> Sat</label>
-              <label class="day-chip"><input type="checkbox" value="6" /> Sun</label>
-            </div>
-          </div>
-          <div class="input-group">
-            <label for="edit-courses">Courses you offer</label>
-            <textarea id="edit-courses" placeholder="One course per line"></textarea>
-            <p class="helper-text">This list powers your public booking info and tutor page.</p>
-          </div>
-        </div>
+            <div id="travel-settings-body" class="collapsible-body">
+              <div class="inline-controls">
+                <label><input type="checkbox" id="mode-online" /> Online</label>
+                <label><input type="checkbox" id="mode-office" /> Tutor’s office / host</label>
+                <label><input type="checkbox" id="mode-travel" /> Travel to student</label>
+              </div>
+              <p class="helper-text">Families can filter tutors based on preferred meeting formats.</p>
 
-        <div class="divider"></div>
+              <div class="inline-field-row">
+                <div class="input-group">
+                  <label for="location-search">Base location <span class="pill-help">Autocomplete</span></label>
+                  <input type="text" id="location-search" placeholder="Start typing an address or landmark" autocomplete="off" />
+                </div>
+                <div class="input-group">
+                  <label for="location-label">Display location label</label>
+                  <input type="text" id="location-label" placeholder="e.g. Beltline, Calgary" />
+                </div>
+              </div>
 
-        <div class="edit-grid" id="edit-availability-grid">
-          <div class="input-group availability-row" data-day="0">
-            <label>Monday availability</label>
-            <div class="field-row">
-              <div class="input-group compact" style="flex:1; min-width:140px;">
-                <label class="muted-note">Start</label>
-                <input type="time" data-role="start" step="900" />
+              <div class="inline-controls">
+                <label><input type="checkbox" id="travel-enabled" /> Allow travel to students</label>
               </div>
-              <div class="input-group compact" style="flex:1; min-width:140px;">
-                <label class="muted-note">End</label>
-                <input type="time" data-role="end" step="900" />
+              <p class="helper-text">Turn this off if you only host or meet online or in 1 location. Travel radius and zones are only shown when enabled.</p>
+
+              <div id="travel-fields">
+                <div class="range-row">
+                  <label for="travel-radius">Travel radius (km)</label>
+                  <input type="range" id="travel-radius" min="0" max="50" value="10" step="1" />
+                  <div class="range-meta">
+                    <span>0 km</span>
+                    <span><output id="travel-radius-value">10</output> km</span>
+                    <span>50 km</span>
+                  </div>
+                </div>
+
+                <div class="input-group">
+                  <label for="travel-zones">Travel zone breaks (km)</label>
+                  <input type="text" id="travel-zones" placeholder="e.g. 5, 10, 20" />
+                  <p class="helper-text">Optional: add comma-separated breakpoints to show concentric travel zones. Values above the travel radius are ignored.</p>
+                </div>
               </div>
-            </div>
-            <p class="helper-text">Leave blank if not available.</p>
-          </div>
-          <div class="input-group availability-row" data-day="1">
-            <label>Tuesday availability</label>
-            <div class="field-row">
-              <div class="input-group compact" style="flex:1; min-width:140px;">
-                <label class="muted-note">Start</label>
-                <input type="time" data-role="start" step="900" />
+
+              <div class="location-map-shell" aria-label="Tutor travel area map">
+                <div id="location-map"></div>
               </div>
-              <div class="input-group compact" style="flex:1; min-width:140px;">
-                <label class="muted-note">End</label>
-                <input type="time" data-role="end" step="900" />
-              </div>
-            </div>
-            <p class="helper-text">Leave blank if not available.</p>
-          </div>
-          <div class="input-group availability-row" data-day="2">
-            <label>Wednesday availability</label>
-            <div class="field-row">
-              <div class="input-group compact" style="flex:1; min-width:140px;">
-                <label class="muted-note">Start</label>
-                <input type="time" data-role="start" step="900" />
-              </div>
-              <div class="input-group compact" style="flex:1; min-width:140px;">
-                <label class="muted-note">End</label>
-                <input type="time" data-role="end" step="900" />
+              <p id="location-status" class="message-area"></p>
+
+              <div id="zone-pricing-section" class="zone-pricing-section" hidden>
+                <h3>Travel zone pricing</h3>
+                <p class="helper-text">Set per-zone price adjustments for in-person travel. Zones follow your travel radius settings.</p>
+                <div id="zone-pricing-rows" class="edit-grid"></div>
               </div>
             </div>
-            <p class="helper-text">Leave blank if not available.</p>
-          </div>
-          <div class="input-group availability-row" data-day="3">
-            <label>Thursday availability</label>
-            <div class="field-row">
-              <div class="input-group compact" style="flex:1; min-width:140px;">
-                <label class="muted-note">Start</label>
-                <input type="time" data-role="start" step="900" />
+          </section>
+
+          <section id="calendar-edit-section" class="edit-subsection collapsible" data-collapsed="false">
+            <div class="collapsible-header" data-toggle="collapse" data-target="calendar-settings-body">
+              <h3>Calendar &amp; availability</h3>
+              <button type="button" class="collapsible-toggle" aria-controls="calendar-settings-body"></button>
+            </div>
+            <div id="calendar-settings-body" class="collapsible-body">
+              <div class="edit-grid">
+                <div class="input-group">
+                  <label>Calendar visible hours</label>
+                  <div class="field-row">
+                    <div class="input-group input-grow">
+                      <label for="edit-calendar-start" class="muted-note">Start</label>
+                      <input type="time" id="edit-calendar-start" step="3600" />
+                    </div>
+                    <div class="input-group input-grow">
+                      <label for="edit-calendar-end" class="muted-note">End</label>
+                      <input type="time" id="edit-calendar-end" step="3600" />
+                    </div>
+                  </div>
+                  <p class="helper-text">Times must be on the hour (e.g., 09:00).</p>
+                </div>
+                <div class="input-group">
+                  <label>Calendar days shown</label>
+                  <div class="day-chips" id="edit-calendar-days">
+                    <label class="day-chip"><input type="checkbox" value="0" /> Mon</label>
+                    <label class="day-chip"><input type="checkbox" value="1" /> Tue</label>
+                    <label class="day-chip"><input type="checkbox" value="2" /> Wed</label>
+                    <label class="day-chip"><input type="checkbox" value="3" /> Thu</label>
+                    <label class="day-chip"><input type="checkbox" value="4" /> Fri</label>
+                    <label class="day-chip"><input type="checkbox" value="5" /> Sat</label>
+                    <label class="day-chip"><input type="checkbox" value="6" /> Sun</label>
+                  </div>
+                </div>
               </div>
-              <div class="input-group compact" style="flex:1; min-width:140px;">
-                <label class="muted-note">End</label>
-                <input type="time" data-role="end" step="900" />
+
+              <div class="divider"></div>
+
+              <div class="edit-grid" id="edit-availability-grid">
+                <div class="input-group availability-row" data-day="0">
+                  <label>Monday availability</label>
+                  <div class="field-row">
+                    <div class="input-group compact input-grow">
+                      <label class="muted-note">Start</label>
+                      <input type="time" data-role="start" step="900" />
+                    </div>
+                    <div class="input-group compact input-grow">
+                      <label class="muted-note">End</label>
+                      <input type="time" data-role="end" step="900" />
+                    </div>
+                  </div>
+                  <p class="helper-text">Leave blank if not available.</p>
+                </div>
+                <div class="input-group availability-row" data-day="1">
+                  <label>Tuesday availability</label>
+                  <div class="field-row">
+                    <div class="input-group compact input-grow">
+                      <label class="muted-note">Start</label>
+                      <input type="time" data-role="start" step="900" />
+                    </div>
+                    <div class="input-group compact input-grow">
+                      <label class="muted-note">End</label>
+                      <input type="time" data-role="end" step="900" />
+                    </div>
+                  </div>
+                  <p class="helper-text">Leave blank if not available.</p>
+                </div>
+                <div class="input-group availability-row" data-day="2">
+                  <label>Wednesday availability</label>
+                  <div class="field-row">
+                    <div class="input-group compact input-grow">
+                      <label class="muted-note">Start</label>
+                      <input type="time" data-role="start" step="900" />
+                    </div>
+                    <div class="input-group compact input-grow">
+                      <label class="muted-note">End</label>
+                      <input type="time" data-role="end" step="900" />
+                    </div>
+                  </div>
+                  <p class="helper-text">Leave blank if not available.</p>
+                </div>
+                <div class="input-group availability-row" data-day="3">
+                  <label>Thursday availability</label>
+                  <div class="field-row">
+                    <div class="input-group compact input-grow">
+                      <label class="muted-note">Start</label>
+                      <input type="time" data-role="start" step="900" />
+                    </div>
+                    <div class="input-group compact input-grow">
+                      <label class="muted-note">End</label>
+                      <input type="time" data-role="end" step="900" />
+                    </div>
+                  </div>
+                  <p class="helper-text">Leave blank if not available.</p>
+                </div>
+                <div class="input-group availability-row" data-day="4">
+                  <label>Friday availability</label>
+                  <div class="field-row">
+                    <div class="input-group compact input-grow">
+                      <label class="muted-note">Start</label>
+                      <input type="time" data-role="start" step="900" />
+                    </div>
+                    <div class="input-group compact input-grow">
+                      <label class="muted-note">End</label>
+                      <input type="time" data-role="end" step="900" />
+                    </div>
+                  </div>
+                  <p class="helper-text">Leave blank if not available.</p>
+                </div>
+                <div class="input-group availability-row" data-day="5">
+                  <label>Saturday availability</label>
+                  <div class="field-row">
+                    <div class="input-group compact input-grow">
+                      <label class="muted-note">Start</label>
+                      <input type="time" data-role="start" step="900" />
+                    </div>
+                    <div class="input-group compact input-grow">
+                      <label class="muted-note">End</label>
+                      <input type="time" data-role="end" step="900" />
+                    </div>
+                  </div>
+                  <p class="helper-text">Leave blank if not available.</p>
+                </div>
+                <div class="input-group availability-row" data-day="6">
+                  <label>Sunday availability</label>
+                  <div class="field-row">
+                    <div class="input-group compact input-grow">
+                      <label class="muted-note">Start</label>
+                      <input type="time" data-role="start" step="900" />
+                    </div>
+                    <div class="input-group compact input-grow">
+                      <label class="muted-note">End</label>
+                      <input type="time" data-role="end" step="900" />
+                    </div>
+                  </div>
+                  <p class="helper-text">Leave blank if not available.</p>
+                </div>
               </div>
             </div>
-            <p class="helper-text">Leave blank if not available.</p>
-          </div>
-          <div class="input-group availability-row" data-day="4">
-            <label>Friday availability</label>
-            <div class="field-row">
-              <div class="input-group compact" style="flex:1; min-width:140px;">
-                <label class="muted-note">Start</label>
-                <input type="time" data-role="start" step="900" />
-              </div>
-              <div class="input-group compact" style="flex:1; min-width:140px;">
-                <label class="muted-note">End</label>
-                <input type="time" data-role="end" step="900" />
-              </div>
-            </div>
-            <p class="helper-text">Leave blank if not available.</p>
-          </div>
-          <div class="input-group availability-row" data-day="5">
-            <label>Saturday availability</label>
-            <div class="field-row">
-              <div class="input-group compact" style="flex:1; min-width:140px;">
-                <label class="muted-note">Start</label>
-                <input type="time" data-role="start" step="900" />
-              </div>
-              <div class="input-group compact" style="flex:1; min-width:140px;">
-                <label class="muted-note">End</label>
-                <input type="time" data-role="end" step="900" />
-              </div>
-            </div>
-            <p class="helper-text">Leave blank if not available.</p>
-          </div>
-          <div class="input-group availability-row" data-day="6">
-            <label>Sunday availability</label>
-            <div class="field-row">
-              <div class="input-group compact" style="flex:1; min-width:140px;">
-                <label class="muted-note">Start</label>
-                <input type="time" data-role="start" step="900" />
-              </div>
-              <div class="input-group compact" style="flex:1; min-width:140px;">
-                <label class="muted-note">End</label>
-                <input type="time" data-role="end" step="900" />
-              </div>
-            </div>
-            <p class="helper-text">Leave blank if not available.</p>
-          </div>
+          </section>
         </div>
 
         <div class="edit-actions">
@@ -453,11 +713,17 @@
             <dt>Each additional student</dt>
             <dd id="rate-extra">—</dd>
           </div>
-          <div>
-            <dt>Session summary add-on</dt>
-            <dd id="rate-summary">—</dd>
-          </div>
         </dl>
+      </article>
+
+      <article class="info-card" id="addon-card" hidden>
+        <h2>Optional Add-ons</h2>
+        <ul id="addon-list" class="courses-list"></ul>
+      </article>
+
+      <article class="info-card" id="zone-pricing-card" hidden>
+        <h2>Travel Zone Pricing</h2>
+        <ul id="zone-pricing-list" class="courses-list"></ul>
       </article>
 
       <article class="info-card">
@@ -504,11 +770,6 @@
         <h2>Weekly Availability</h2>
         <ul id="booking-availability-list" class="availability-list"></ul>
       </article>
-
-      <article class="info-card">
-        <h2>Courses Offered</h2>
-        <ul id="booking-courses-list" class="courses-list"></ul>
-      </article>
     </section>
 
     <p id="booking-info-footer" class="info-footer" hidden></p>
@@ -523,6 +784,7 @@
   <script src="role-utils.js"></script>
   <script type="module">
     import { auth, db, onAuthStateChanged, doc, getDoc, setDoc, serverTimestamp } from './firebase-config.js';
+    import { loadGoogleMapsApi, normalizeTutorLocation, parseTravelZoneBreaks, viewportToRectanglePath } from './maps-utils.js';
 
     const SITE_SETTINGS_COLLECTION = 'siteSettings';
     const BOOKING_SETTINGS_DOC_ID = 'booking';
@@ -537,7 +799,6 @@
       bufferMinutes: 15,
       baseSessionCost: 50,
       extraStudentCost: 20,
-      sessionSummaryAddOn: 10,
       recurringMaxAdvanceWeeks: 12,
       availability: {
         '0': [],
@@ -553,6 +814,8 @@
         endHour: 20,
         visibleDays: ['0', '1', '2', '3', '4']
       },
+      radiusPricing: [],
+      addOns: [],
       currency: 'CAD'
     };
 
@@ -575,12 +838,30 @@
       bufferMinutes: document.getElementById('edit-buffer-minutes'),
       baseRate: document.getElementById('edit-base-rate'),
       extraRate: document.getElementById('edit-extra-rate'),
-      summaryAddOn: document.getElementById('edit-summary-add-on'),
       recurringWeeks: document.getElementById('edit-recurring-weeks'),
       calendarStart: document.getElementById('edit-calendar-start'),
-      calendarEnd: document.getElementById('edit-calendar-end'),
-      courses: document.getElementById('edit-courses')
+      calendarEnd: document.getElementById('edit-calendar-end')
     };
+
+    const modeOnline = document.getElementById('mode-online');
+    const modeOffice = document.getElementById('mode-office');
+    const modeTravel = document.getElementById('mode-travel');
+    const locationSearchInput = document.getElementById('location-search');
+    const locationLabelInput = document.getElementById('location-label');
+    const travelEnabledToggle = document.getElementById('travel-enabled');
+    const travelRadiusInput = document.getElementById('travel-radius');
+    const travelRadiusValue = document.getElementById('travel-radius-value');
+    const travelZonesInput = document.getElementById('travel-zones');
+    const travelFields = document.getElementById('travel-fields');
+    const locationMapEl = document.getElementById('location-map');
+    const locationStatusEl = document.getElementById('location-status');
+
+    const addonRowsEl = document.getElementById('addon-rows');
+    const addonEmptyEl = document.getElementById('addon-empty');
+    const addAddonBtn = document.getElementById('add-addon-btn');
+
+    const zonePricingSection = document.getElementById('zone-pricing-section');
+    const zonePricingRows = document.getElementById('zone-pricing-rows');
 
     const availabilityInputs = Array.from(document.querySelectorAll('#edit-availability-grid .availability-row')).map((row) => {
       return {
@@ -595,7 +876,8 @@
     const fieldEls = {
       baseRate: document.getElementById('rate-base'),
       extraRate: document.getElementById('rate-extra'),
-      summaryAddOn: document.getElementById('rate-summary'),
+      addOnCard: document.getElementById('addon-card'),
+      addOnList: document.getElementById('addon-list'),
       minDuration: document.getElementById('session-min'),
       maxDuration: document.getElementById('session-max'),
       bufferMinutes: document.getElementById('session-buffer'),
@@ -605,14 +887,28 @@
       calendarDays: document.getElementById('calendar-days')
     };
 
+    const zonePricingCard = document.getElementById('zone-pricing-card');
+    const zonePricingList = document.getElementById('zone-pricing-list');
+
     const availabilityListEl = document.getElementById('booking-availability-list');
-    const coursesListEl = document.getElementById('booking-courses-list');
+
+    const mapDefaultCenter = { lat: 51.0447, lng: -114.0719 };
+    let mapsApi = null;
+    let locationMap = null;
+    let locationMarker = null;
+    let locationViewportShape = null;
+    let travelOverlays = [];
+    let locationAutocomplete = null;
+    let currentLocationState = null;
+    let currentTutorProfileData = null;
 
     let currentUser = null;
     let currentUserDoc = null;
     let targetTutorProfileId = null;
     let lastLoadedSettings = null;
     let siteSettingsCache = null;
+    let travelZoneBreaks = [];
+    let currentAddOns = [];
 
     function normalizeEmail(value) {
       if (typeof value !== 'string') {
@@ -821,6 +1117,62 @@
       return normalized;
     }
 
+    function normalizeTravelZones(rawZones) {
+      const list = Array.isArray(rawZones) ? rawZones : [];
+      const cleaned = list
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value) && value > 0)
+        .map((value) => Number(value.toFixed(2)));
+      const unique = Array.from(new Set(cleaned)).sort((a, b) => a - b);
+      return unique;
+    }
+
+    function normalizeRadiusPricing(rawPricing = []) {
+      if (!Array.isArray(rawPricing)) {
+        return [];
+      }
+      return rawPricing
+        .map((entry) => ({
+          upToKm: Number(entry?.upToKm ?? entry?.upTo ?? entry?.radius ?? entry?.km),
+          priceDelta: Number(entry?.priceDelta ?? entry?.delta ?? entry?.adjustment ?? 0),
+          label: typeof entry?.label === 'string' ? entry.label.trim() : null
+        }))
+        .filter((entry) => Number.isFinite(entry.upToKm))
+        .map((entry) => ({
+          ...entry,
+          upToKm: Math.max(0, Number(entry.upToKm.toFixed(2))),
+          priceDelta: Number.isFinite(entry.priceDelta) ? Number(entry.priceDelta.toFixed(2)) : 0
+        }))
+        .sort((a, b) => a.upToKm - b.upToKm);
+    }
+
+    function normalizeAddOns(rawAddOns = []) {
+      if (!Array.isArray(rawAddOns)) {
+        return [];
+      }
+      const toId = (label, fallbackIndex) => {
+        const safe = (label || '').toString().trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        return safe || `addon-${fallbackIndex}`;
+      };
+      return rawAddOns
+        .map((entry, index) => {
+          const label = typeof entry?.label === 'string' ? entry.label.trim() : '';
+          const id = typeof entry?.id === 'string' && entry.id.trim() ? entry.id.trim() : toId(label, index + 1);
+          const priceDelta = Number(entry?.priceDelta ?? entry?.delta ?? entry?.amount ?? 0);
+          const defaultSelected = entry?.defaultSelected === true || entry?.default === true;
+          if (!label) {
+            return null;
+          }
+          return {
+            id,
+            label,
+            priceDelta: Number.isFinite(priceDelta) ? Number(priceDelta.toFixed(2)) : 0,
+            defaultSelected
+          };
+        })
+        .filter(Boolean);
+    }
+
     function normalizeCalendarDayKey(value) {
       if (value == null) {
         return null;
@@ -885,7 +1237,6 @@
       normalized.bufferMinutes = clampNumber(raw.bufferMinutes, normalized.bufferMinutes, { min: 0, max: 240, roundNearest: 1 });
       normalized.baseSessionCost = clampNumber(raw.baseSessionCost, normalized.baseSessionCost, { min: 0, precision: 2 });
       normalized.extraStudentCost = clampNumber(raw.extraStudentCost, normalized.extraStudentCost, { min: 0, precision: 2 });
-      normalized.sessionSummaryAddOn = clampNumber(raw.sessionSummaryAddOn, normalized.sessionSummaryAddOn, { min: 0, precision: 2 });
       normalized.recurringMaxAdvanceWeeks = clampNumber(raw.recurringMaxAdvanceWeeks, normalized.recurringMaxAdvanceWeeks, { min: 1, max: 52, roundNearest: 1 });
 
       const startHour = coerceHour(raw.calendarDisplay?.startHour, normalized.calendarDisplay.startHour);
@@ -916,10 +1267,355 @@
         normalized.courses = [];
       }
 
+      normalized.radiusPricing = normalizeRadiusPricing(raw.radiusPricing || raw.zonePricing || []);
+  normalized.addOns = normalizeAddOns(raw.addOns || raw.addons || []);
+
       normalized._lastUpdatedAt = raw._lastUpdatedAt || base._lastUpdatedAt || null;
       normalized._lastUpdatedBy = raw._lastUpdatedBy || base._lastUpdatedBy || null;
 
       return normalized;
+    }
+
+    function setLocationStatus(message, type = 'neutral') {
+      if (!locationStatusEl) return;
+      locationStatusEl.textContent = message || '';
+      locationStatusEl.classList.remove('ok', 'error');
+      if (!message) return;
+      if (type === 'error') {
+        locationStatusEl.classList.add('error');
+      } else if (type === 'success') {
+        locationStatusEl.classList.add('ok');
+      }
+    }
+
+    function clampTravelRadius(value) {
+      const minValue = Number(travelRadiusInput?.min);
+      const maxValue = Number(travelRadiusInput?.max);
+      const min = Number.isFinite(minValue) ? minValue : 0;
+      const max = Number.isFinite(maxValue) ? maxValue : 50;
+      if (!Number.isFinite(value)) return min;
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function updateTravelRadiusDisplay() {
+      if (!travelRadiusInput || !travelRadiusValue) return;
+      const radius = clampTravelRadius(Number(travelRadiusInput.value) || 0);
+      travelRadiusInput.value = radius;
+      travelRadiusValue.value = radius;
+      travelRadiusValue.textContent = radius;
+    }
+
+    function isTravelModeActive() {
+      return Boolean(modeTravel?.checked);
+    }
+
+    function isTravelEnabled() {
+      if (!isTravelModeActive()) return false;
+      if (travelEnabledToggle) return travelEnabledToggle.checked;
+      return false;
+    }
+
+    function applyTravelVisibility(options = {}) {
+      if (!modeTravel?.checked && travelEnabledToggle) {
+        travelEnabledToggle.checked = false;
+      }
+      const travelActive = isTravelEnabled();
+      const skipSync = options.skipSync === true;
+
+      if (travelFields) {
+        travelFields.hidden = !travelActive;
+      }
+      if (travelRadiusInput) {
+        travelRadiusInput.disabled = !travelActive;
+      }
+      if (travelZonesInput) {
+        travelZonesInput.disabled = !travelActive;
+      }
+
+      if (!travelActive) {
+        travelZoneBreaks = [];
+        renderZonePricingInputs(travelZoneBreaks, lastLoadedSettings?.radiusPricing || []);
+        clearTravelOverlays();
+        return;
+      }
+
+      if (!skipSync && currentLocationState?.basePlace) {
+        syncLocationFromInputs();
+      } else {
+        updateTravelRadiusDisplay();
+      }
+    }
+
+    function clearTravelOverlays() {
+      travelOverlays.forEach((overlay) => overlay.setMap && overlay.setMap(null));
+      travelOverlays = [];
+      if (locationViewportShape) {
+        locationViewportShape.setMap(null);
+        locationViewportShape = null;
+      }
+    }
+
+    function toggleCollapsible(section, collapsed) {
+      if (!section) return;
+      const isCollapsed = collapsed != null ? collapsed : section.dataset.collapsed === 'true';
+      const next = !isCollapsed;
+      section.dataset.collapsed = next ? 'false' : 'true';
+    }
+
+    function setupCollapsibles() {
+      const headers = Array.from(document.querySelectorAll('.collapsible-header'));
+      headers.forEach((header) => {
+        header.addEventListener('click', (event) => {
+          const section = header.closest('.collapsible');
+          if (!section) return;
+          const collapsed = section.dataset.collapsed === 'true';
+          section.dataset.collapsed = collapsed ? 'false' : 'true';
+          event.preventDefault();
+        });
+      });
+    }
+
+    async function ensureLocationMap() {
+      if (!locationMapEl) return null;
+      if (!mapsApi) {
+        try {
+          mapsApi = await loadGoogleMapsApi({ libraries: 'places' });
+        } catch (error) {
+          console.error('Google Maps failed to load on booking info', error);
+          setLocationStatus('Map failed to load. Check your Google Maps API key.', 'error');
+          return null;
+        }
+      }
+
+      if (!locationMap) {
+        locationMap = new mapsApi.Map(locationMapEl, {
+          center: mapDefaultCenter,
+          zoom: 11,
+          mapTypeControl: false,
+          fullscreenControl: false,
+          streetViewControl: false
+        });
+      }
+
+      if (!locationAutocomplete && locationSearchInput) {
+        locationAutocomplete = new mapsApi.places.Autocomplete(locationSearchInput, {
+          fields: ['place_id', 'name', 'formatted_address', 'geometry', 'types', 'url']
+        });
+        locationAutocomplete.addListener('place_changed', () => {
+          const place = locationAutocomplete.getPlace();
+          applyPlaceSelection(place);
+        });
+      }
+
+      return locationMap;
+    }
+
+    function normalizePlaceViewport(geometryViewport) {
+      if (!geometryViewport) return null;
+      try {
+        const ne = geometryViewport.getNorthEast();
+        const sw = geometryViewport.getSouthWest();
+        return {
+          north: ne.lat(),
+          south: sw.lat(),
+          east: ne.lng(),
+          west: sw.lng()
+        };
+      } catch (error) {
+        return normalizeTutorLocation({ viewport: geometryViewport }).basePlace?.viewport || null;
+      }
+    }
+
+    function applyPlaceSelection(place) {
+      if (!place || !place.geometry || !place.geometry.location) {
+        setLocationStatus('Please choose a location from the suggestions.', 'error');
+        return;
+      }
+
+      const location = {
+        basePlace: {
+          placeId: place.place_id || null,
+          name: place.name || place.formatted_address || locationSearchInput?.value || 'Tutor base',
+          primaryType: Array.isArray(place.types) && place.types.length ? place.types[0] : null,
+          formattedAddress: place.formatted_address || place.name || null,
+          mapsUrl: place.url || null,
+          location: {
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng()
+          },
+          viewport: normalizePlaceViewport(place.geometry.viewport)
+        },
+        displayLocationLabel: (locationLabelInput?.value || '').trim() || place.name || place.formatted_address || null,
+        travelEnabled: isTravelEnabled(),
+        travelRadiusKm: clampTravelRadius(Number(travelRadiusInput?.value) || 0),
+        travelZoneBreaksKm: parseTravelZoneBreaks(travelZonesInput?.value, Number(travelRadiusInput?.value) || undefined).value
+      };
+
+      currentLocationState = location;
+      if (locationLabelInput && !locationLabelInput.value) {
+        locationLabelInput.value = location.displayLocationLabel || '';
+      }
+      travelZoneBreaks = normalizeTravelZones(location.travelZoneBreaksKm || []);
+      renderZonePricingInputs(travelZoneBreaks, lastLoadedSettings?.radiusPricing || []);
+      void renderLocationOnMap(currentLocationState);
+      setLocationStatus('Location selected. Adjust travel radius and save.', 'success');
+    }
+
+    async function renderLocationOnMap(location) {
+      const map = await ensureLocationMap();
+      if (!map) return;
+      clearTravelOverlays();
+
+      if (!location || !location.basePlace || !location.basePlace.location) {
+        map.setCenter(mapDefaultCenter);
+        map.setZoom(11);
+        if (locationMarker) {
+          locationMarker.setMap(null);
+          locationMarker = null;
+        }
+        return;
+      }
+
+      const position = location.basePlace.location;
+      if (!locationMarker) {
+        locationMarker = new mapsApi.Marker({
+          map,
+          position,
+          title: location.basePlace.name || 'Tutor base'
+        });
+      } else {
+        locationMarker.setPosition(position);
+      }
+
+      const bounds = new mapsApi.LatLngBounds();
+      bounds.extend(position);
+
+      const viewportPath = viewportToRectanglePath(location.basePlace.viewport);
+      if (viewportPath) {
+        locationViewportShape = new mapsApi.Polygon({
+          map,
+          paths: viewportPath,
+          strokeColor: '#38bdf8',
+          strokeOpacity: 0.45,
+          strokeWeight: 2,
+          fillColor: '#38bdf8',
+          fillOpacity: 0.12
+        });
+        viewportPath.forEach((point) => bounds.extend(point));
+      }
+
+      const radii = [];
+      const totalRadius = clampTravelRadius(Number(location.travelRadiusKm) || 0);
+      const travelActive = (location.travelEnabled !== false) && isTravelEnabled() && totalRadius > 0;
+
+      if (travelActive && Array.isArray(location.travelZoneBreaksKm)) {
+        travelZoneBreaks = normalizeTravelZones(location.travelZoneBreaksKm || []);
+        radii.push(...travelZoneBreaks);
+      }
+      if (travelActive && totalRadius > 0) {
+        radii.push(totalRadius);
+      }
+      const sortedRadii = radii.filter((r) => Number.isFinite(r) && r > 0).sort((a, b) => a - b);
+      const palette = ['#22d3ee', '#38bdf8', '#60a5fa', '#a5b4fc'];
+
+      sortedRadii.forEach((radiusKm, index) => {
+        const color = palette[index % palette.length];
+        const circle = new mapsApi.Circle({
+          map,
+          center: position,
+          radius: radiusKm * 1000,
+          strokeColor: color,
+          strokeOpacity: 0.4,
+          strokeWeight: 2,
+          fillColor: color,
+          fillOpacity: Math.max(0.05, 0.15 - index * 0.02)
+        });
+        travelOverlays.push(circle);
+        bounds.extend(circle.getBounds().getNorthEast());
+        bounds.extend(circle.getBounds().getSouthWest());
+      });
+
+      map.fitBounds(bounds, 48);
+      currentLocationState = {
+        ...location,
+        travelRadiusKm: totalRadius
+      };
+    }
+
+    function syncLocationFromInputs() {
+      if (!currentLocationState?.basePlace) {
+        updateTravelRadiusDisplay();
+        renderZonePricingInputs(travelZoneBreaks, lastLoadedSettings?.radiusPricing || []);
+        return;
+      }
+      const travelActive = isTravelEnabled();
+      const radius = travelActive
+        ? clampTravelRadius(Number(travelRadiusInput?.value) || currentLocationState.travelRadiusKm || 0)
+        : 0;
+      const { value: zones, errors } = parseTravelZoneBreaks(travelZonesInput?.value, radius || undefined);
+      travelZoneBreaks = travelActive ? zones : [];
+      currentLocationState = {
+        ...currentLocationState,
+        displayLocationLabel: (locationLabelInput?.value || '').trim() || currentLocationState.displayLocationLabel || currentLocationState.basePlace?.formattedAddress || null,
+        travelEnabled: travelActive,
+        travelRadiusKm: radius,
+        travelZoneBreaksKm: travelActive ? zones : []
+      };
+      renderZonePricingInputs(travelZoneBreaks, lastLoadedSettings?.radiusPricing || []);
+      if (errors.length) {
+        setLocationStatus(errors.join(' '), 'error');
+      } else {
+        setLocationStatus('', 'neutral');
+      }
+      void renderLocationOnMap(currentLocationState);
+    }
+
+    function populateMeetingFields(profileData) {
+      currentTutorProfileData = profileData || currentTutorProfileData;
+      const rawModes = currentTutorProfileData?.meetingModes || {};
+      const modes = {
+        online: rawModes.online !== false,
+        tutorsOffice: rawModes.tutorsOffice ?? rawModes.inPerson ?? rawModes.hybrid ?? false,
+        travel: rawModes.travel ?? false
+      };
+      if (modeOnline) modeOnline.checked = modes.online !== false;
+
+      const normalized = normalizeTutorLocation(currentTutorProfileData?.tutorLocation || {});
+      const hasBase = Boolean(normalized.basePlace?.location);
+      if (modeOffice) modeOffice.checked = modes.tutorsOffice !== false && hasBase;
+      const travelEnabledFromData = normalized.travelEnabled !== false
+        ? Boolean(normalized.travelRadiusKm || (normalized.travelZoneBreaksKm || []).length)
+        : false;
+      const travelModeEnabled = Boolean(modes.travel) && travelEnabledFromData;
+      if (modeTravel) modeTravel.checked = travelModeEnabled;
+      if (travelEnabledToggle) {
+        travelEnabledToggle.checked = travelModeEnabled;
+      }
+
+      const radius = travelEnabledFromData
+        ? clampTravelRadius(normalized.travelRadiusKm || Number(travelRadiusInput?.value) || 10)
+        : 0;
+      if (travelRadiusInput) {
+        travelRadiusInput.value = radius;
+        updateTravelRadiusDisplay();
+      }
+      if (travelZonesInput) {
+        travelZonesInput.value = (normalized.travelZoneBreaksKm || []).join(', ');
+      }
+      if (locationLabelInput) {
+        locationLabelInput.value = normalized.displayLocationLabel || '';
+      }
+      if (locationSearchInput && normalized.basePlace?.formattedAddress) {
+        locationSearchInput.value = normalized.basePlace.formattedAddress;
+      }
+
+      travelZoneBreaks = travelEnabledFromData ? normalizeTravelZones(normalized.travelZoneBreaksKm || []) : [];
+      renderZonePricingInputs(travelZoneBreaks, lastLoadedSettings?.radiusPricing || []);
+
+      const hasLocation = normalized.basePlace?.location || radius;
+      currentLocationState = hasLocation ? { ...normalized, travelRadiusKm: radius, travelEnabled: travelEnabledFromData } : null;
+      applyTravelVisibility({ skipSync: true });
+      void renderLocationOnMap(currentLocationState);
     }
 
     function formatCurrency(amount, currency) {
@@ -998,19 +1694,156 @@
       });
     }
 
-    function renderCourses(courses) {
-      coursesListEl.innerHTML = '';
-      if (!Array.isArray(courses) || !courses.length) {
-        const li = document.createElement('li');
-        li.textContent = 'No courses listed.';
-        coursesListEl.appendChild(li);
+    function renderZonePricingInputs(zones, pricing) {
+      if (!zonePricingSection || !zonePricingRows) return;
+      const normalizedZones = normalizeTravelZones(zones || travelZoneBreaks || []);
+      travelZoneBreaks = normalizedZones;
+      zonePricingRows.innerHTML = '';
+
+      if (!normalizedZones.length) {
+        zonePricingSection.hidden = true;
         return;
       }
-      courses.forEach((course) => {
-        const li = document.createElement('li');
-        li.textContent = course;
-        coursesListEl.appendChild(li);
+
+      zonePricingSection.hidden = false;
+      const pricingMap = new Map((pricing || []).map((entry) => [Number(entry.upToKm), entry]));
+
+      normalizedZones.forEach((zoneKm, index) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'input-group';
+        wrapper.dataset.zoneRow = 'true';
+        wrapper.dataset.upToKm = String(zoneKm);
+
+        const label = document.createElement('label');
+        label.textContent = `Up to ${zoneKm} km surcharge`;
+        wrapper.appendChild(label);
+
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.step = '0.01';
+        const existing = pricingMap.get(zoneKm);
+        input.value = Number.isFinite(existing?.priceDelta) ? existing.priceDelta : '';
+        wrapper.appendChild(input);
+
+        const helper = document.createElement('p');
+        helper.className = 'helper-text';
+        helper.textContent = index === 0 ? 'Applies within this zone.' : 'Applies up to this breakpoint.';
+        wrapper.appendChild(helper);
+
+        zonePricingRows.appendChild(wrapper);
       });
+    }
+
+    function renderZonePricingDisplay(settings) {
+      if (!zonePricingCard || !zonePricingList) return;
+      zonePricingList.innerHTML = '';
+      const pricing = normalizeRadiusPricing(settings.radiusPricing || []);
+      const zones = normalizeTravelZones(travelZoneBreaks);
+      if (!pricing.length || !zones.length) {
+        zonePricingCard.hidden = true;
+        return;
+      }
+
+      const pricingMap = new Map(pricing.map((entry) => [Number(entry.upToKm), entry]));
+      zones.forEach((zoneKm) => {
+        const entry = pricingMap.get(zoneKm);
+        if (!entry) return;
+        const li = document.createElement('li');
+        const amount = formatCurrency(entry.priceDelta, settings.currency) || `${entry.priceDelta}`;
+        li.textContent = `Up to ${zoneKm} km: ${amount}`;
+        zonePricingList.appendChild(li);
+      });
+
+      zonePricingCard.hidden = zonePricingList.children.length === 0;
+    }
+
+    function addAddonRowToEditor(addOn) {
+      if (!addonRowsEl || !addonEmptyEl) return;
+      const row = document.createElement('div');
+      row.className = 'addon-row';
+      row.dataset.addonId = addOn.id;
+
+      const labelInput = document.createElement('input');
+      labelInput.type = 'text';
+      labelInput.placeholder = 'Add-on label (shown to families)';
+      labelInput.value = addOn.label || '';
+      row.appendChild(labelInput);
+
+      const priceInput = document.createElement('input');
+      priceInput.type = 'number';
+      priceInput.step = '0.01';
+      priceInput.value = Number.isFinite(addOn.priceDelta) ? addOn.priceDelta : '';
+      priceInput.placeholder = '+/- cost';
+      row.appendChild(priceInput);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'remove-btn';
+      removeBtn.textContent = 'Remove';
+      removeBtn.addEventListener('click', () => {
+        row.remove();
+        if (!addonRowsEl.children.length) {
+          addonEmptyEl.hidden = false;
+        }
+      });
+      row.appendChild(removeBtn);
+
+      addonRowsEl.appendChild(row);
+      addonEmptyEl.hidden = addonRowsEl.children.length > 0;
+    }
+
+    function handleAddOnAddClick() {
+      const newAddOn = { id: `addon-${Date.now()}`, label: '', priceDelta: 0 };
+      addAddonRowToEditor(newAddOn);
+    }
+
+    function renderAddOnRows(addOns = []) {
+      if (!addonRowsEl || !addonEmptyEl) return;
+      addonRowsEl.innerHTML = '';
+      const normalized = normalizeAddOns(addOns);
+      normalized.forEach((addOn) => addAddonRowToEditor(addOn));
+      addonEmptyEl.hidden = normalized.length > 0;
+      currentAddOns = normalized;
+    }
+
+    function buildAddOnsPayload() {
+      if (!addonRowsEl) return [];
+      const rows = Array.from(addonRowsEl.querySelectorAll('.addon-row'));
+      const payload = rows
+        .map((row, index) => {
+          const inputs = row.querySelectorAll('input');
+          const label = inputs[0]?.value?.trim();
+          if (!label) return null;
+          const priceDelta = Number(inputs[1]?.value || 0);
+          const id = row.dataset.addonId || `addon-${index + 1}`;
+          return {
+            id,
+            label,
+            priceDelta: Number.isFinite(priceDelta) ? Number(priceDelta.toFixed(2)) : 0,
+            defaultSelected: false
+          };
+        })
+        .filter(Boolean);
+      return payload;
+    }
+
+    function renderAddOnsDisplay(settings) {
+      if (!fieldEls.addOnCard || !fieldEls.addOnList) return;
+      fieldEls.addOnList.innerHTML = '';
+      const addOns = normalizeAddOns(settings.addOns || []);
+      if (!addOns.length) {
+        fieldEls.addOnCard.hidden = true;
+        return;
+      }
+      addOns.forEach((addOn) => {
+        const li = document.createElement('li');
+        const amount = Number(addOn.priceDelta) >= 0
+          ? `+${formatCurrency(addOn.priceDelta, settings.currency)}`
+          : `${formatCurrency(addOn.priceDelta, settings.currency)}`;
+        li.textContent = `${addOn.label} (${amount})`;
+        fieldEls.addOnList.appendChild(li);
+      });
+      fieldEls.addOnCard.hidden = false;
     }
 
     function toDate(value) {
@@ -1088,11 +1921,9 @@
       editInputs.bufferMinutes.value = safe.bufferMinutes ?? DEFAULT_BOOKING_SETTINGS.bufferMinutes;
       editInputs.baseRate.value = safe.baseSessionCost;
       editInputs.extraRate.value = safe.extraStudentCost;
-      editInputs.summaryAddOn.value = safe.sessionSummaryAddOn;
       editInputs.recurringWeeks.value = safe.recurringMaxAdvanceWeeks;
       editInputs.calendarStart.value = formatHourForTimeInput(safe.calendarDisplay.startHour);
       editInputs.calendarEnd.value = formatHourForTimeInput(safe.calendarDisplay.endHour);
-      editInputs.courses.value = Array.isArray(safe.courses) ? safe.courses.join('\n') : '';
 
       const visibleDays = new Set(safe.calendarDisplay.visibleDays.map(normalizeCalendarDayKey).filter((v) => v != null));
       calendarDayCheckboxes.forEach((checkbox) => {
@@ -1113,6 +1944,9 @@
         entry.start.value = first?.start || '';
         entry.end.value = first?.end || '';
       });
+
+      renderZonePricingInputs(travelZoneBreaks, safe.radiusPricing || []);
+      renderAddOnRows(safe.addOns || []);
     }
 
     function buildAvailabilityPayload() {
@@ -1138,6 +1972,26 @@
       return payload;
     }
 
+    function buildZonePricingPayload() {
+      if (!zonePricingRows || zonePricingSection?.hidden) {
+        return [];
+      }
+      const rows = Array.from(zonePricingRows.querySelectorAll('[data-zone-row]'));
+      const entries = rows
+        .map((row) => {
+          const upToKm = Number(row.dataset.upToKm);
+          const input = row.querySelector('input');
+          const priceDelta = Number(input?.value);
+          if (!Number.isFinite(upToKm)) {
+            return null;
+          }
+          const safeDelta = Number.isFinite(priceDelta) ? Number(priceDelta.toFixed(2)) : 0;
+          return { upToKm, priceDelta: safeDelta };
+        })
+        .filter(Boolean);
+      return normalizeRadiusPricing(entries);
+    }
+
     function buildUpdatePayload() {
       const maxStudents = Number(editInputs.maxStudents.value || DEFAULT_BOOKING_SETTINGS.maxStudentsPerSession);
       const maxHours = Number(editInputs.maxHours.value || DEFAULT_BOOKING_SETTINGS.maxHoursPerSession);
@@ -1145,7 +1999,6 @@
       const bufferMinutes = Number(editInputs.bufferMinutes.value || DEFAULT_BOOKING_SETTINGS.bufferMinutes);
       const baseRate = Number(editInputs.baseRate.value || DEFAULT_BOOKING_SETTINGS.baseSessionCost);
       const extraRate = Number(editInputs.extraRate.value || DEFAULT_BOOKING_SETTINGS.extraStudentCost);
-      const summaryAddOn = Number(editInputs.summaryAddOn.value || DEFAULT_BOOKING_SETTINGS.sessionSummaryAddOn);
       const recurringWeeks = Number(editInputs.recurringWeeks.value || DEFAULT_BOOKING_SETTINGS.recurringMaxAdvanceWeeks);
 
       if (!Number.isFinite(maxStudents) || maxStudents < 1) {
@@ -1168,9 +2021,6 @@
       }
       if (!Number.isFinite(extraRate) || extraRate < 0) {
         throw new Error('Cost per additional student must be zero or higher.');
-      }
-      if (!Number.isFinite(summaryAddOn) || summaryAddOn < 0) {
-        throw new Error('Session summary add-on must be zero or higher.');
       }
       if (!Number.isFinite(recurringWeeks) || recurringWeeks < 1) {
         throw new Error('Recurring sessions must be allowed at least one week in advance.');
@@ -1196,39 +2046,80 @@
 
       calendarVisibleDays.sort((a, b) => Number(a) - Number(b));
 
-      const coursesList = (editInputs.courses.value || '')
-        .split(/\r?\n/)
-        .map((entry) => entry.trim())
-        .filter(Boolean);
-
       const availabilityPayload = buildAvailabilityPayload();
+      const meetingModes = {
+        online: modeOnline?.checked ?? false,
+        tutorsOffice: !!modeOffice?.checked,
+        travel: !!(modeTravel?.checked && isTravelEnabled())
+      };
 
-      return {
+      if (!meetingModes.online && !meetingModes.tutorsOffice && !meetingModes.travel) {
+        throw new Error('Select at least one meeting option.');
+      }
+
+      syncLocationFromInputs();
+
+      const travelActive = isTravelEnabled();
+      const locationPayload = currentLocationState?.basePlace?.location
+        ? {
+            ...currentLocationState,
+            displayLocationLabel: (locationLabelInput?.value || '').trim()
+              || currentLocationState.displayLocationLabel
+              || currentLocationState.basePlace?.formattedAddress
+              || null,
+            travelEnabled: travelActive,
+            travelRadiusKm: travelActive
+              ? clampTravelRadius(currentLocationState.travelRadiusKm || Number(travelRadiusInput?.value) || 0)
+              : 0,
+            travelZoneBreaksKm: travelActive ? travelZoneBreaks : [],
+            updatedAt: serverTimestamp()
+          }
+        : null;
+
+      if ((meetingModes.tutorsOffice || meetingModes.travel) && !locationPayload) {
+        throw new Error('Add a base location for in-person or travel sessions.');
+      }
+
+      const placesSettings = locationPayload?.basePlace?.placeId
+        ? {
+            enabled: true,
+            placeId: locationPayload.basePlace.placeId,
+            displayAddress: locationPayload.displayLocationLabel || locationPayload.basePlace.formattedAddress || null
+          }
+        : { enabled: false, placeId: null, displayAddress: null };
+
+      const bookingSettings = {
         maxStudentsPerSession: Math.min(Math.max(Math.round(maxStudents), 1), 8),
         maxHoursPerSession: Math.min(Math.max(Number(maxHours.toFixed(2)), 1), 6),
         minSessionMinutes: Math.min(Math.max(Math.round(minSessionMinutes / 15) * 15, 30), Math.round(maxHours * 60)),
         bufferMinutes: Math.min(Math.max(Math.round(bufferMinutes), 0), 240),
         baseSessionCost: Number(baseRate.toFixed(2)),
         extraStudentCost: Number(extraRate.toFixed(2)),
-        sessionSummaryAddOn: Number(summaryAddOn.toFixed(2)),
         recurringMaxAdvanceWeeks: Math.min(Math.max(Math.round(recurringWeeks), 1), 52),
-        courses: coursesList,
         availability: availabilityPayload,
         calendarDisplay: {
           startHour: calendarStartHour,
           endHour: calendarEndHour,
           visibleDays: calendarVisibleDays
         },
+        radiusPricing: buildZonePricingPayload(),
+        addOns: buildAddOnsPayload(),
         currency: DEFAULT_BOOKING_SETTINGS.currency,
         _lastUpdatedAt: serverTimestamp(),
         _lastUpdatedBy: currentUser?.email || currentUser?.uid || 'tutor'
+      };
+
+      return {
+        bookingSettings,
+        meetingModes,
+        tutorLocation: locationPayload,
+        placesSettings
       };
     }
 
     function renderBookingSettings(settings) {
       fieldEls.baseRate.textContent = formatCurrency(settings.baseSessionCost, settings.currency);
       fieldEls.extraRate.textContent = formatCurrency(settings.extraStudentCost, settings.currency);
-      fieldEls.summaryAddOn.textContent = formatCurrency(settings.sessionSummaryAddOn, settings.currency);
       fieldEls.minDuration.textContent = formatDurationMinutes(settings.minSessionMinutes);
       fieldEls.maxDuration.textContent = formatDurationMinutes(settings.maxHoursPerSession * 60);
       fieldEls.bufferMinutes.textContent = `${Math.round(settings.bufferMinutes ?? DEFAULT_BOOKING_SETTINGS.bufferMinutes)} min`;
@@ -1238,7 +2129,8 @@
       fieldEls.calendarDays.textContent = formatVisibleDays(settings.calendarDisplay.visibleDays);
 
       renderAvailability(settings.availability);
-      renderCourses(settings.courses);
+      renderZonePricingDisplay(settings);
+      renderAddOnsDisplay(settings);
       renderLastUpdated(settings);
 
       contentEl.hidden = false;
@@ -1254,6 +2146,7 @@
       const snapshot = await getDoc(settingsRef);
       const data = snapshot.exists() ? snapshot.data() : {};
       siteSettingsCache = normalizeBookingSettings(data);
+      travelZoneBreaks = [];
       return siteSettingsCache;
     }
 
@@ -1265,6 +2158,8 @@
         return null;
       }
       const data = snap.data() || {};
+      currentTutorProfileData = data;
+      travelZoneBreaks = normalizeTravelZones(data.tutorLocation?.travelZoneBreaksKm || []);
       const booking = data.bookingSettings || {};
       const base = baseSettings || siteSettingsCache || DEFAULT_BOOKING_SETTINGS;
       const merged = { ...base, ...booking };
@@ -1324,6 +2219,8 @@
       lastLoadedSettings = settings;
 
       renderBookingSettings(settings);
+      populateMeetingFields(currentTutorProfileData);
+      applyTravelVisibility({ skipSync: true });
 
       const editable = canEditBooking(user, userDoc, targetTutorProfileId);
       if (editable) {
@@ -1345,14 +2242,83 @@
       if (resetBtn) resetBtn.disabled = true;
       setEditStatus('Saving booking info...');
       try {
-        const updatePayload = buildUpdatePayload();
+        const { bookingSettings, meetingModes, tutorLocation, placesSettings } = buildUpdatePayload();
         const profileRef = doc(db, TUTOR_PROFILES_COLLECTION, targetTutorProfileId);
-        await setDoc(profileRef, { bookingSettings: updatePayload }, { merge: true });
+        await setDoc(profileRef, {
+          bookingSettings,
+          meetingModes,
+          tutorLocation,
+          placesSettings,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+
+      [modeOnline, modeOffice, modeTravel].forEach((checkbox) => {
+        if (checkbox) {
+          checkbox.addEventListener('change', () => {
+            if (checkbox === modeTravel && travelEnabledToggle && checkbox.checked) {
+              travelEnabledToggle.checked = true;
+            }
+            applyTravelVisibility();
+          });
+        }
+      });
+
+      if (travelEnabledToggle) {
+        travelEnabledToggle.addEventListener('change', () => applyTravelVisibility());
+      }
+
+      if (travelRadiusInput) {
+        travelRadiusInput.addEventListener('input', () => {
+          updateTravelRadiusDisplay();
+          syncLocationFromInputs();
+        });
+      }
+
+      if (travelZonesInput) {
+        travelZonesInput.addEventListener('change', () => {
+          syncLocationFromInputs();
+        });
+      }
+
+      if (addAddonBtn) {
+        addAddonBtn.disabled = false;
+        addAddonBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          handleAddOnAddClick();
+        });
+      }
+
+      // Fallback delegation in case the direct listener misses (e.g., re-rendered button)
+      document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (target && target.closest && target.closest('.addon-add-btn')) {
+          event.preventDefault();
+          handleAddOnAddClick();
+        }
+      });
+
+      if (locationLabelInput) {
+        locationLabelInput.addEventListener('input', () => {
+          if (currentLocationState) {
+            syncLocationFromInputs();
+          }
+        });
+      }
+
+      if (locationSearchInput) {
+        locationSearchInput.addEventListener('focus', () => {
+          void ensureLocationMap();
+        });
+      }
+
+      updateTravelRadiusDisplay();
+      applyTravelVisibility({ skipSync: true });
         const refreshed = await fetchTutorBookingSettings(targetTutorProfileId, siteSettingsCache || DEFAULT_BOOKING_SETTINGS);
         if (refreshed) {
           lastLoadedSettings = refreshed;
           renderBookingSettings(refreshed);
           populateEditForm(refreshed);
+          populateMeetingFields(currentTutorProfileData);
         }
         setEditStatus('Booking info saved.', 'ok');
       } catch (error) {
@@ -1367,6 +2333,8 @@
     function resetEditor() {
       if (lastLoadedSettings) {
         populateEditForm(lastLoadedSettings);
+        populateMeetingFields(currentTutorProfileData);
+        applyTravelVisibility({ skipSync: true });
         setEditStatus('Reset to last saved values.', 'info');
       }
     }
@@ -1377,6 +2345,8 @@
     if (resetBtn) {
       resetBtn.addEventListener('click', resetEditor);
     }
+
+    setupCollapsibles();
 
     onAuthStateChanged(auth, async (user) => {
       if (!user) {

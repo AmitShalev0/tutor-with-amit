@@ -581,50 +581,13 @@
         <p id="profile-message" class="message-area"></p>
       </form>
 
-      <form class="hub-card" id="meeting-form">
+      <article class="hub-card" id="meeting-moved-card">
         <h2>Meeting Preferences</h2>
-        <div class="inline-controls">
-          <label><input type="checkbox" id="mode-online" /> Online</label>
-          <label><input type="checkbox" id="mode-inperson" /> In person</label>
-          <label><input type="checkbox" id="mode-hybrid" /> Hybrid</label>
-        </div>
-        <p class="subtle-text">Families can filter tutors based on preferred meeting formats.</p>
-
-        <div class="inline-field-row">
-          <div>
-            <label for="location-search">Base location <span class="pill-help">Autocomplete</span></label>
-            <input type="text" id="location-search" placeholder="Start typing an address or landmark" autocomplete="off" />
-          </div>
-          <div>
-            <label for="location-label">Display location label</label>
-            <input type="text" id="location-label" placeholder="e.g. Beltline, Calgary" />
-          </div>
-        </div>
-
-        <div class="range-row">
-          <label for="travel-radius">Travel radius (km)</label>
-          <input type="range" id="travel-radius" min="1" max="50" value="10" step="1" />
-          <div class="range-meta">
-            <span>1 km</span>
-            <span><output id="travel-radius-value">10</output> km</span>
-            <span>50 km</span>
-          </div>
-        </div>
-
-        <label for="travel-zones">Travel zone breaks (km)</label>
-        <input type="text" id="travel-zones" placeholder="e.g. 5, 10, 20" />
-        <p class="subtle-text">Optional: add comma-separated breakpoints to show concentric travel zones. Values above the travel radius are ignored.</p>
-
-        <div class="location-map-shell" aria-label="Tutor travel area map">
-          <div id="location-map"></div>
-        </div>
-
+        <p class="subtle-text">Meeting modes, travel radius, zones, and map editing have moved to Booking Info.</p>
         <div class="card-footer">
-          <button class="btn primary" type="submit">Save Preferences</button>
+          <a class="btn primary" href="booking-info.html">Open Booking Info</a>
         </div>
-        <p id="meeting-message" class="message-area"></p>
-        <p id="location-status" class="message-area"></p>
-      </form>
+      </article>
 
       <article class="hub-card verification-card" id="verification-card">
         <h2>Verification Checklist</h2>
@@ -771,9 +734,11 @@
     const modeHybrid = document.getElementById('mode-hybrid');
     const locationSearchInput = document.getElementById('location-search');
     const locationLabelInput = document.getElementById('location-label');
+    const travelEnabledToggle = document.getElementById('travel-enabled');
     const travelRadiusInput = document.getElementById('travel-radius');
     const travelRadiusValue = document.getElementById('travel-radius-value');
     const travelZonesInput = document.getElementById('travel-zones');
+    const travelFields = document.getElementById('travel-fields');
     const locationMapEl = document.getElementById('location-map');
     const locationStatusEl = document.getElementById('location-status');
 
@@ -855,8 +820,10 @@
     }
 
     function clampTravelRadius(value) {
-      const min = Number(travelRadiusInput?.min) || 1;
-      const max = Number(travelRadiusInput?.max) || 50;
+      const minValue = Number(travelRadiusInput?.min);
+      const maxValue = Number(travelRadiusInput?.max);
+      const min = Number.isFinite(minValue) ? minValue : 0;
+      const max = Number.isFinite(maxValue) ? maxValue : 50;
       if (!Number.isFinite(value)) return min;
       return Math.min(max, Math.max(min, value));
     }
@@ -867,6 +834,63 @@
       travelRadiusInput.value = radius;
       travelRadiusValue.value = radius;
       travelRadiusValue.textContent = radius;
+    }
+
+    function isTravelModeActive() {
+      return Boolean(modeInPerson?.checked || modeHybrid?.checked);
+    }
+
+    function isTravelEnabled() {
+      if (!isTravelModeActive()) return false;
+      if (travelEnabledToggle) return travelEnabledToggle.checked;
+      return true;
+    }
+
+    function applyTravelVisibility(options = {}) {
+      const travelActive = isTravelEnabled();
+      const skipSync = options.skipSync === true;
+
+      if (travelFields) {
+        travelFields.hidden = !travelActive;
+      }
+      if (travelRadiusInput) {
+        travelRadiusInput.disabled = !travelActive;
+      }
+      if (travelZonesInput) {
+        travelZonesInput.disabled = !travelActive;
+      }
+
+      if (!travelActive) {
+        if (travelRadiusInput) {
+          travelRadiusInput.value = '0';
+          updateTravelRadiusDisplay();
+        }
+        if (travelZonesInput) {
+          travelZonesInput.value = '';
+        }
+        if (currentLocationState) {
+          currentLocationState = {
+            ...currentLocationState,
+            travelEnabled: false,
+            travelRadiusKm: 0,
+            travelZoneBreaksKm: []
+          };
+          clearTravelOverlays();
+          void renderLocationOnMap(currentLocationState);
+        } else {
+          clearTravelOverlays();
+        }
+        return;
+      }
+
+      if (travelEnabledToggle) {
+        travelEnabledToggle.checked = true;
+      }
+      if (!skipSync && currentLocationState?.basePlace) {
+        syncLocationFromInputs();
+      } else {
+        updateTravelRadiusDisplay();
+      }
     }
 
     function clearTravelOverlays() {
@@ -949,6 +973,7 @@
           viewport: normalizePlaceViewport(place.geometry.viewport)
         },
         displayLocationLabel: (locationLabelInput?.value || '').trim() || place.name || place.formatted_address || null,
+        travelEnabled: isTravelEnabled(),
         travelRadiusKm: clampTravelRadius(Number(travelRadiusInput?.value) || 0),
         travelZoneBreaksKm: parseTravelZoneBreaks(travelZonesInput?.value, Number(travelRadiusInput?.value) || undefined).value
       };
@@ -1006,10 +1031,12 @@
 
       const radii = [];
       const totalRadius = clampTravelRadius(Number(location.travelRadiusKm) || 0);
-      if (Array.isArray(location.travelZoneBreaksKm)) {
+      const travelActive = (location.travelEnabled !== false) && isTravelEnabled() && totalRadius > 0;
+
+      if (travelActive && Array.isArray(location.travelZoneBreaksKm)) {
         radii.push(...location.travelZoneBreaksKm);
       }
-      if (totalRadius > 0) {
+      if (travelActive && totalRadius > 0) {
         radii.push(totalRadius);
       }
       const sortedRadii = radii.filter((r) => Number.isFinite(r) && r > 0).sort((a, b) => a - b);
@@ -1044,13 +1071,17 @@
         updateTravelRadiusDisplay();
         return;
       }
-      const radius = clampTravelRadius(Number(travelRadiusInput?.value) || currentLocationState.travelRadiusKm || 0);
+      const travelActive = isTravelEnabled();
+      const radius = travelActive
+        ? clampTravelRadius(Number(travelRadiusInput?.value) || currentLocationState.travelRadiusKm || 0)
+        : 0;
       const { value: zones, errors } = parseTravelZoneBreaks(travelZonesInput?.value, radius || undefined);
       currentLocationState = {
         ...currentLocationState,
         displayLocationLabel: (locationLabelInput?.value || '').trim() || currentLocationState.displayLocationLabel || currentLocationState.basePlace?.formattedAddress || null,
+        travelEnabled: travelActive,
         travelRadiusKm: radius,
-        travelZoneBreaksKm: zones
+        travelZoneBreaksKm: travelActive ? zones : []
       };
       if (errors.length) {
         setLocationStatus(errors.join(' '), 'error');
@@ -1062,8 +1093,16 @@
 
     function populateLocationFields(rawLocation) {
       const normalized = normalizeTutorLocation(rawLocation || {});
+      const travelEnabledFromData = normalized.travelEnabled !== false
+        ? Boolean(normalized.travelRadiusKm || (normalized.travelZoneBreaksKm || []).length)
+        : false;
+      if (travelEnabledToggle) {
+        travelEnabledToggle.checked = travelEnabledFromData;
+      }
 
-      const radius = clampTravelRadius(normalized.travelRadiusKm || Number(travelRadiusInput?.value) || 10);
+      const radius = travelEnabledFromData
+        ? clampTravelRadius(normalized.travelRadiusKm || Number(travelRadiusInput?.value) || 10)
+        : 0;
       if (travelRadiusInput) {
         travelRadiusInput.value = radius;
         updateTravelRadiusDisplay();
@@ -1079,7 +1118,8 @@
       }
 
       const hasLocation = normalized.basePlace?.location || radius;
-      currentLocationState = hasLocation ? { ...normalized, travelRadiusKm: radius } : null;
+      currentLocationState = hasLocation ? { ...normalized, travelRadiusKm: radius, travelEnabled: travelEnabledFromData } : null;
+      applyTravelVisibility({ skipSync: true });
       void renderLocationOnMap(currentLocationState);
     }
 
@@ -2320,6 +2360,20 @@
       });
     }
 
+    [modeOnline, modeInPerson, modeHybrid].forEach((checkbox) => {
+      if (checkbox) {
+        checkbox.addEventListener('change', () => {
+          applyTravelVisibility();
+        });
+      }
+    });
+
+    if (travelEnabledToggle) {
+      travelEnabledToggle.addEventListener('change', () => {
+        applyTravelVisibility();
+      });
+    }
+
     if (travelRadiusInput) {
       travelRadiusInput.addEventListener('input', () => {
         updateTravelRadiusDisplay();
@@ -2346,6 +2400,8 @@
         void ensureLocationMap();
       });
     }
+
+    applyTravelVisibility({ skipSync: true });
 
     if (verificationButtons.stripe) {
       verificationButtons.stripe.addEventListener('click', () => {
@@ -2734,23 +2790,25 @@
       applyProfileSubjectsToCatalog(profile.subjectsOffered || [], profile.catalogSubjectIds || []);
       gradesInput.value = (profile.gradeLevels || []).join(', ');
 
-      const modes = profile.meetingModes || {};
-      modeOnline.checked = modes.online !== false;
-      modeInPerson.checked = !!modes.inPerson;
-      modeHybrid.checked = !!modes.hybrid;
+      if (meetingForm) {
+        const modes = profile.meetingModes || {};
+        if (modeOnline) modeOnline.checked = modes.online !== false;
+        if (modeInPerson) modeInPerson.checked = !!modes.inPerson;
+        if (modeHybrid) modeHybrid.checked = !!modes.hybrid;
 
-      const locationSource = profile.tutorLocation || null;
-      const fallbackLocation = profile.placesSettings?.placeId
-        ? {
-            basePlace: {
-              placeId: profile.placesSettings.placeId,
-              formattedAddress: profile.placesSettings.displayAddress || null
-            },
-            displayLocationLabel: profile.placesSettings.displayAddress || null
-          }
-        : profile.travelInfo || null;
-      populateLocationFields(locationSource || fallbackLocation || {});
-      void ensureLocationMap();
+        const locationSource = profile.tutorLocation || null;
+        const fallbackLocation = profile.placesSettings?.placeId
+          ? {
+              basePlace: {
+                placeId: profile.placesSettings.placeId,
+                formattedAddress: profile.placesSettings.displayAddress || null
+              },
+              displayLocationLabel: profile.placesSettings.displayAddress || null
+            }
+          : profile.travelInfo || null;
+        populateLocationFields(locationSource || fallbackLocation || {});
+        void ensureLocationMap();
+      }
 
       const profileUrl = buildProfileUrl(profile.slug);
       if (profileUrl) {
@@ -2853,65 +2911,71 @@
       }
     });
 
-    meetingForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      if (!tutorProfileRef) return;
+    if (meetingForm) {
+      meetingForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!tutorProfileRef) return;
 
-      const meetingModes = {
-        online: modeOnline.checked,
-        inPerson: modeInPerson.checked,
-        hybrid: modeHybrid.checked
-      };
+        const meetingModes = {
+          online: modeOnline.checked,
+          inPerson: modeInPerson.checked,
+          hybrid: modeHybrid.checked
+        };
 
-      if (!meetingModes.online && !meetingModes.inPerson && !meetingModes.hybrid) {
-        showMessage(meetingMessage, 'Select at least one meeting option.', true);
-        return;
-      }
+        if (!meetingModes.online && !meetingModes.inPerson && !meetingModes.hybrid) {
+          showMessage(meetingMessage, 'Select at least one meeting option.', true);
+          return;
+        }
 
-      syncLocationFromInputs();
+        syncLocationFromInputs();
 
-      const locationPayload = currentLocationState?.basePlace?.location
-        ? {
-            ...currentLocationState,
-            displayLocationLabel: (locationLabelInput?.value || '').trim()
-              || currentLocationState.displayLocationLabel
-              || currentLocationState.basePlace?.formattedAddress
-              || null,
-            travelRadiusKm: clampTravelRadius(currentLocationState.travelRadiusKm || Number(travelRadiusInput?.value) || 0),
-            travelZoneBreaksKm: currentLocationState.travelZoneBreaksKm || [],
+        const travelActive = isTravelEnabled();
+        const locationPayload = currentLocationState?.basePlace?.location
+          ? {
+              ...currentLocationState,
+              displayLocationLabel: (locationLabelInput?.value || '').trim()
+                || currentLocationState.displayLocationLabel
+                || currentLocationState.basePlace?.formattedAddress
+                || null,
+              travelEnabled: travelActive,
+              travelRadiusKm: travelActive
+                ? clampTravelRadius(currentLocationState.travelRadiusKm || Number(travelRadiusInput?.value) || 0)
+                : 0,
+              travelZoneBreaksKm: travelActive ? currentLocationState.travelZoneBreaksKm || [] : [],
+              updatedAt: serverTimestamp()
+            }
+          : null;
+
+        if ((meetingModes.inPerson || meetingModes.hybrid) && !locationPayload) {
+          showMessage(meetingMessage, 'Add a base location for in-person or hybrid sessions.', true);
+          setLocationStatus('Add a base location to show your in-person area.', 'error');
+          return;
+        }
+
+        const placesSettings = locationPayload?.basePlace?.placeId
+          ? {
+              enabled: true,
+              placeId: locationPayload.basePlace.placeId,
+              displayAddress: locationPayload.displayLocationLabel || locationPayload.basePlace.formattedAddress || null
+            }
+          : { enabled: false, placeId: null, displayAddress: null };
+
+        try {
+          await updateDoc(tutorProfileRef, {
+            meetingModes,
+            placesSettings,
+            tutorLocation: locationPayload || null,
             updatedAt: serverTimestamp()
-          }
-        : null;
-
-      if ((meetingModes.inPerson || meetingModes.hybrid) && !locationPayload) {
-        showMessage(meetingMessage, 'Add a base location for in-person or hybrid sessions.', true);
-        setLocationStatus('Add a base location to show your in-person area.', 'error');
-        return;
-      }
-
-      const placesSettings = locationPayload?.basePlace?.placeId
-        ? {
-            enabled: true,
-            placeId: locationPayload.basePlace.placeId,
-            displayAddress: locationPayload.displayLocationLabel || locationPayload.basePlace.formattedAddress || null
-          }
-        : { enabled: false, placeId: null, displayAddress: null };
-
-      try {
-        await updateDoc(tutorProfileRef, {
-          meetingModes,
-          placesSettings,
-          tutorLocation: locationPayload || null,
-          updatedAt: serverTimestamp()
-        });
-        tutorProfileData = { ...tutorProfileData, meetingModes, placesSettings, tutorLocation: locationPayload || null };
-        showMessage(meetingMessage, 'Meeting preferences saved.');
-        setLocationStatus(locationPayload ? 'Location saved.' : 'Meeting modes saved.', 'success');
-      } catch (error) {
-        console.error('Meeting save error', error);
-        showMessage(meetingMessage, 'Failed to save meeting preferences.', true);
-      }
-    });
+          });
+          tutorProfileData = { ...tutorProfileData, meetingModes, placesSettings, tutorLocation: locationPayload || null };
+          showMessage(meetingMessage, 'Meeting preferences saved.');
+          setLocationStatus(locationPayload ? 'Location saved.' : 'Meeting modes saved.', 'success');
+        } catch (error) {
+          console.error('Meeting save error', error);
+          showMessage(meetingMessage, 'Failed to save meeting preferences.', true);
+        }
+      });
+    }
   </script>
 </body>
 </html>

@@ -101,7 +101,6 @@ const DEFAULT_BOOKING_SETTINGS = {
   bufferMinutes: 15,
   baseSessionCost: 50,
   extraStudentCost: 20,
-  sessionSummaryAddOn: 10,
   recurringMaxAdvanceWeeks: 12,
   availability: {
     '0': [],
@@ -282,7 +281,6 @@ function normalizeBookingSettingsInput(settings = {}) {
   merged.bufferMinutes = Number.isFinite(bufferVal) ? Math.min(Math.max(Math.round(bufferVal), 0), 240) : DEFAULT_BOOKING_SETTINGS.bufferMinutes;
   merged.baseSessionCost = Math.max(0, Number(settings.baseSessionCost ?? merged.baseSessionCost));
   merged.extraStudentCost = Math.max(0, Number(settings.extraStudentCost ?? merged.extraStudentCost));
-  merged.sessionSummaryAddOn = Math.max(0, Number(settings.sessionSummaryAddOn ?? merged.sessionSummaryAddOn));
   merged.recurringMaxAdvanceWeeks = clamp(settings.recurringMaxAdvanceWeeks, merged.recurringMaxAdvanceWeeks, 1, 52);
 
   if (settings.availability && typeof settings.availability === 'object') {
@@ -393,9 +391,6 @@ function setupBookingForm(settingsOverride) {
 
   const bookingSettings = normalizeBookingSettingsInput(settingsOverride || window.bookingSettings || {});
   window.bookingSettings = bookingSettings;
-  const baseRatePerHour = bookingSettings.baseSessionCost;
-  const extraStudentRatePerHour = bookingSettings.extraStudentCost;
-  const summaryAddOnFee = bookingSettings.sessionSummaryAddOn;
   const availabilityBlocks = bookingSettings.availabilityBlocks;
   const maxSessionHours = bookingSettings.maxHoursPerSession;
   const maxRecurringWeeks = bookingSettings.recurringMaxAdvanceWeeks;
@@ -461,9 +456,17 @@ function setupBookingForm(settingsOverride) {
   const recurringRow = document.getElementById("recurring-end-row");
   const recurringEndSel = document.getElementById("recurring-end");
   const costDisplay = document.getElementById("cost-display");
-  const includeSummaryCb = document.getElementById("include-summary");
 
   setupInputValidation(form);
+
+  function getActivePricing() {
+    const context = window.bookingPricingContext || {};
+    return {
+      baseRatePerHour: Number(context.baseSessionCost ?? bookingSettings.baseSessionCost ?? 0),
+      extraStudentRatePerHour: Number(context.extraStudentCost ?? bookingSettings.extraStudentCost ?? 0),
+      travelSurcharge: Number(context.travelSurcharge ?? 0)
+    };
+  }
 
   function updateCost() {
     let numStudents = 1;
@@ -480,9 +483,20 @@ function setupBookingForm(settingsOverride) {
     }
     const durationSelect = document.getElementById("duration-hours");
     const duration = parseFloat(durationSelect?.value || String(durationChoiceFallback));
-    const includeSummary = includeSummaryCb ? includeSummaryCb.checked : false;
     const discountSlider = document.getElementById("income-slider");
     const discountAmountSpan = document.getElementById("discount-amount");
+    const travelSurchargeInput = document.getElementById("travel-surcharge-value");
+    const travelSurcharge = Number(travelSurchargeInput?.value || 0) || 0;
+    const addonCheckboxes = document.querySelectorAll('#add-on-checkboxes input[type="checkbox"]');
+    let addOnTotal = 0;
+    addonCheckboxes.forEach((cb) => {
+      if (cb.checked) {
+        const delta = Number(cb.dataset.priceDelta || cb.value || 0);
+        addOnTotal += Number.isFinite(delta) ? delta : 0;
+      }
+    });
+
+    const { baseRatePerHour, extraStudentRatePerHour } = getActivePricing();
 
     let maxDiscountPerHour;
     if (numStudents <= 2) {
@@ -503,9 +517,8 @@ function setupBookingForm(settingsOverride) {
     const discountPerHour = discountSteps * 10;
     const discountAmount = discountPerHour * duration;
 
-    const summaryFee = includeSummary ? summaryAddOnFee : 0;
     const costPerHour = baseRatePerHour + ((numStudents - 1) * extraStudentRatePerHour);
-    const standardTotal = (costPerHour * duration) + summaryFee;
+    const standardTotal = (costPerHour * duration) + addOnTotal + travelSurcharge;
     const discountedTotal = standardTotal - discountAmount;
 
     if (discountAmountSpan) {
@@ -517,9 +530,22 @@ function setupBookingForm(settingsOverride) {
     }
   }
 
-  if (includeSummaryCb) {
-    includeSummaryCb.addEventListener('change', updateCost);
-  }
+  window.setBookingPricingContext = (context = {}) => {
+    const current = window.bookingPricingContext || {};
+    window.bookingPricingContext = { ...current, ...context };
+    if (Object.prototype.hasOwnProperty.call(context, 'travelSurcharge')) {
+      const surchargeVal = Number(context.travelSurcharge || 0);
+      const travelInput = document.getElementById('travel-surcharge-value');
+      const travelDisplay = document.getElementById('travel-surcharge-display');
+      if (travelInput) {
+        travelInput.value = surchargeVal;
+      }
+      if (travelDisplay && Number.isFinite(surchargeVal)) {
+        travelDisplay.value = `$${surchargeVal.toFixed(2)}`;
+      }
+    }
+    updateCost();
+  };
 
   const slidingScaleToggle = document.getElementById("sliding-scale-toggle");
   const slidingScaleRow = document.getElementById("sliding-scale-row");
@@ -541,6 +567,20 @@ function setupBookingForm(settingsOverride) {
   const incomeSlider = document.getElementById("income-slider");
   if (incomeSlider) {
     incomeSlider.addEventListener('input', updateCost);
+  }
+
+  const addOnContainer = document.getElementById('add-on-checkboxes');
+  if (addOnContainer) {
+    addOnContainer.addEventListener('change', (event) => {
+      if (event.target && event.target.matches('input[type="checkbox"]')) {
+        updateCost();
+      }
+    });
+  }
+
+  const travelSurchargeInput = document.getElementById('travel-surcharge-value');
+  if (travelSurchargeInput) {
+    travelSurchargeInput.addEventListener('change', updateCost);
   }
 
   window.recalculateBookingCost = updateCost;
@@ -1767,15 +1807,26 @@ function setupBookingForm(settingsOverride) {
     obj.session_title = `${obj.subject} – ${firstNames.join(", ")}`;
 
     const duration = parseFloat(obj.duration_hours || "1");
-    const includeSummary = obj.include_summary === "on";
     const slidingScaleEnabled = obj.sliding_scale_toggle === "on";
     const discountSlider = document.getElementById("income-slider");
 
-    const baseRate = 50;
-    const additionalRate = 20;
-    const summaryFee = includeSummary ? 10 : 0;
+    const pricingContext = window.bookingPricingContext || {};
+    const settingsFallback = window.bookingSettings || {};
+    const baseRate = Number(pricingContext.baseSessionCost ?? settingsFallback.baseSessionCost ?? 50);
+    const additionalRate = Number(pricingContext.extraStudentCost ?? settingsFallback.extraStudentCost ?? 20);
+    const travelSurchargeInput = document.getElementById("travel-surcharge-value");
+    const travelSurcharge = Number(travelSurchargeInput?.value || 0) || 0;
+    const addOnCheckboxes = document.querySelectorAll('#add-on-checkboxes input[type="checkbox"]');
+    let addOnTotal = 0;
+    addOnCheckboxes.forEach((cb) => {
+      if (cb.checked) {
+        const delta = Number(cb.dataset.priceDelta || cb.value || 0);
+        addOnTotal += Number.isFinite(delta) ? delta : 0;
+      }
+    });
+
     const costPerHour = baseRate + ((num - 1) * additionalRate);
-    const standardTotal = (costPerHour * duration) + summaryFee;
+    const standardTotal = (costPerHour * duration) + addOnTotal + travelSurcharge;
 
     let finalCost = standardTotal;
     if (slidingScaleEnabled && discountSlider) {
