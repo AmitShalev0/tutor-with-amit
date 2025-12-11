@@ -1034,6 +1034,9 @@
           <h2>Registered Users</h2>
           <button class="btn" onclick="loadUsers({ showStatus: true })">🔄 Refresh</button>
         </div>
+        <div class="search-box">
+          <input type="text" id="users-search" placeholder="Search users..." oninput="filterUsers()">
+        </div>
         <p id="users-status" class="form-message" role="status" aria-live="polite"></p>
         <div id="users-container" class="loading">Loading users...</div>
       </section>
@@ -1298,6 +1301,7 @@
     let currentUser = null;
     let allSessions = [];
     let allStudents = [];
+    let allUsers = [];
     let currentRenderedSessions = [];
     let currentRenderedSessionIds = [];
     let recurringGroupSessions = new Map();
@@ -1318,6 +1322,7 @@
     const courseForm = document.getElementById('course-form');
     const courseIdInput = document.getElementById('course-id');
     const courseRequestIdInput = document.getElementById('course-request-id');
+  const userNotesCache = new Map();
     const courseNameInput = document.getElementById('course-name');
     const courseSubjectInput = document.getElementById('course-subject');
     const courseGradeInput = document.getElementById('course-grade');
@@ -1340,6 +1345,13 @@
     const adminRelationshipSelect = document.getElementById('admin-relationship');
     const adminNotesInput = document.getElementById('admin-notes');
     const studentEditSaveBtn = document.getElementById('student-edit-save-btn');
+    const userNotesModal = document.getElementById('user-notes-modal');
+    const userNotesInput = document.getElementById('user-notes-input');
+    const userNotesStatus = document.getElementById('user-notes-status');
+    const userNotesSaveBtn = document.getElementById('user-notes-save-btn');
+    const userNotesTitle = document.getElementById('user-notes-title');
+    let currentNotesUserId = null;
+    let currentNotesUserName = '';
 
     const INVOICE_STATUS_READY = 'ready';
     const INVOICE_STATUS_SENT = 'sent';
@@ -6036,6 +6048,186 @@ window.saveSessionChanges = async function (sessionId) {
       });
     }
 
+    function renderUserNoteRow(meta) {
+      return `<tr id="user-note-row-${meta.id}" class="user-note-row" style="display:none;">
+        <td colspan="6">
+          <div class="session-comment-wrapper">
+            <textarea id="user-note-input-${meta.id}" class="session-comment-input" placeholder="Add private notes about this user..."></textarea>
+            <div class="session-comment-actions">
+              <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); saveUserNote('${meta.jsSafeId}')">Save Note</button>
+              <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); hideUserNote('${meta.jsSafeId}')">Close</button>
+              <span id="user-note-status-${meta.id}" class="form-message" style="margin-left: 8px;"></span>
+            </div>
+          </div>
+        </td>
+      </tr>`;
+    }
+
+    function renderUsersTable(usersMeta) {
+      const container = document.getElementById('users-container');
+      if (!container) {
+        return;
+      }
+
+      if (!usersMeta || usersMeta.length === 0) {
+        container.innerHTML = '<div class="empty-state"><h3>No users found</h3></div>';
+        return;
+      }
+
+      let html = '<div class="data-table"><table><thead><tr>';
+      html += '<th>Name</th><th>Email</th><th>Phone</th><th>Joined</th><th>Account Type</th><th>Actions</th>';
+      html += '</tr></thead><tbody>';
+
+      usersMeta.forEach((meta) => {
+        html += `<tr class="user-row" onclick="toggleUserNotesRow('${meta.jsSafeId}', '${meta.jsSafeName}')">
+          <td>${escapeHtml(meta.displayName || '-')}</td>
+          <td>${escapeHtml(meta.displayEmail || '-')}</td>
+          <td>${escapeHtml(meta.displayPhone || '-')}</td>
+          <td>${escapeHtml(meta.joinedDisplay || '-')}</td>
+          <td>${renderAccountTypeCell(meta)}</td>
+          <td>
+            <div class="action-buttons">
+              <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); viewUserSessions('${meta.jsSafeId}')">View Sessions</button>
+              <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); viewUserStudents('${meta.jsSafeId}')">View Students</button>
+              <button class="btn btn-sm" onclick="event.stopPropagation(); showAddSessionModal('${meta.jsSafeId}', '${meta.jsSafeName}')">Add Session</button>
+              <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteUser('${meta.jsSafeId}', '${meta.jsSafeEmail}')">Delete</button>
+            </div>
+          </td>
+        </tr>`;
+        html += renderUserNoteRow(meta);
+      });
+
+      html += '</tbody></table></div>';
+
+      const tutorEntries = usersMeta.filter((meta) => meta.accountType !== 'student');
+      html += buildTutorSummary(tutorEntries);
+
+      container.innerHTML = html;
+    }
+
+    window.filterUsers = () => {
+      const searchInput = document.getElementById('users-search');
+      const term = (searchInput?.value || '').toLowerCase();
+
+      if (!term) {
+        renderUsersTable(allUsers);
+        return;
+      }
+
+      const filtered = allUsers.filter((meta) => {
+        const fields = [
+          meta.displayName || '',
+          meta.displayEmail || '',
+          meta.displayPhone || '',
+          ACCOUNT_TYPE_LABELS[meta.accountType] || meta.accountType || '',
+          meta.stateLabel || ''
+        ];
+        return fields.some((value) => value.toLowerCase().includes(term));
+      });
+
+      renderUsersTable(filtered);
+    };
+
+    async function loadUserNote(userId) {
+      if (userNotesCache.has(userId)) {
+        return userNotesCache.get(userId);
+      }
+
+      try {
+        const snap = await getDoc(doc(db, 'adminUserNotes', userId));
+        const note = snap.exists() ? (snap.data().note || '') : '';
+        userNotesCache.set(userId, note);
+        return note;
+      } catch (error) {
+        console.error('Error loading user note:', error);
+        throw error;
+      }
+    }
+
+    window.toggleUserNotesRow = async (userId, userName = 'User') => {
+      const row = document.getElementById(`user-note-row-${userId}`);
+      if (!row) return;
+
+      const isHidden = row.style.display === 'none' || row.style.display === '';
+      if (!isHidden) {
+        row.style.display = 'none';
+        return;
+      }
+
+      row.style.display = 'table-row';
+      const textarea = document.getElementById(`user-note-input-${userId}`);
+      const statusEl = document.getElementById(`user-note-status-${userId}`);
+      if (statusEl) {
+        statusEl.textContent = 'Loading note...';
+        statusEl.className = 'form-message';
+      }
+
+      try {
+        const note = await loadUserNote(userId);
+        if (textarea) {
+          textarea.value = note || '';
+        }
+        if (statusEl) {
+          statusEl.textContent = '';
+        }
+      } catch (error) {
+        if (statusEl) {
+          statusEl.textContent = 'Unable to load note.';
+          statusEl.classList.add('error');
+        }
+      }
+    };
+
+    window.hideUserNote = (userId) => {
+      const row = document.getElementById(`user-note-row-${userId}`);
+      if (row) {
+        row.style.display = 'none';
+      }
+      const statusEl = document.getElementById(`user-note-status-${userId}`);
+      if (statusEl) {
+        statusEl.textContent = '';
+        statusEl.className = 'form-message';
+      }
+    };
+
+    window.saveUserNote = async (userId) => {
+      const textarea = document.getElementById(`user-note-input-${userId}`);
+      const statusEl = document.getElementById(`user-note-status-${userId}`);
+      if (!textarea) return;
+
+      const noteText = textarea.value.trim();
+
+      if (statusEl) {
+        statusEl.textContent = 'Saving...';
+        statusEl.className = 'form-message';
+      }
+
+      try {
+        await setDoc(doc(db, 'adminUserNotes', userId), {
+          note: noteText,
+          updatedAt: serverTimestamp(),
+          updatedBy: currentUser?.uid || null,
+          updatedByEmail: currentUser?.email || null
+        });
+
+        userNotesCache.set(userId, noteText);
+
+        if (statusEl) {
+          statusEl.textContent = 'Saved';
+          statusEl.classList.add('ok');
+        }
+        setTimeout(() => {
+          hideUserNote(userId);
+        }, 400);
+      } catch (error) {
+        console.error('Error saving user note:', error);
+        if (statusEl) {
+          statusEl.textContent = 'Save failed.';
+          statusEl.classList.add('error');
+        }
+      }
+    };
+
     // Users
     window.loadUsers = async (options = {}) => {
       const container = document.getElementById('users-container');
@@ -6072,16 +6264,17 @@ window.saveSessionChanges = async function (sessionId) {
           }
         });
 
+        userDataCache.clear();
+
         if (snapshot.empty) {
-          userDataCache.clear();
-          container.innerHTML = '<div class="empty-state"><h3>No users found</h3></div>';
+          allUsers = [];
+          renderUsersTable([]);
           if (showStatus) {
             setUsersStatus('');
           }
           return;
         }
 
-        userDataCache.clear();
         const usersMeta = [];
 
         snapshot.forEach((docSnap) => {
@@ -6119,34 +6312,8 @@ window.saveSessionChanges = async function (sessionId) {
           });
         });
 
-        let html = '<div class="data-table"><table><thead><tr>';
-        html += '<th>Name</th><th>Email</th><th>Phone</th><th>Joined</th><th>Account Type</th><th>Actions</th>';
-        html += '</tr></thead><tbody>';
-
-        usersMeta.forEach((meta) => {
-          html += `<tr>
-            <td>${escapeHtml(meta.displayName || '-')}</td>
-            <td>${escapeHtml(meta.displayEmail || '-')}</td>
-            <td>${escapeHtml(meta.displayPhone || '-')}</td>
-            <td>${escapeHtml(meta.joinedDisplay || '-')}</td>
-            <td>${renderAccountTypeCell(meta)}</td>
-            <td>
-              <div class="action-buttons">
-                <button class="btn btn-secondary btn-sm" onclick="viewUserSessions('${meta.jsSafeId}')">View Sessions</button>
-                <button class="btn btn-secondary btn-sm" onclick="viewUserStudents('${meta.jsSafeId}')">View Students</button>
-                <button class="btn btn-sm" onclick="showAddSessionModal('${meta.jsSafeId}', '${meta.jsSafeName}')">Add Session</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteUser('${meta.jsSafeId}', '${meta.jsSafeEmail}')">Delete</button>
-              </div>
-            </td>
-          </tr>`;
-        });
-
-        html += '</tbody></table></div>';
-
-        const tutorEntries = usersMeta.filter((meta) => meta.accountType !== 'student');
-        html += buildTutorSummary(tutorEntries);
-
-        container.innerHTML = html;
+        allUsers = usersMeta;
+        filterUsers();
 
         if (showStatus) {
           setUsersStatus('');
@@ -6155,6 +6322,107 @@ window.saveSessionChanges = async function (sessionId) {
         console.error('Error loading users:', error);
         container.innerHTML = `<div class="empty-state"><h3>Error loading users</h3><p>${escapeHtml(error.message)}</p></div>`;
         setUsersStatus('Error loading users. Please check the console for details.', 'error');
+      }
+    };
+
+    window.openUserNotes = async (userId, userName = 'User') => {
+      if (!userId || !userNotesModal) {
+        return;
+      }
+
+      currentNotesUserId = userId;
+      currentNotesUserName = userName;
+
+      if (userNotesTitle) {
+        userNotesTitle.textContent = `User Notes — ${userName}`;
+      }
+      if (userNotesStatus) {
+        userNotesStatus.textContent = '';
+        userNotesStatus.className = 'form-message';
+      }
+
+      if (userNotesInput) {
+        userNotesInput.value = '';
+      }
+      if (userNotesSaveBtn) {
+        userNotesSaveBtn.disabled = true;
+      }
+
+      userNotesModal.classList.add('active');
+
+      try {
+        const noteSnap = await getDoc(doc(db, 'adminUserNotes', userId));
+        if (userNotesInput) {
+          userNotesInput.value = noteSnap.exists() ? (noteSnap.data().note || '') : '';
+        }
+      } catch (error) {
+        console.error('Error loading user notes:', error);
+        if (userNotesStatus) {
+          userNotesStatus.textContent = 'Unable to load notes right now.';
+          userNotesStatus.classList.add('error');
+        }
+      } finally {
+        if (userNotesSaveBtn) {
+          userNotesSaveBtn.disabled = false;
+        }
+      }
+    };
+
+    window.closeUserNotes = () => {
+      if (userNotesModal) {
+        userNotesModal.classList.remove('active');
+      }
+      currentNotesUserId = null;
+      currentNotesUserName = '';
+      if (userNotesInput) {
+        userNotesInput.value = '';
+      }
+      if (userNotesStatus) {
+        userNotesStatus.textContent = '';
+        userNotesStatus.className = 'form-message';
+      }
+    };
+
+    window.saveUserNotes = async () => {
+      if (!currentNotesUserId) {
+        return;
+      }
+
+      const noteText = userNotesInput ? userNotesInput.value.trim() : '';
+
+      if (userNotesStatus) {
+        userNotesStatus.textContent = 'Saving notes...';
+        userNotesStatus.className = 'form-message';
+      }
+      if (userNotesSaveBtn) {
+        userNotesSaveBtn.disabled = true;
+      }
+
+      try {
+        await setDoc(doc(db, 'adminUserNotes', currentNotesUserId), {
+          note: noteText,
+          updatedAt: serverTimestamp(),
+          updatedBy: currentUser?.uid || null,
+          updatedByEmail: currentUser?.email || null
+        });
+
+        if (userNotesStatus) {
+          userNotesStatus.textContent = 'Notes saved.';
+          userNotesStatus.classList.add('ok');
+        }
+        setTimeout(() => {
+          closeUserNotes();
+        }, 400);
+      } catch (error) {
+        console.error('Error saving user notes:', error);
+        if (userNotesStatus) {
+          userNotesStatus.textContent = 'Failed to save notes. Please try again.';
+          userNotesStatus.classList.add('error');
+        }
+      } finally {
+        if (userNotesSaveBtn) {
+          userNotesSaveBtn.disabled = false;
+        }
       }
     };
 
@@ -7398,7 +7666,7 @@ window.saveSessionChanges = async function (sessionId) {
       container.innerHTML = '<div class="loading">Loading user sessions...</div>';
 
       try {
-        const q = query(collection(db, 'bookings'), where('userId', '==', userId), orderBy('sessionDate', 'desc'));
+        const q = query(collection(db, 'bookings'), where('userId', '==', userId));
         const snapshot = await getDocs(q);
 
         if (snapshot.empty) {
@@ -7410,6 +7678,14 @@ window.saveSessionChanges = async function (sessionId) {
         snapshot.forEach(doc => {
           sessions.push({ id: doc.id, ...doc.data() });
         });
+
+        const dateValue = (value) => {
+          if (!value) return 0;
+          if (value.toDate) return value.toDate().getTime();
+          return new Date(value).getTime() || 0;
+        };
+
+        sessions.sort((a, b) => dateValue(b.sessionDate) - dateValue(a.sessionDate));
 
         renderSessions(sessions);
       } catch (error) {
