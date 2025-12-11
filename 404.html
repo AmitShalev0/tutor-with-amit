@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Page not found</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; background: #0b1220; color: #e2e8f0; }
+    .card { max-width: 760px; width: 100%; background: #0f172a; border: 1px solid #1f2937; border-radius: 0.9rem; padding: 1.75rem; box-shadow: 0 10px 40px rgba(0,0,0,0.35); }
+    h1 { margin-top: 0; font-size: 2rem; }
+    p { line-height: 1.6; }
+    .pill { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.45rem 0.8rem; border-radius: 999px; background: rgba(59,130,246,0.14); color: #bfdbfe; font-weight: 600; font-size: 0.9rem; }
+    .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+    a.btn { text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="card" id="message-card">
+    <p class="pill" id="context-pill">Page not found</p>
+    <h1 id="title">We couldn't find that page</h1>
+    <p id="body-copy">The link you followed may be broken or the page may have been moved.</p>
+    <div class="actions">
+      <a class="btn primary" href="/index.html">Go to home</a>
+      <a class="btn secondary" href="/tutor-search.html">Find a tutor</a>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      const path = window.location.pathname || '';
+      const card = document.getElementById('message-card');
+      const pill = document.getElementById('context-pill');
+      const title = document.getElementById('title');
+      const body = document.getElementById('body-copy');
+
+      const homeMatch = path.match(/\/home\/([^/]+)\/?/i);
+      if (homeMatch) {
+        const slug = decodeURIComponent(homeMatch[1] || '').trim();
+        pill.textContent = 'Tutor page placeholder';
+        title.textContent = 'This tutor page isn\'t ready yet';
+        body.textContent = slug
+          ? `This is where ${slug} will share their tutor story, courses, and availability once they publish their page.`
+          : 'This is where the tutor will share their story, courses, and availability once they publish their page.';
+        return;
+      }
+
+      pill.textContent = 'Page not found';
+      title.textContent = 'We couldn\'t find that page';
+      body.textContent = 'The link you followed may be broken or the page may have been moved.';
+    })();
+  </script>
+</body>
+</html>

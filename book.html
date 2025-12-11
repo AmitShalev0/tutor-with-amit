@@ -1139,14 +1139,23 @@
   function displayStudentDropdowns() {
     cacheStudentDropdowns();
 
-    if (userStudents.length === 0) {
+    const studentHasCourse = (student) => {
+      if (!student) return false;
+      const subject = typeof student.subject === 'string' ? student.subject.trim() : '';
+      const subjectId = typeof student.subjectId === 'string' ? student.subjectId.trim() : '';
+      return Boolean(subject || subjectId);
+    };
+
+    const eligibleStudents = userStudents.filter(studentHasCourse);
+
+    if (eligibleStudents.length === 0) {
       // Show message and disable first dropdown
       const firstDropdown = studentDropdowns[0];
       if (firstDropdown) {
-        firstDropdown.innerHTML = '<option value="">No students added yet</option>';
+        firstDropdown.innerHTML = '<option value="">Add a subject in the student profile before booking</option>';
         firstDropdown.disabled = true;
       }
-      applyBookingSettingsToStudentSelectors(window.bookingSettings, userStudents.length);
+      applyBookingSettingsToStudentSelectors(window.bookingSettings, eligibleStudents.length);
       return;
     }
 
@@ -1166,7 +1175,7 @@
         dropdown.appendChild(fallbackOption);
       }
 
-      userStudents.forEach((student) => {
+      eligibleStudents.forEach((student) => {
         const option = document.createElement('option');
         option.value = student.id;
         option.textContent = student.studentName;
@@ -1175,7 +1184,7 @@
     });
     
     if (window.bookingSettings) {
-      applyBookingSettingsToStudentSelectors(window.bookingSettings, userStudents.length);
+      applyBookingSettingsToStudentSelectors(window.bookingSettings, eligibleStudents.length);
     }
     handleStudentSelectionChange();
     

@@ -1,37 +1,36 @@
 (function (global) {
   const DEFAULT_COURSES = [
-    { id: 'math-1', label: 'Math 1', subjectGroup: 'math', gradeCeiling: 1 },
-    { id: 'math-2', label: 'Math 2', subjectGroup: 'math', gradeCeiling: 2 },
-    { id: 'math-3', label: 'Math 3', subjectGroup: 'math', gradeCeiling: 3 },
-    { id: 'math-4', label: 'Math 4', subjectGroup: 'math', gradeCeiling: 4 },
-    { id: 'math-5', label: 'Math 5', subjectGroup: 'math', gradeCeiling: 5 },
-    { id: 'math-6', label: 'Math 6', subjectGroup: 'math', gradeCeiling: 6 },
-    { id: 'math-7', label: 'Math 7', subjectGroup: 'math', gradeCeiling: 7 },
-    { id: 'math-8', label: 'Math 8', subjectGroup: 'math', gradeCeiling: 8 },
-    { id: 'math-9', label: 'Math 9', subjectGroup: 'math', gradeCeiling: 9 },
+    { id: 'math-k6', label: 'Math K-6', subjectGroup: 'math', gradeCeiling: 6 },
+    { id: 'math-7-9', label: 'Math 7-9', subjectGroup: 'math', gradeCeiling: 9 },
+    { id: 'english-k6', label: 'English K-6', subjectGroup: 'english', gradeCeiling: 6 },
+    { id: 'english-7-9', label: 'English 7-9', subjectGroup: 'english', gradeCeiling: 9 },
+    { id: 'social-k6', label: 'Social K-6', subjectGroup: 'social', gradeCeiling: 6 },
+    { id: 'social-7-9', label: 'Social 7-9', subjectGroup: 'social', gradeCeiling: 9 },
+    { id: 'science-k6', label: 'Science K-6', subjectGroup: 'science', gradeCeiling: 6 },
+    { id: 'science-7-9', label: 'Science 7-9', subjectGroup: 'science', gradeCeiling: 9 },
+    { id: 'french-k6', label: 'French K-6', subjectGroup: 'french', gradeCeiling: 6 },
+    { id: 'french-7-9', label: 'French 7-9', subjectGroup: 'french', gradeCeiling: 9 },
     { id: 'math-10', label: 'Math 10', subjectGroup: 'math', gradeCeiling: 10 },
-    { id: 'math-11', label: 'Math 11', subjectGroup: 'math', gradeCeiling: 11 },
-    { id: 'math-12', label: 'Math 12', subjectGroup: 'math', gradeCeiling: 12 },
-    { id: 'elem-math', label: 'Elementary Math', subjectGroup: 'math', gradeCeiling: 6 },
-    { id: 'elem-english', label: 'Elementary English', subjectGroup: 'english', gradeCeiling: 6 },
-    { id: 'elem-social', label: 'Elementary Social', subjectGroup: 'social', gradeCeiling: 6 },
-    { id: 'elem-science', label: 'Elementary Science', subjectGroup: 'science', gradeCeiling: 6 },
-    { id: 'jr-math', label: 'Jr high Math', subjectGroup: 'math', gradeCeiling: 9 },
-    { id: 'jr-english', label: 'Jr high English', subjectGroup: 'english', gradeCeiling: 9 },
-    { id: 'jr-social', label: 'Jr high Social', subjectGroup: 'social', gradeCeiling: 9 },
-    { id: 'jr-science', label: 'Jr high Science', subjectGroup: 'science', gradeCeiling: 9 },
-    { id: 'gr10-math', label: 'Math 10', subjectGroup: 'math', gradeCeiling: 10 },
-    { id: 'gr11-math', label: 'Math 20', subjectGroup: 'math', gradeCeiling: 11 },
-    { id: 'gr12-math', label: 'Math 30', subjectGroup: 'math', gradeCeiling: 12 },
-    { id: 'gr10-english', label: 'English 10', subjectGroup: 'english', gradeCeiling: 10 },
-    { id: 'gr11-english', label: 'English 11', subjectGroup: 'english', gradeCeiling: 11 },
-    { id: 'gr12-english', label: 'English 12', subjectGroup:  'english', gradeCeiling: 12 },
-    { id: 'gr10-social', label: 'Social 10', subjectGroup: 'social', gradeCeiling: 10 },
-    { id: 'gr11-social', label: 'Social 20', subjectGroup: 'social', gradeCeiling: 11 },
-    { id: 'gr12-social', label: 'Social 30', subjectGroup: 'social', gradeCeiling: 12 },
-    { id: 'gr10-science', label: 'Science 10', subjectGroup: 'science', gradeCeiling: 10 },
-    { id: 'gr11-science', label: 'Science 11', subjectGroup: 'science', gradeCeiling: 11 },
-    { id: 'gr12-science', label: 'Science 12', subjectGroup: 'science', gradeCeiling: 12 }
+    { id: 'math-20', label: 'Math 20', subjectGroup: 'math', gradeCeiling: 11 },
+    { id: 'math-30', label: 'Math 30', subjectGroup: 'math', gradeCeiling: 12 },
+    { id: 'science-10', label: 'Science 10', subjectGroup: 'science', gradeCeiling: 10 },
+    { id: 'science-20', label: 'Science 20', subjectGroup: 'science', gradeCeiling: 11 },
+    { id: 'science-30', label: 'Science 30', subjectGroup: 'science', gradeCeiling: 12 },
+    { id: 'social-10', label: 'Social 10', subjectGroup: 'social', gradeCeiling: 10 },
+    { id: 'social-20', label: 'Social 20', subjectGroup: 'social', gradeCeiling: 11 },
+    { id: 'social-30', label: 'Social 30', subjectGroup: 'social', gradeCeiling: 12 },
+    { id: 'english-10', label: 'English 10', subjectGroup: 'english', gradeCeiling: 10 },
+    { id: 'english-20', label: 'English 20', subjectGroup: 'english', gradeCeiling: 11 },
+    { id: 'english-30', label: 'English 30', subjectGroup: 'english', gradeCeiling: 12 },
+    { id: 'french-10', label: 'French 10', subjectGroup: 'french', gradeCeiling: 10 },
+    { id: 'french-20', label: 'French 20', subjectGroup: 'french', gradeCeiling: 11 },
+    { id: 'french-30', label: 'French 30', subjectGroup: 'french', gradeCeiling: 12 },
+    { id: 'physics-20', label: 'Physics 20', subjectGroup: 'science', gradeCeiling: 11 },
+    { id: 'physics-30', label: 'Physics 30', subjectGroup: 'science', gradeCeiling: 12 },
+    { id: 'biology-20', label: 'Biology 20', subjectGroup: 'science', gradeCeiling: 11 },
+    { id: 'biology-30', label: 'Biology 30', subjectGroup: 'science', gradeCeiling: 12 },
+    { id: 'chemistry-20', label: 'Chemistry 20', subjectGroup: 'science', gradeCeiling: 11 },
+    { id: 'chemistry-30', label: 'Chemistry 30', subjectGroup: 'science', gradeCeiling: 12 }
   ];
 
   const SUBJECTS = [
@@ -116,7 +115,7 @@
         baseCourses = global.CANONICAL_COURSES;
       }
 
-      if (!baseCourses.length && typeof import === 'function') {
+      if (!baseCourses.length) {
         try {
           const module = await import('./courses-data.js');
           baseCourses = module.ALL_COURSES || module.CANONICAL_COURSES || [];

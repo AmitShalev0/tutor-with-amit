@@ -404,7 +404,8 @@
     if (slugMatch) {
       document.body.dataset.homeSlug = decodeURIComponent(slugMatch[1]);
     }
-    const profileSlug = document.body.dataset.profileSlug || document.body.dataset.homeSlug || null;
+    const rawProfileSlug = document.body.dataset.profileSlug || document.body.dataset.homeSlug || null;
+    const profileSlug = rawProfileSlug;
 
     let currentUser = null;
     let currentTutorId = null;
@@ -418,6 +419,11 @@
       }
       const parts = source.split(/\s+/).filter(Boolean);
       return parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("") || "TU";
+    }
+
+    function pickPhotoUrl(profile) {
+      if (!profile) return null;
+      return profile.photoURL || profile.photoUrl || profile.photo || profile.avatarUrl || profile.imageUrl || null;
     }
 
     function renderSummaryPhoto(name, photoUrl) {
@@ -819,30 +825,54 @@
       };
     }
 
+    function buildSlugCandidates() {
+      const candidates = new Set();
+      const homeSlug = document.body.dataset.homeSlug || null;
+      const add = (value) => {
+        if (!value) return;
+        const trimmed = value.trim();
+        if (!trimmed) return;
+        candidates.add(trimmed);
+        candidates.add(trimmed.replace(/-/g, ""));
+      };
+      add(profileSlug);
+      add(homeSlug);
+      return Array.from(candidates).filter(Boolean);
+    }
+
     async function loadTutorProfile() {
-      if (!db || !profileSlug) {
+      if (!db) {
         updateFavoriteButtonState();
         return;
       }
-      try {
-        const snapshot = await getDocs(
-          query(collection(db, "tutorProfiles"), where("slug", "==", profileSlug))
-        );
 
-        if (snapshot.empty) {
+      const slugCandidates = buildSlugCandidates();
+      let docSnap = null;
+
+      try {
+        for (const candidate of slugCandidates) {
+          const snapshot = await getDocs(
+            query(collection(db, "tutorProfiles"), where("slug", "==", candidate))
+          );
+          if (!snapshot.empty) {
+            docSnap = snapshot.docs[0];
+            break;
+          }
+        }
+
+        if (!docSnap) {
           updateFavoriteButtonState();
           return;
         }
 
-        const docSnap = snapshot.docs[0];
-        const profile = docSnap.data();
+        const profile = docSnap.data() || {};
         currentTutorId = docSnap.id;
 
         if (profile.fullName && summaryNameEl) {
           summaryNameEl.textContent = profile.fullName;
         }
 
-        renderSummaryPhoto(profile.fullName, profile.photoURL);
+        renderSummaryPhoto(profile.fullName, pickPhotoUrl(profile));
         renderSummaryModes(profile.meetingModes);
         renderSummaryCourses(profile.subjectsOffered);
 

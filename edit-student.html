@@ -51,10 +51,27 @@
     </div>
 
     <div class="field-row">
-      <label>Main Subject</label>
-      <input type="text" name="subject" id="subject" placeholder="Search and choose a course" list="student-course-options" autocomplete="off" />
-      <datalist id="student-course-options"></datalist>
-      <p class="help-text">Pick from the list or <button type="button" id="request-course-btn" class="link-button">Don't see your course? Add it here!</button></p>
+      <label>Grade*</label>
+      <select name="grade" id="grade" required title="Select the student's grade">
+        <option value="">Select grade...</option>
+        <option value="k-6">K-6</option>
+        <option value="7-9">7-9</option>
+        <option value="10">10</option>
+        <option value="11">11</option>
+        <option value="12">12</option>
+        <option value="university">University</option>
+        <option value="college">College</option>
+        <option value="community">Community Learning</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+
+    <div class="field-row">
+      <label>Subject*</label>
+      <select name="subject" id="subject" required disabled title="Select the student's subject">
+        <option value="">Select grade first...</option>
+      </select>
+      <p class="help-text">Grade and subject are required to book sessions. <button type="button" id="request-course-btn" class="link-button">Don't see your course? Add it here!</button></p>
     </div>
 
     <div class="field-row">
@@ -121,8 +138,8 @@
 
   const form = document.getElementById("edit-student-form");
   const msg = document.getElementById("form-message");
-  const subjectInput = document.getElementById('subject');
-  const courseOptions = document.getElementById('student-course-options');
+  const gradeSelect = document.getElementById('grade');
+  const subjectSelect = document.getElementById('subject');
   const requestCourseBtn = document.getElementById('request-course-btn');
 
   let currentUser = null;
@@ -130,6 +147,7 @@
   let canonicalCourses = [];
   let courseIndex = null;
   let currentCourseId = null;
+  let subjectOptionsByGrade = null;
   let coursesPromise = null;
 
   // Get student ID from URL
@@ -139,6 +157,34 @@
   if (!studentId) {
     alert("No student ID provided");
     window.location.href = "dashboard.html";
+  }
+
+  function subjectGroupToLabel(group) {
+    const key = (group || '').toLowerCase();
+    const map = {
+      math: 'Math',
+      english: 'English',
+      ela: 'English',
+      social: 'Social',
+      science: 'Science',
+      french: 'French',
+      biology: 'Biology',
+      chemistry: 'Chemistry',
+      physics: 'Physics'
+    };
+    if (map[key]) return map[key];
+    return key ? key.charAt(0).toUpperCase() + key.slice(1) : '';
+  }
+
+  function mapGradeValueToCeiling(gradeValue) {
+    switch ((gradeValue || '').toLowerCase()) {
+      case 'k-6': return 6;
+      case '7-9': return 9;
+      case '10': return 10;
+      case '11': return 11;
+      case '12': return 12;
+      default: return null;
+    }
   }
 
   function getDefaultCourses() {
@@ -184,16 +230,28 @@
     return candidates[candidates.length - 1];
   }
 
+  function inferSubjectGroupFromText(value) {
+    if (!value) return null;
+    const text = value.toString().trim().toLowerCase();
+    if (!text) return null;
+
+    if (text.includes('chem')) return 'chemistry';
+    if (text.includes('bio')) return 'biology';
+    if (text.includes('phys')) return 'physics';
+    if (text.includes('math')) return 'math';
+    if (text.includes('english') || text.includes('ela')) return 'english';
+    if (text.includes('social')) return 'social';
+    if (text.includes('french')) return 'french';
+    if (text.includes('science')) return 'science';
+    return null;
+  }
+
   function inferCourseFromText(value) {
     if (!value) return null;
     const text = value.toString().trim().toLowerCase();
     if (!text) return null;
 
-    let subjectGroup = null;
-    if (text.includes('math')) subjectGroup = 'math';
-    else if (text.includes('english') || text.includes('ela')) subjectGroup = 'english';
-    else if (text.includes('social')) subjectGroup = 'social';
-    else if (text.includes('science')) subjectGroup = 'science';
+    const subjectGroup = inferSubjectGroupFromText(text);
 
     let gradeCeiling = null;
     if (/gr\s*12|grade\s*12|\b12\b/.test(text)) gradeCeiling = 12;
@@ -213,29 +271,81 @@
     return inferCourseFromText(value);
   }
 
-  function renderCourseOptions(priorityCourseId = null) {
-    if (!courseOptions) return;
-    courseOptions.innerHTML = '';
-    const seen = new Set();
-    const addOption = (course) => {
-      if (!course || seen.has(course.id)) return;
-      seen.add(course.id);
-      const opt = document.createElement('option');
-      opt.value = course.label;
-      courseOptions.appendChild(opt);
-    };
+  function pickCourseFromGradeAndSubject(gradeValue, subjectLabel) {
+    const gradeCeiling = mapGradeValueToCeiling(gradeValue);
+    const subjectGroup = inferSubjectGroupFromText(subjectLabel);
 
-    if (priorityCourseId) {
-      const course = courseIndex?.byId.get(priorityCourseId);
-      if (course) addOption(course);
+    if (courseIndex && subjectLabel) {
+      const direct = findCourseByLabel(subjectLabel, courseIndex);
+      if (direct) return direct;
     }
 
-    canonicalCourses.forEach(addOption);
+    if (subjectGroup && gradeCeiling) {
+      const match = getCourseBySubjectAndLevel(subjectGroup, gradeCeiling);
+      if (match) return match;
+    }
+
+    if (subjectGroup) {
+      const fallback = canonicalCourses.find((c) => c.subjectGroup === subjectGroup);
+      if (fallback) return fallback;
+    }
+
+    return findCourseFromInput(subjectLabel);
+  }
+
+  function buildSubjectOptions() {
+    const baseSubjects = ["Math", "English", "Social", "Science", "French", "Physics", "Biology", "Chemistry"];
+    subjectOptionsByGrade = {
+      "k-6": baseSubjects,
+      "7-9": baseSubjects,
+      "10": baseSubjects,
+      "11": baseSubjects,
+      "12": baseSubjects,
+      "university": baseSubjects,
+      "college": baseSubjects,
+      "community": baseSubjects,
+      "other": baseSubjects
+    };
+  }
+
+  function gradeKeyFromCourse(course) {
+    if (!course) return "";
+    const ceiling = Number(course.gradeCeiling);
+    if (!Number.isFinite(ceiling)) return "";
+    if (ceiling <= 6) return "k-6";
+    if (ceiling <= 9) return "7-9";
+    if (ceiling === 10) return "10";
+    if (ceiling === 11) return "11";
+    return "12";
+  }
+
+  function setSubjectOptions(gradeKey, preselectValue = null) {
+    if (!subjectSelect) return;
+    subjectSelect.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = gradeKey ? 'Select subject...' : 'Select grade first...';
+    subjectSelect.appendChild(placeholder);
+
+    const options = subjectOptionsByGrade?.[gradeKey] || [];
+    subjectSelect.disabled = !options.length;
+
+    options.forEach((label) => {
+      const opt = document.createElement('option');
+      opt.value = label;
+      opt.textContent = label;
+      subjectSelect.appendChild(opt);
+    });
+
+    if (preselectValue) {
+      subjectSelect.value = preselectValue;
+    }
   }
 
   function handleCourseInputChange() {
-    const value = document.getElementById('subject').value;
-    const match = findCourseFromInput(value);
+    const value = subjectSelect ? subjectSelect.value : '';
+    const gradeValue = gradeSelect ? gradeSelect.value : '';
+    const match = pickCourseFromGradeAndSubject(gradeValue, value);
     currentCourseId = match ? match.id : null;
   }
 
@@ -264,9 +374,17 @@
     }
   }
 
-  if (subjectInput) {
-    subjectInput.addEventListener('change', handleCourseInputChange);
-    subjectInput.addEventListener('input', () => {
+  if (gradeSelect) {
+    gradeSelect.addEventListener('change', () => {
+      setSubjectOptions(gradeSelect.value || '');
+      subjectSelect.value = '';
+      currentCourseId = null;
+    });
+  }
+
+  if (subjectSelect) {
+    subjectSelect.addEventListener('change', handleCourseInputChange);
+    subjectSelect.addEventListener('input', () => {
       currentCourseId = null;
     });
   }
@@ -283,6 +401,7 @@
     }
     currentUser = user;
 
+    buildSubjectOptions();
     coursesPromise = loadCoursesFromFirestore();
     
     // Load student data
@@ -304,9 +423,9 @@
       const student = studentDoc.data();
 
       await (coursesPromise || loadCoursesFromFirestore());
-      const matchedCourse = findCourseFromInput(student.subject || student.subjectId);
+      const gradeKey = student.subjectGrade || gradeKeyFromCourse(findCourseFromInput(student.subject || student.subjectId));
+      const matchedCourse = pickCourseFromGradeAndSubject(gradeKey, student.subject || student.subjectId);
       currentCourseId = matchedCourse ? matchedCourse.id : null;
-      renderCourseOptions(currentCourseId);
 
       // Verify ownership
       if (student.userId !== currentUser.uid) {
@@ -319,11 +438,17 @@
       document.getElementById("student-name").value = student.studentName || "";
       document.getElementById("birthdate").value = student.birthdate || "";
       document.getElementById("pronouns").value = student.pronouns || "";
-      document.getElementById("subject").value = matchedCourse?.label || student.subject || "";
       document.getElementById("school").value = student.school || "";
       document.getElementById("relationship").value = student.relationship || "";
       document.getElementById("notes").value = student.notes || "";
 
+      if (gradeSelect) {
+        gradeSelect.value = gradeKey || "";
+      }
+      const subjectDisplay = matchedCourse
+        ? subjectGroupToLabel(matchedCourse.subjectGroup)
+        : subjectGroupToLabel(inferSubjectGroupFromText(student.subject || "")) || (student.subject || "");
+      setSubjectOptions(gradeKey || "", subjectDisplay);
       handleCourseInputChange();
 
       msg.textContent = "";
@@ -345,18 +470,24 @@
       return;
     }
 
+    const selectedGrade = gradeSelect?.value || "";
+    const selectedSubject = subjectSelect?.value.trim() || "";
+
+    if (!selectedGrade || !selectedSubject) {
+      msg.textContent = "Please select both grade and subject.";
+      msg.classList.add("error");
+      return;
+    }
+
+    const matchedCourse = pickCourseFromGradeAndSubject(selectedGrade, selectedSubject);
+
     const updatedData = {
       studentName: document.getElementById("student-name").value.trim(),
       birthdate: document.getElementById("birthdate").value,
       pronouns: document.getElementById("pronouns").value || null,
-      subject: (() => {
-        const match = findCourseFromInput(document.getElementById("subject").value.trim());
-        return match ? match.label : (document.getElementById("subject").value.trim() || null);
-      })(),
-      subjectId: (() => {
-        const match = findCourseFromInput(document.getElementById("subject").value.trim());
-        return match ? match.id : null;
-      })(),
+      subjectGrade: selectedGrade,
+      subject: matchedCourse ? matchedCourse.label : selectedSubject,
+      subjectId: matchedCourse ? matchedCourse.id : null,
       school: document.getElementById("school").value.trim() || null,
       relationship: document.getElementById("relationship").value || null,
       notes: document.getElementById("notes").value.trim(),

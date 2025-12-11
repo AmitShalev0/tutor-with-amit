@@ -302,7 +302,7 @@
             📅 Book Sessions
           </button>
           <button class="btn secondary" id="edit-book-form-btn" type="button" hidden>
-            ✏️ Edit my Book Form
+            📄 Booking info
           </button>
         </div>
       </div>
@@ -582,12 +582,7 @@
 
   if (editBookFormBtn) {
     editBookFormBtn.addEventListener("click", () => {
-      try {
-        sessionStorage.setItem("page-editor:book", "1");
-      } catch (_err) {
-        // ignore storage issues
-      }
-      window.location.href = "book.html?editPage=1";
+      window.location.href = "booking-info.html";
     });
   }
 
