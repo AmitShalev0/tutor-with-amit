@@ -1536,12 +1536,13 @@ import { loadGoogleMapsApi, normalizeTutorLocation, parseTravelZoneBreaks, viewp
           updatedAt: serverTimestamp()
         }, { merge: true });
 
-        // Always push booking defaults + meeting modes to the shared site settings that the public
-        // booking form consumes.
-        const siteSettingsRef = doc(db, SITE_SETTINGS_COLLECTION, BOOKING_SETTINGS_DOC_ID);
-        const sitePayload = { ...bookingSettings, meetingModes };
-        await setDoc(siteSettingsRef, sitePayload, { merge: true });
-        siteSettingsCache = normalizeBookingSettings(sitePayload);
+        // Only admins update global site booking defaults; tutors update just their profile.
+        if (isOwner(currentUser, currentUserDoc)) {
+          const siteSettingsRef = doc(db, SITE_SETTINGS_COLLECTION, BOOKING_SETTINGS_DOC_ID);
+          const sitePayload = { ...bookingSettings, meetingModes };
+          await setDoc(siteSettingsRef, sitePayload, { merge: true });
+          siteSettingsCache = normalizeBookingSettings(sitePayload);
+        }
         const refreshed = await fetchTutorBookingSettings(targetTutorProfileId, siteSettingsCache || DEFAULT_BOOKING_SETTINGS);
         if (refreshed) {
           lastLoadedSettings = refreshed;

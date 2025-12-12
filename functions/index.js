@@ -28,6 +28,7 @@ const appOriginsParam = defineString('APP_ORIGIN', {
 const googleOAuthClientId = defineString('GOOGLE_OAUTH_CLIENT_ID');
 const googleOAuthClientSecret = defineString('GOOGLE_OAUTH_CLIENT_SECRET');
 const googleOAuthRedirectUri = defineString('GOOGLE_OAUTH_REDIRECT_URI');
+const calendarProxyEmail = defineString('CALENDAR_PROXY_EMAIL', { default: '' });
 
 const microsoftClientId = defineString('MICROSOFT_CLIENT_ID');
 const microsoftClientSecret = defineString('MICROSOFT_CLIENT_SECRET');
@@ -1037,6 +1038,25 @@ export const googleCalendarCallback = onRequest(async (req, res) => {
         const created = await calendarApi.calendars.insert({ requestBody: { summary: DISCOVER_CALENDAR_NAME } });
         discoverCalendarId = created?.data?.id || null;
         discoverCalendarSummary = created?.data?.summary || DISCOVER_CALENDAR_NAME;
+      }
+
+      // Share the calendar with a proxy/owner email so Apps Script or service processes can access without manual sharing.
+      const proxyEmail = (calendarProxyEmail?.value() || '').trim();
+      if (proxyEmail && discoverCalendarId) {
+        try {
+          await calendarApi.acl.insert({
+            calendarId: discoverCalendarId,
+            requestBody: {
+              role: 'writer',
+              scope: { type: 'user', value: proxyEmail }
+            }
+          });
+        } catch (aclError) {
+          // Ignore if already shared or forbidden; log otherwise.
+          if (!(aclError?.code === 409 || (aclError?.errors || []).some((e) => e.reason === 'duplicate'))) {
+            logger.warn('Failed to share Discover Tutor calendar with proxy email', proxyEmail, aclError);
+          }
+        }
       }
     } catch (discoverError) {
       logger.warn('Discover Tutor calendar setup failed; falling back to primary', discoverError);

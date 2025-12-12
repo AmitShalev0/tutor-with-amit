@@ -957,6 +957,9 @@ import { haversineDistanceKm, loadGoogleMapsApi, normalizeTutorLocation } from '
     const candidates = [
       tutor.calendar?.google?.discoverCalendarId,
       tutor.calendar?.google?.primaryCalendarId,
+      tutor.calendar?.discoverCalendarId,
+      tutor.calendar?.calendarId,
+      tutor.calendar?.id,
       tutor.calendarId,
       tutor.calendarEmail,
       tutor.calendarOwner,
