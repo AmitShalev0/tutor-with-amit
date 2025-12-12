@@ -1,5 +1,5 @@
-  import { CANONICAL_COURSES, buildCourseIndex, sortCourses, findCourseByLabel } from './course-catalog.js';
-  import { loadGoogleMapsApi, haversineDistanceKm, normalizeTutorLocation } from './maps-utils.js';
+  import { CANONICAL_COURSES, buildCourseIndex, findCourseByLabel, sortCourses } from './course-catalog.js';
+import { haversineDistanceKm, loadGoogleMapsApi, normalizeTutorLocation } from './maps-utils.js';
 
   const auth = window.firebaseAuth;
   const db = window.firebaseDb;
@@ -35,6 +35,9 @@
   const tutorSelectRow = document.getElementById("tutor-select-row");
   const tutorSelectHelp = document.getElementById("tutor-select-help");
   const meetingModeInputs = Array.from(document.querySelectorAll('input[name="meeting_mode"]'));
+  const meetingModeHelp = document.getElementById('meeting-mode-help');
+  const travelMeetingModeInput = meetingModeInputs.find((input) => input.value === 'travel' || input.id === 'meeting-mode-travel') || null;
+  const travelMeetingModeLabel = travelMeetingModeInput ? travelMeetingModeInput.closest('label') : null;
   const travelFields = document.getElementById('travel-fields');
   const travelAddressInput = document.getElementById('travel-address');
   const travelInstructionsInput = document.getElementById('travel-instructions');
@@ -50,6 +53,8 @@
   let travelDistanceKm = null;
   const urlParams = new URLSearchParams(window.location.search);
   const tutorsById = new Map();
+  // Expose for debugging only (read-only usage in console)
+  window._tutorsById = tutorsById;
   const preselectedTutorQuery = sanitizeTutorId(urlParams.get('tutor'));
   let publishedTutors = [];
 
@@ -142,7 +147,8 @@
     const modes = {
       online: rawModes.online !== false,
       tutorsOffice: rawModes.tutorsOffice !== false,
-      travel: rawModes.travel === true || rawModes.travel === undefined ? true : Boolean(rawModes.travel)
+      // Travel is allowed unless explicitly disabled; per-tutor gating happens elsewhere.
+      travel: rawModes.travel !== false
     };
     const allowedInputs = [];
     meetingModeInputs.forEach((input) => {
@@ -159,13 +165,144 @@
       allowedInputs[0].checked = true;
     }
     syncMeetingModeVisibility();
+    syncTravelMeetingModeOption();
   }
+
+  function isTravelGloballyEnabled(settings = window.bookingSettings || {}) {
+    const rawModes = settings?.meetingModes || {};
+    const rawTravel = rawModes.travel;
+    // Treat travel as OFF by default unless explicitly true.
+    return rawTravel === true;
+  }
+
+  function isTutorTravelEnabled(tutorId) {
+    if (!tutorId) return false;
+    const location = getTutorTravelLocation(tutorId);
+    const tutor = tutorsById.get(tutorId);
+    if (tutor?.meetingModes && tutor.meetingModes.travel === false) {
+      return false;
+    }
+    return Boolean(location && location.travelEnabled && location.basePlace && location.basePlace.location);
+  }
+
+  function isAnyTutorTravelEnabled() {
+    if (!Array.isArray(publishedTutors) || publishedTutors.length === 0) {
+      // Default to hidden until we know a tutor supports travel.
+      return false;
+    }
+    return publishedTutors.some((tutor) => isTutorTravelEnabled(tutor.id));
+  }
+
+  function shouldShowTravelMeetingMode() {
+    const bookingSettings = window.bookingSettings || {};
+    const globalTravelSetting = bookingSettings.meetingModes?.travel;
+    // Respect explicit off; otherwise allow if true OR unspecified (fall back to tutor availability).
+    if (globalTravelSetting === false) {
+      return false;
+    }
+
+    const tutorId = getSelectedTutorId();
+    if (tutorId) {
+      const tutorOk = isTutorTravelEnabled(tutorId);
+      if (globalTravelSetting === true) {
+        return tutorOk;
+      }
+      // If unspecified globally, allow when tutor supports travel.
+      return tutorOk;
+    }
+
+    const anyTutorOk = isAnyTutorTravelEnabled();
+    if (globalTravelSetting === true) {
+      return anyTutorOk;
+    }
+    // If unspecified globally, show only if some tutor supports travel.
+    return anyTutorOk;
+  }
+
+  function ensureMeetingModeSelected() {
+    const current = getSelectedMeetingMode();
+    if (current) {
+      return;
+    }
+
+    const fallback = meetingModeInputs.find((input) => {
+      if (!input || input.disabled) return false;
+      const label = input.closest('label');
+      return !(label && label.classList.contains('hidden'));
+    });
+
+    if (fallback) {
+      fallback.checked = true;
+    }
+  }
+
+  function syncTravelMeetingModeOption() {
+    if (!travelMeetingModeInput || !travelMeetingModeLabel) {
+      return;
+    }
+
+    const showTravel = shouldShowTravelMeetingMode();
+    console.log('Travel visibility check', {
+      showTravel,
+      meetingModes: (window.bookingSettings || {}).meetingModes,
+      tutorId: typeof getSelectedTutorId === 'function' ? getSelectedTutorId() : null,
+      tutorTravelEnabled: typeof getSelectedTutorId === 'function' ? isTutorTravelEnabled(getSelectedTutorId()) : false
+    });
+    travelMeetingModeLabel.classList.toggle('hidden', !showTravel);
+    travelMeetingModeLabel.style.setProperty('display', showTravel ? '' : 'none', 'important');
+    travelMeetingModeInput.style.setProperty('display', showTravel ? '' : 'none', 'important');
+
+    if (!showTravel) {
+      if (travelMeetingModeInput.checked) {
+        travelMeetingModeInput.checked = false;
+      }
+      // Disable only as a UI guard; re-enable when travel becomes available again.
+      travelMeetingModeInput.dataset.disabledByTutor = 'true';
+      travelMeetingModeInput.disabled = true;
+      travelMeetingModeInput.required = false;
+    } else {
+      delete travelMeetingModeInput.dataset.disabledByTutor;
+      travelMeetingModeInput.disabled = false;
+      travelMeetingModeInput.required = true;
+    }
+
+    ensureMeetingModeSelected();
+    syncMeetingModeVisibility();
+  }
+
+  // Helper to debug travel visibility in console
+  window.getTravelDebugState = () => {
+    const bookingSettings = window.bookingSettings || {};
+    const tutorId = typeof getSelectedTutorId === 'function' ? getSelectedTutorId() : null;
+    const tutor = tutorsById.get ? tutorsById.get(tutorId) : null;
+    return {
+      meetingModes: bookingSettings.meetingModes,
+      isTravelGloballyEnabled: isTravelGloballyEnabled(bookingSettings),
+      tutorId,
+      tutorMeetingModes: tutor?.meetingModes,
+      tutorTravelEnabled: isTutorTravelEnabled(tutorId),
+      showTravel: shouldShowTravelMeetingMode()
+    };
+  };
 
   function renderAddOnsFromSettings(settings = {}) {
     if (!addOnContainer) return;
-    addOnContainer.innerHTML = '';
     const normalized = normalizeAddOns(settings.addOns || []);
+    console.log('Rendering add-ons from settings', { raw: settings.addOns, normalized });
+
+    // If we already rendered add-ons and the new settings contain none, keep the existing UI
+    // instead of wiping it due to an empty/undefined payload from a later call.
+    if (normalized.length === 0 && activeAddOns.length > 0) {
+      console.warn('Skipping add-on clear because previous add-ons exist and new payload is empty.');
+      return;
+    }
+
+    addOnContainer.innerHTML = '';
     activeAddOns = normalized;
+    const addOnsRow = document.getElementById('add-ons-row');
+    if (addOnsRow) {
+      addOnsRow.classList.toggle('hidden', normalized.length === 0);
+    }
     if (!normalized.length) {
       if (addOnsHelp) {
         addOnsHelp.textContent = 'No add-ons available for this session.';
@@ -174,6 +311,9 @@
         window.recalculateBookingCost();
       }
       return;
+    }
+    if (addOnsHelp) {
+      addOnsHelp.textContent = 'Select any add-ons you want included.';
     }
     normalized.forEach((addOn, index) => {
       const safeId = (addOn.id || `addon-${index + 1}`).replace(/[^a-zA-Z0-9_-]/g, '-');
@@ -733,6 +873,12 @@
     const initialSelection = selectionStillValid ? currentSelection : pickInitialTutorSelection(favouriteSet, window.bookingSettings || {}, availableTutors);
     populateTutorSelect(availableTutors, favouriteSet, initialSelection);
 
+    syncCalendarSourceToSelection();
+    syncTravelMeetingModeOption();
+    if (getSelectedMeetingMode() === 'travel') {
+      void updateTravelSurcharge();
+    }
+
     if (subjectId && availableTutors.length === 0 && subjectHelp) {
       subjectHelp.innerHTML = 'No published tutors currently cover this course. Please choose another course or check back soon.';
     }
@@ -1069,6 +1215,7 @@
       renderSubjectDropdown();
       refreshTutorSelectForSubject();
       syncCalendarSourceToSelection();
+      syncTravelMeetingModeOption();
       void updateTravelSurcharge();
     });
   }
@@ -1180,16 +1327,17 @@
 
       if (typeof setupBookingForm === 'function') {
         const fetchedSettings = await bookingSettingsPromise;
-        setupBookingForm(fetchedSettings || {});
+        const resolvedBookingSettings = fetchedSettings || window.bookingSettings || {};
+        window.bookingSettings = resolvedBookingSettings;
+        setupBookingForm(resolvedBookingSettings);
         bookingFormInitialized = true;
         applyBookingSettingsToStudentSelectors(window.bookingSettings, userStudents.length);
-        const settingsForUi = fetchedSettings || window.bookingSettings || {};
-        applyMeetingModeAvailability(settingsForUi);
-        renderAddOnsFromSettings(settingsForUi);
+        applyMeetingModeAvailability(resolvedBookingSettings);
+        renderAddOnsFromSettings(resolvedBookingSettings);
         if (typeof window.setBookingPricingContext === 'function') {
           window.setBookingPricingContext({
-            baseSessionCost: settingsForUi.baseSessionCost,
-            extraStudentCost: settingsForUi.extraStudentCost
+            baseSessionCost: resolvedBookingSettings.baseSessionCost,
+            extraStudentCost: resolvedBookingSettings.extraStudentCost
           });
         }
       } else {
@@ -1201,6 +1349,7 @@
       renderSubjectDropdown();
       applyMeetingModeAvailability(window.bookingSettings || {});
       renderAddOnsFromSettings(window.bookingSettings || {});
+      syncTravelMeetingModeOption();
       void updateTravelSurcharge();
       syncCalendarSourceToSelection();
 

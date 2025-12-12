@@ -1,5 +1,5 @@
-    import { auth, db, onAuthStateChanged, doc, getDoc, setDoc, serverTimestamp } from './firebase-config.js';
-    import { loadGoogleMapsApi, normalizeTutorLocation, parseTravelZoneBreaks, viewportToRectanglePath } from './maps-utils.js';
+    import { auth, db, doc, getDoc, onAuthStateChanged, serverTimestamp, setDoc } from './firebase-config.js';
+import { loadGoogleMapsApi, normalizeTutorLocation, parseTravelZoneBreaks, viewportToRectanglePath } from './maps-utils.js';
 
     const SITE_SETTINGS_COLLECTION = 'siteSettings';
     const BOOKING_SETTINGS_DOC_ID = 'booking';
@@ -554,8 +554,6 @@
       }
 
       if (!travelActive) {
-        travelZoneBreaks = [];
-        renderZonePricingInputs(travelZoneBreaks, lastLoadedSettings?.radiusPricing || []);
         clearTravelOverlays();
         return;
       }
@@ -766,23 +764,28 @@
     function syncLocationFromInputs() {
       if (!currentLocationState?.basePlace) {
         updateTravelRadiusDisplay();
-        renderZonePricingInputs(travelZoneBreaks, lastLoadedSettings?.radiusPricing || []);
+        // Preserve any in-progress pricing edits when only radius changes.
+        const preservedPricing = buildZonePricingPayload();
+        renderZonePricingInputs(travelZoneBreaks, preservedPricing.length ? preservedPricing : lastLoadedSettings?.radiusPricing || []);
         return;
       }
       const travelActive = isTravelEnabled();
       const radius = travelActive
         ? clampTravelRadius(Number(travelRadiusInput?.value) || currentLocationState.travelRadiusKm || 0)
-        : 0;
-      const { value: zones, errors } = parseTravelZoneBreaks(travelZonesInput?.value, radius || undefined);
-      travelZoneBreaks = travelActive ? zones : [];
+        : currentLocationState.travelRadiusKm || clampTravelRadius(Number(travelRadiusInput?.value) || 0);
+      const parseRadius = travelActive ? radius : undefined; // when travel off, don’t bound zones to 0
+      const { value: zones, errors } = parseTravelZoneBreaks(travelZonesInput?.value, parseRadius);
+      travelZoneBreaks = zones;
       currentLocationState = {
         ...currentLocationState,
         displayLocationLabel: (locationLabelInput?.value || '').trim() || currentLocationState.displayLocationLabel || currentLocationState.basePlace?.formattedAddress || null,
         travelEnabled: travelActive,
         travelRadiusKm: radius,
-        travelZoneBreaksKm: travelActive ? zones : []
+        travelZoneBreaksKm: zones
       };
-      renderZonePricingInputs(travelZoneBreaks, lastLoadedSettings?.radiusPricing || []);
+      // Keep the user’s current surcharge edits when the zone list stays the same.
+      const preservedPricing = buildZonePricingPayload();
+      renderZonePricingInputs(travelZoneBreaks, preservedPricing.length ? preservedPricing : lastLoadedSettings?.radiusPricing || []);
       if (errors.length) {
         setLocationStatus(errors.join(' '), 'error');
       } else {
@@ -830,7 +833,7 @@
         locationSearchInput.value = normalized.basePlace.formattedAddress;
       }
 
-      travelZoneBreaks = travelEnabledFromData ? normalizeTravelZones(normalized.travelZoneBreaksKm || []) : [];
+      travelZoneBreaks = normalizeTravelZones(normalized.travelZoneBreaksKm || []);
       renderZonePricingInputs(travelZoneBreaks, lastLoadedSettings?.radiusPricing || []);
 
       const hasLocation = normalized.basePlace?.location || radius;
@@ -1235,10 +1238,16 @@
     }
 
     function buildZonePricingPayload() {
-      if (!zonePricingRows || zonePricingSection?.hidden) {
+      if (!zonePricingRows) {
         return [];
       }
+
       const rows = Array.from(zonePricingRows.querySelectorAll('[data-zone-row]'));
+      if (!rows.length) {
+        // Preserve the last-loaded pricing if the UI rows are hidden (e.g., travel temporarily disabled).
+        return normalizeRadiusPricing(lastLoadedSettings?.radiusPricing || []);
+      }
+
       const entries = rows
         .map((row) => {
           const upToKm = Number(row.dataset.upToKm);
@@ -1320,6 +1329,7 @@
       }
 
       syncLocationFromInputs();
+      const radiusPricing = buildZonePricingPayload();
 
       const travelActive = isTravelEnabled();
       const locationPayload = currentLocationState?.basePlace?.location
@@ -1333,7 +1343,8 @@
             travelRadiusKm: travelActive
               ? clampTravelRadius(currentLocationState.travelRadiusKm || Number(travelRadiusInput?.value) || 0)
               : 0,
-            travelZoneBreaksKm: travelActive ? travelZoneBreaks : [],
+            travelZoneBreaksKm: travelZoneBreaks,
+            radiusPricing,
             updatedAt: serverTimestamp()
           }
         : null;
@@ -1373,7 +1384,7 @@
           endHour: calendarEndHour,
           visibleDays: calendarVisibleDays
         },
-        radiusPricing: buildZonePricingPayload(),
+        radiusPricing,
         addOns: buildAddOnsPayload(),
         currency: DEFAULT_BOOKING_SETTINGS.currency,
         _lastUpdatedAt: serverTimestamp(),
@@ -1524,6 +1535,13 @@
           officeAddress,
           updatedAt: serverTimestamp()
         }, { merge: true });
+
+        // Always push booking defaults + meeting modes to the shared site settings that the public
+        // booking form consumes.
+        const siteSettingsRef = doc(db, SITE_SETTINGS_COLLECTION, BOOKING_SETTINGS_DOC_ID);
+        const sitePayload = { ...bookingSettings, meetingModes };
+        await setDoc(siteSettingsRef, sitePayload, { merge: true });
+        siteSettingsCache = normalizeBookingSettings(sitePayload);
         const refreshed = await fetchTutorBookingSettings(targetTutorProfileId, siteSettingsCache || DEFAULT_BOOKING_SETTINGS);
         if (refreshed) {
           lastLoadedSettings = refreshed;
