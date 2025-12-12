@@ -1,5 +1,6 @@
 import { logger } from 'firebase-functions';
 import { defineString } from 'firebase-functions/params';
+import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
 import { setGlobalOptions } from 'firebase-functions/v2/options';
 import { google } from 'googleapis';
@@ -1022,10 +1023,34 @@ export const googleCalendarCallback = onRequest(async (req, res) => {
       logger.warn('Failed to fetch primary calendar', calendarError);
     }
 
+    let discoverCalendarId = null;
+    let discoverCalendarSummary = null;
+    const DISCOVER_CALENDAR_NAME = 'Discover Tutor';
+    try {
+      const calendarApi = google.calendar({ version: 'v3', auth: oauthClient });
+      const list = await calendarApi.calendarList.list();
+      const existing = list?.data?.items?.find((item) => (item.summary || '').toLowerCase() === DISCOVER_CALENDAR_NAME.toLowerCase());
+      if (existing) {
+        discoverCalendarId = existing.id || null;
+        discoverCalendarSummary = existing.summary || DISCOVER_CALENDAR_NAME;
+      } else {
+        const created = await calendarApi.calendars.insert({ requestBody: { summary: DISCOVER_CALENDAR_NAME } });
+        discoverCalendarId = created?.data?.id || null;
+        discoverCalendarSummary = created?.data?.summary || DISCOVER_CALENDAR_NAME;
+      }
+    } catch (discoverError) {
+      logger.warn('Discover Tutor calendar setup failed; falling back to primary', discoverError);
+    }
+
+    const resolvedCalendarId = discoverCalendarId || primaryCalendarId;
+    const resolvedCalendarSummary = discoverCalendarSummary || primarySummary || 'primary';
+
     const tokenPayload = {
       email: email || primaryCalendarId || null,
       primaryCalendarId,
       primaryCalendarSummary: primarySummary,
+      discoverCalendarId,
+      discoverCalendarSummary,
       accessToken: tokens.access_token || null,
       refreshToken: tokens.refresh_token || null,
       scope: tokens.scope || CALENDAR_SCOPES.join(' '),
@@ -1039,7 +1064,9 @@ export const googleCalendarCallback = onRequest(async (req, res) => {
     await userRef.set({
       calendar: {
         google: tokenPayload
-      }
+      },
+      calendarId: resolvedCalendarId,
+      calendarSummary: resolvedCalendarSummary
     }, { merge: true });
 
     const userDoc = await userRef.get();
@@ -1051,10 +1078,14 @@ export const googleCalendarCallback = onRequest(async (req, res) => {
             email: tokenPayload.email,
             primaryCalendarId,
             primaryCalendarSummary: primarySummary,
+            discoverCalendarId,
+            discoverCalendarSummary,
             connected: true,
             syncedAt: admin.firestore.FieldValue.serverTimestamp()
           }
-        }
+        },
+        calendarId: resolvedCalendarId,
+        calendarSummary: resolvedCalendarSummary
       }, { merge: true });
     }
 
@@ -1063,9 +1094,13 @@ export const googleCalendarCallback = onRequest(async (req, res) => {
         email: tokenPayload.email,
         primaryCalendarId,
         primaryCalendarSummary: primarySummary,
+        discoverCalendarId,
+        discoverCalendarSummary,
         connected: true,
         syncedAt: new Date().toISOString()
-      }
+      },
+      calendarId: resolvedCalendarId,
+      calendarSummary: resolvedCalendarSummary
     };
 
     res.status(200).send(renderCalendarCallbackPage(responsePayload, null));

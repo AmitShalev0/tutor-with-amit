@@ -955,6 +955,8 @@ import { haversineDistanceKm, loadGoogleMapsApi, normalizeTutorLocation } from '
   function resolveTutorCalendarId(tutor) {
     if (!tutor) return null;
     const candidates = [
+      tutor.calendar?.google?.discoverCalendarId,
+      tutor.calendar?.google?.primaryCalendarId,
       tutor.calendarId,
       tutor.calendarEmail,
       tutor.calendarOwner,
@@ -1002,6 +1004,20 @@ import { haversineDistanceKm, loadGoogleMapsApi, normalizeTutorLocation } from '
     if (typeof window.setBookingCalendarSource === 'function') {
       window.setBookingCalendarSource(source);
     }
+  }
+
+  function getEffectiveBookingSettingsForTutor(tutor) {
+    const base = window.bookingSettings || {};
+    const merged = { ...base };
+    if (tutor && typeof tutor === 'object') {
+      if (tutor.meetingModes) {
+        merged.meetingModes = { ...base.meetingModes, ...tutor.meetingModes };
+      }
+      if (Array.isArray(tutor.addOns)) {
+        merged.addOns = tutor.addOns;
+      }
+    }
+    return merged;
   }
 
   function getTutorNameById(tutorId) {
@@ -1214,6 +1230,11 @@ import { haversineDistanceKm, loadGoogleMapsApi, normalizeTutorLocation } from '
     tutorSelect.addEventListener('change', () => {
       renderSubjectDropdown();
       refreshTutorSelectForSubject();
+      const tutorId = getSelectedTutorId();
+      const tutor = tutorId ? tutorsById.get(tutorId) : null;
+      const effectiveSettings = getEffectiveBookingSettingsForTutor(tutor);
+      applyMeetingModeAvailability(effectiveSettings);
+      renderAddOnsFromSettings(effectiveSettings);
       syncCalendarSourceToSelection();
       syncTravelMeetingModeOption();
       void updateTravelSurcharge();
@@ -1347,8 +1368,13 @@ import { haversineDistanceKm, loadGoogleMapsApi, normalizeTutorLocation } from '
       await tutorOptionsPromise;
       refreshTutorSelectForSubject();
       renderSubjectDropdown();
-      applyMeetingModeAvailability(window.bookingSettings || {});
-      renderAddOnsFromSettings(window.bookingSettings || {});
+      {
+        const tutorId = getSelectedTutorId();
+        const tutor = tutorId ? tutorsById.get(tutorId) : null;
+        const effectiveSettings = getEffectiveBookingSettingsForTutor(tutor);
+        applyMeetingModeAvailability(effectiveSettings);
+        renderAddOnsFromSettings(effectiveSettings);
+      }
       syncTravelMeetingModeOption();
       void updateTravelSurcharge();
       syncCalendarSourceToSelection();
@@ -1687,35 +1713,40 @@ import { haversineDistanceKm, loadGoogleMapsApi, normalizeTutorLocation } from '
       const endTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
       
       const resolveTutorUid = () => {
-        if (requestedTutorId) {
-          return requestedTutorId;
-        }
-        const settings = window.bookingSettings || {};
-        const candidate = settings.defaultTutorUid
-          || settings.primaryTutorUid
-          || settings.tutorUid
-          || settings.defaultTutorId
-          || settings.primaryTutorId
-          || settings.tutorId;
-        if (candidate) {
-          return candidate;
-        }
-        if (userProfile?.preferredTutorUid) {
-          return userProfile.preferredTutorUid;
-        }
-        return 'unassigned';
-      };
+          if (requestedTutor) {
+            return requestedTutor.userId || requestedTutor.id || requestedTutorId;
+          }
+          if (requestedTutorId) {
+            return requestedTutorId;
+          }
+          const settings = window.bookingSettings || {};
+          const candidate = settings.defaultTutorUid
+            || settings.primaryTutorUid
+            || settings.tutorUid
+            || settings.defaultTutorId
+            || settings.primaryTutorId
+            || settings.tutorId;
+          if (candidate) {
+            return candidate;
+          }
+          if (userProfile?.preferredTutorUid) {
+            return userProfile.preferredTutorUid;
+          }
+          return 'unassigned';
+        };
 
-      const tutorUid = resolveTutorUid();
-      const resolvedTutorDocId = await resolveTutorDocumentId({
-        tutorUid,
-        tutorName: tutorNameForLookup || userProfile?.preferredTutorName || userProfile?.preferredTutor,
-        bookingSettings: window.bookingSettings || {},
-        userProfile
-      });
-      const tutorDocId = (typeof resolvedTutorDocId === 'string' && resolvedTutorDocId.trim())
-        ? resolvedTutorDocId.trim()
-        : (tutorUid && tutorUid !== 'unassigned' ? tutorUid : DEFAULT_TUTOR_DOC_ID);
+        const tutorUid = resolveTutorUid();
+        const resolvedTutorDocId = requestedTutorId
+          ? requestedTutorId
+          : await resolveTutorDocumentId({
+              tutorUid,
+              tutorName: tutorNameForLookup || userProfile?.preferredTutorName || userProfile?.preferredTutor,
+              bookingSettings: window.bookingSettings || {},
+              userProfile
+            });
+        const tutorDocId = (typeof resolvedTutorDocId === 'string' && resolvedTutorDocId.trim())
+          ? resolvedTutorDocId.trim()
+          : (tutorUid && tutorUid !== 'unassigned' ? tutorUid : DEFAULT_TUTOR_DOC_ID);
 
       // Base booking data
       const baseBookingData = {
