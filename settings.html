@@ -288,11 +288,45 @@
             <span id="password-status" class="status-text"></span>
           </div>
         </form>
+
+        <div class="divider"></div>
+        <section class="field">
+          <h3 style="margin:0;">Disable accounts</h3>
+          <p class="status-text">Pause tutor/student access temporarily. Requires no upcoming approved sessions.</p>
+          <div class="toggle-list" aria-label="Pause roles">
+            <label class="toggle">
+              <input type="checkbox" id="pause-tutor-toggle" />
+              <span class="toggle-track" aria-hidden="true"></span>
+              <span class="toggle-label">Pause tutor account</span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" id="pause-student-toggle" />
+              <span class="toggle-track" aria-hidden="true"></span>
+              <span class="toggle-label">Pause student account</span>
+            </label>
+          </div>
+          <div class="field" style="margin-top:0.75rem;">
+            <label for="pause-password">Re-enter password to apply</label>
+            <div class="password-wrapper">
+              <input id="pause-password" type="password" autocomplete="current-password" />
+              <button type="button" class="password-toggle" aria-label="Toggle password visibility" data-target="pause-password">🙈</button>
+            </div>
+          </div>
+          <div class="actions-row">
+            <button type="button" class="btn secondary" id="pause-apply-btn">Apply pause</button>
+            <span id="pause-status" class="status-text"></span>
+          </div>
+        </section>
       </section>
 
       <section class="settings-card danger-zone">
         <h2>Delete Account</h2>
         <p class="status-text">This will permanently delete your account data. Tutors will remove all tutor info; student session logs stay with tutors.</p>
+        <div class="actions-row" style="margin-top:0.25rem;">
+          <button type="button" class="btn tertiary" id="delete-tutor-btn">Delete Tutor</button>
+          <button type="button" class="btn tertiary" id="delete-student-btn">Delete Student</button>
+          <span class="status-text">Requires no upcoming approved sessions.</span>
+        </div>
         <form id="delete-form">
           <div class="field">
             <label for="delete-confirm">Type DELETE to confirm</label>

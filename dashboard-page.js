@@ -26,6 +26,8 @@
   const tutorLinkDisplayEl = document.getElementById("tutor-link-display");
   const copyTutorLinkBtn = document.getElementById("copy-tutor-link");
   const copyTutorLinkBtnQA = document.getElementById("copy-tutor-link-qa");
+  const quickActionsStudentCard = document.getElementById("quick-actions-student");
+  const quickActionsTutorCard = document.getElementById("quick-actions-tutor");
   const homeLinkBtn = document.getElementById("home-link-btn");
   const editBookFormBtn = document.getElementById("edit-book-form-btn");
   const subjectRequestForm = document.getElementById("subject-request-form");
@@ -44,6 +46,18 @@
   let hybridAccountEnabled = false;
 
   const copyButtons = [copyTutorLinkBtn, copyTutorLinkBtnQA].filter(Boolean);
+
+  function reconcileQuickActions(hasTutorRole, hasStudentRole) {
+    const showStudentQA = hasStudentRole || (!hasStudentRole && !hasTutorRole);
+    const showTutorQA = hasTutorRole && !hasStudentRole;
+
+    if (quickActionsStudentCard) {
+      quickActionsStudentCard.style.display = showStudentQA ? "block" : "none";
+    }
+    if (quickActionsTutorCard) {
+      quickActionsTutorCard.style.display = showTutorQA ? "block" : "none";
+    }
+  }
 
   function setCopyButtons(url) {
     copyButtons.forEach((btn) => {
@@ -257,6 +271,7 @@
 
       const hasTutorRole = !!(userData?.roles?.tutor);
       const hasStudentRole = !!(userData?.roles?.student);
+      reconcileQuickActions(hasTutorRole, hasStudentRole);
       setHybridAccountState(hasTutorRole && hasStudentRole);
       if (hasTutorRole) {
         await loadTutorSummary(userData);

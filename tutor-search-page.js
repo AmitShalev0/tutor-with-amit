@@ -914,16 +914,26 @@
         return;
       }
       try {
-        const tutorQuery = query(
+        let tutorQuery = query(
           collection(db, 'tutorProfiles'),
-          where('status', '==', 'published')
+          where('status', '==', 'published'),
+          where('isPaused', '==', false)
         );
-        const tutorsCollection = collection(db, 'tutors');
 
-        const [profileSnapshot, locationSnapshot] = await Promise.all([
-          getDocs(tutorQuery),
-          getDocs(tutorsCollection)
-        ]);
+        let profileSnapshot;
+        try {
+          profileSnapshot = await getDocs(tutorQuery);
+          if (profileSnapshot.empty) {
+            tutorQuery = query(collection(db, 'tutorProfiles'), where('status', '==', 'published'));
+            profileSnapshot = await getDocs(tutorQuery);
+          }
+        } catch (err) {
+          console.warn('Primary paused tutor query failed, falling back to published only', err);
+          tutorQuery = query(collection(db, 'tutorProfiles'), where('status', '==', 'published'));
+          profileSnapshot = await getDocs(tutorQuery);
+        }
+        const tutorsCollection = collection(db, 'tutors');
+        const locationSnapshot = await getDocs(tutorsCollection);
 
         const locationById = new Map();
         locationSnapshot.forEach((docSnap) => {
@@ -935,6 +945,7 @@
           ...docSnap.data(),
           travelInfo: locationById.get(docSnap.id) || null
         }));
+        allTutors = allTutors.filter((t) => t.isPaused !== true);
         allTutors.sort((a, b) => (a.fullName || '').localeCompare(b.fullName || ''));
 
         try {

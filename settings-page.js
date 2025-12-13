@@ -41,6 +41,13 @@ const themeToggleLabel = document.getElementById('theme-toggle-label');
 const themeAutoToggle = document.getElementById('settings-theme-auto');
 const lightTimeInput = document.getElementById('settings-light-time');
 const darkTimeInput = document.getElementById('settings-dark-time');
+const pauseTutorToggle = document.getElementById('pause-tutor-toggle');
+const pauseStudentToggle = document.getElementById('pause-student-toggle');
+const pausePasswordInput = document.getElementById('pause-password');
+const pauseApplyBtn = document.getElementById('pause-apply-btn');
+const pauseStatus = document.getElementById('pause-status');
+const deleteTutorBtn = document.getElementById('delete-tutor-btn');
+const deleteStudentBtn = document.getElementById('delete-student-btn');
 
 const newEmailInput = document.getElementById('settings-new-email');
 const emailPasswordInput = document.getElementById('settings-email-password');
@@ -51,6 +58,8 @@ const confirmPasswordInput = document.getElementById('settings-confirm-password'
 const deleteConfirmInput = document.getElementById('delete-confirm');
 const deleteEmailInput = document.getElementById('delete-email');
 const deletePasswordInput = document.getElementById('delete-password');
+const serverTimestamp = window.firestoreServerTimestamp;
+const arrayRemove = window.firestoreArrayRemove;
 
 let currentUser = null;
 let currentUserDoc = null;
@@ -231,6 +240,20 @@ function hydrateProfile(data = {}) {
   notifyInvoice.checked = data.notifyInvoiceEmail === true;
   notifyReceipt.checked = data.notifyReceiptEmail === true;
   deleteEmailInput.value = currentUser?.email || '';
+
+  const pause = data.pause || {};
+  const pauseTutor = pause.tutor || {};
+  const pauseStudent = pause.student || {};
+  if (pauseTutorToggle) {
+    pauseTutorToggle.checked = pauseTutor.active === true;
+    pauseTutorToggle.disabled = !hasRoleFlag('tutor', data);
+  }
+  if (pauseStudentToggle) {
+    pauseStudentToggle.checked = pauseStudent.active === true;
+    pauseStudentToggle.disabled = !hasRoleFlag('student', data);
+  }
+  if (deleteTutorBtn) deleteTutorBtn.disabled = !hasRoleFlag('tutor', data);
+  if (deleteStudentBtn) deleteStudentBtn.disabled = !hasRoleFlag('student', data);
 }
 
 async function loadProfile() {
@@ -269,6 +292,271 @@ async function saveProfile(event) {
 
 function requirePassword(value) {
   return value && value.length >= 6;
+}
+
+async function reauthWithPassword(password, statusEl = pauseStatus) {
+  if (!currentUser || !emailProvider || !reauth) return false;
+  if (!password) {
+    setStatus(statusEl, 'Password required to continue.', 'error');
+    return false;
+  }
+  try {
+    const cred = emailProvider.credential(currentUser.email, password);
+    await reauth(currentUser, cred);
+    return true;
+  } catch (error) {
+    console.error('Reauth failed', error);
+    setStatus(statusEl, 'Incorrect password.', 'error');
+    return false;
+  }
+}
+
+async function fetchSessionsForRole(roleField) {
+  const sessionsCol = collection(db, 'sessions');
+  const now = new Date();
+
+  const pendingSnap = await getDocs(query(sessionsCol, where(roleField, '==', currentUser.uid), where('status', '==', 'pending')));
+  const approvedSnap = await getDocs(query(sessionsCol, where(roleField, '==', currentUser.uid), where('status', '==', 'approved')));
+
+  const pendingDocs = pendingSnap.docs || [];
+  const upcoming = (approvedSnap.docs || []).filter((docSnap) => {
+    const data = docSnap.data() || {};
+    const start = data.startTime?.toDate?.();
+    return start && start.getTime() > now.getTime();
+  });
+
+  return { pendingDocs, upcoming };
+}
+
+async function deletePendingSessions(pendingDocs) {
+  const deletions = pendingDocs.map((docSnap) => deleteDoc(docSnap.ref));
+  await Promise.allSettled(deletions);
+}
+
+function setRoleDeleteBusy(isBusy) {
+  if (deleteTutorBtn) deleteTutorBtn.disabled = isBusy || !hasRoleFlag('tutor');
+  if (deleteStudentBtn) deleteStudentBtn.disabled = isBusy || !hasRoleFlag('student');
+}
+
+function hasRoleFlag(role, data = currentUserDoc) {
+  const roles = data?.roles;
+  if (!roles) return false;
+  if (typeof roles === 'string') return roles.toLowerCase().includes(role);
+  if (Array.isArray(roles)) return roles.some((r) => String(r || '').toLowerCase().includes(role));
+  if (typeof roles === 'object') {
+    const value = roles[role];
+    if (value === true) return true;
+    if (typeof value === 'string') {
+      const normalized = value.toLowerCase();
+      return normalized.includes('active') || normalized.includes('true');
+    }
+  }
+  return false;
+}
+
+async function cleanupTutorRecords() {
+  const deletions = [
+    deleteDoc(docFn(db, 'tutorProfiles', currentUser.uid)),
+    deleteDoc(docFn(db, 'tutors', currentUser.uid))
+  ];
+
+  try {
+    const favoritesSnap = await getDocs(query(collection(db, 'users'), where('favoriteTutorIds', 'array-contains', currentUser.uid)));
+    if (arrayRemove) {
+      const favoriteUpdates = (favoritesSnap.docs || []).map((docSnap) => updateDoc(docSnap.ref, { favoriteTutorIds: arrayRemove(currentUser.uid) }));
+      await Promise.allSettled(favoriteUpdates);
+    }
+  } catch (error) {
+    console.warn('Failed to clean up tutor favorites', error);
+  }
+
+  await Promise.allSettled(deletions);
+}
+
+async function cleanupStudentRecords() {
+  try {
+    const studentsSnap = await getDocs(query(collection(db, 'students'), where('userId', '==', currentUser.uid)));
+    const deletions = (studentsSnap.docs || []).map((docSnap) => deleteDoc(docSnap.ref));
+    await Promise.allSettled(deletions);
+  } catch (error) {
+    console.warn('Failed to clean up student records', error);
+  }
+}
+
+async function deleteRole(role) {
+  setStatus(deleteStatus, '');
+  if (!currentUser) {
+    setStatus(deleteStatus, 'Sign in again to manage roles.', 'error');
+    return;
+  }
+  if (!currentUserDoc) {
+    setStatus(deleteStatus, 'Still loading your account. Try again.', 'error');
+    return;
+  }
+
+  const label = role === 'tutor' ? 'Tutor' : role === 'student' ? 'Student' : 'Role';
+  const hasRole = hasRoleFlag(role, currentUserDoc);
+  if (!hasRole) {
+    setStatus(deleteStatus, `${label} role is already removed.`, 'error');
+    return;
+  }
+
+  const password = window.prompt(`Enter your password to delete your ${label.toLowerCase()} role. This keeps your account active.`) || '';
+  const authed = await reauthWithPassword(password, deleteStatus);
+  if (!authed) return;
+
+  setRoleDeleteBusy(true);
+  try {
+    setStatus(deleteStatus, `Checking ${label.toLowerCase()} sessions...`);
+
+    const roleField = role === 'tutor' ? 'tutorId' : 'studentId';
+    const { pendingDocs, upcoming } = await fetchSessionsForRole(roleField);
+    if (upcoming.length) {
+      setStatus(deleteStatus, `Cannot delete ${label.toLowerCase()} role with approved upcoming sessions.`, 'error');
+      return;
+    }
+
+    if (pendingDocs.length) {
+      await deletePendingSessions(pendingDocs);
+    }
+
+    if (role === 'tutor') {
+      await cleanupTutorRecords();
+    }
+    if (role === 'student') {
+      await cleanupStudentRecords();
+    }
+
+    const payload = {
+      [`roles.${role}`]: false,
+      [`pause.${role}.active`]: false,
+      [`pause.${role}.setAt`]: serverTimestamp ? serverTimestamp() : new Date()
+    };
+    await updateDoc(docFn(db, 'users', currentUser.uid), payload);
+
+    currentUserDoc = {
+      ...(currentUserDoc || {}),
+      roles: { ...(currentUserDoc?.roles || {}), [role]: false },
+      pause: {
+        ...(currentUserDoc?.pause || {}),
+        [role]: { ...(currentUserDoc?.pause?.[role] || {}), active: false, setAt: new Date() }
+      }
+    };
+
+    if (role === 'tutor' && pauseTutorToggle) pauseTutorToggle.checked = false;
+    if (role === 'student' && pauseStudentToggle) pauseStudentToggle.checked = false;
+    if (deleteTutorBtn && role === 'tutor') deleteTutorBtn.disabled = true;
+    if (deleteStudentBtn && role === 'student') deleteStudentBtn.disabled = true;
+
+    setStatus(deleteStatus, `${label} role deleted. Account remains active.`, 'success');
+  } catch (error) {
+    console.error(`${label} role delete failed`, error);
+    setStatus(deleteStatus, `Unable to delete ${label.toLowerCase()} role right now.`, 'error');
+  } finally {
+    setRoleDeleteBusy(false);
+  }
+}
+
+async function updateTutorProfilePause(active) {
+  try {
+    const profileId = currentUserDoc?.tutorProfileId || null;
+    let profileRef = profileId ? docFn(db, 'tutorProfiles', profileId) : null;
+    if (!profileRef) {
+      const snap = await getDocs(query(collection(db, 'tutorProfiles'), where('userId', '==', currentUser.uid)));
+      const first = snap.docs[0];
+      if (first) profileRef = first.ref;
+    }
+    if (profileRef) {
+      await updateDoc(profileRef, { isPaused: active === true });
+    }
+  } catch (error) {
+    console.warn('Unable to mirror pause to tutor profile', error);
+  }
+}
+
+async function applyPauseChanges(event) {
+  if (event) event.preventDefault();
+  setStatus(pauseStatus, '');
+  if (!currentUser) {
+    setStatus(pauseStatus, 'Sign in again to update.', 'error');
+    return;
+  }
+
+  const desiredTutorPause = pauseTutorToggle?.checked === true;
+  const desiredStudentPause = pauseStudentToggle?.checked === true;
+  const password = pausePasswordInput?.value || '';
+
+  const hasTutorRole = !!currentUserDoc?.roles?.tutor;
+  const hasStudentRole = !!currentUserDoc?.roles?.student;
+
+  if (!hasTutorRole && !hasStudentRole) {
+    setStatus(pauseStatus, 'No roles to pause.', 'error');
+    return;
+  }
+
+  const authed = await reauthWithPassword(password);
+  if (!authed) return;
+
+  setStatus(pauseStatus, 'Checking sessions...');
+
+  const updates = [];
+
+  if (hasTutorRole) {
+    const { pendingDocs, upcoming } = await fetchSessionsForRole('tutorId');
+    if (desiredTutorPause && upcoming.length) {
+      setStatus(pauseStatus, 'Cannot pause tutor role with approved upcoming sessions.', 'error');
+      return;
+    }
+    if (desiredTutorPause && pendingDocs.length) {
+      await deletePendingSessions(pendingDocs);
+    }
+    updates.push({ path: 'pause.tutor', active: desiredTutorPause });
+  }
+
+  if (hasStudentRole) {
+    const { pendingDocs, upcoming } = await fetchSessionsForRole('studentId');
+    if (desiredStudentPause && upcoming.length) {
+      setStatus(pauseStatus, 'Cannot pause student role with approved upcoming sessions.', 'error');
+      return;
+    }
+    if (desiredStudentPause && pendingDocs.length) {
+      await deletePendingSessions(pendingDocs);
+    }
+    updates.push({ path: 'pause.student', active: desiredStudentPause });
+  }
+
+  try {
+    const payload = updates.reduce((acc, item) => {
+      if (item.path === 'pause.tutor') {
+        acc['pause.tutor.active'] = item.active;
+        acc['pause.tutor.setAt'] = serverTimestamp ? serverTimestamp() : new Date();
+      }
+      if (item.path === 'pause.student') {
+        acc['pause.student.active'] = item.active;
+        acc['pause.student.setAt'] = serverTimestamp ? serverTimestamp() : new Date();
+      }
+      return acc;
+    }, {});
+
+    await updateDoc(docFn(db, 'users', currentUser.uid), payload);
+    if (hasTutorRole) {
+      await updateTutorProfilePause(desiredTutorPause);
+    }
+    currentUserDoc = {
+      ...(currentUserDoc || {}),
+      pause: {
+        ...(currentUserDoc?.pause || {}),
+        tutor: { ...(currentUserDoc?.pause?.tutor || {}), active: desiredTutorPause },
+        student: { ...(currentUserDoc?.pause?.student || {}), active: desiredStudentPause }
+      }
+    };
+
+    setStatus(pauseStatus, 'Pause preferences updated.', 'success');
+    pausePasswordInput.value = '';
+  } catch (error) {
+    console.error('Pause update failed', error);
+    setStatus(pauseStatus, 'Could not update pause settings.', 'error');
+  }
 }
 
 async function updateEmailFlow(event) {
@@ -392,6 +680,9 @@ function bindEvents() {
   emailForm.addEventListener('submit', updateEmailFlow);
   passwordForm.addEventListener('submit', updatePasswordFlow);
   deleteForm.addEventListener('submit', deleteAccount);
+  if (pauseApplyBtn) pauseApplyBtn.addEventListener('click', applyPauseChanges);
+  if (deleteTutorBtn) deleteTutorBtn.addEventListener('click', () => deleteRole('tutor'));
+  if (deleteStudentBtn) deleteStudentBtn.addEventListener('click', () => deleteRole('student'));
 }
 
 function requireAuth() {

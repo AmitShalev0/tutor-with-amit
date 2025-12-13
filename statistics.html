@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Statistics – Amit Tutoring</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .stats-container { max-width: 1200px; margin: 0 auto; }
+    .stats-hero { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.5rem; }
+    .stats-title { margin: 0; font-size: 2rem; }
+    .stats-subtitle { margin: 0.25rem 0 0; color: #9ca3af; }
+    .stats-view-toggle { display: none; padding: 0.45rem 0.9rem; border-radius: 999px; border: 1px solid #4b5563; background: rgba(59, 130, 246, 0.15); color: #bfdbfe; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
+    .stats-view-toggle:hover { background: rgba(59, 130, 246, 0.3); border-color: #60a5fa; color: #e0f2fe; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem; }
+    .stats-card { background: #111827; border: 1px solid #1f2937; border-radius: 0.75rem; padding: 1.25rem 1.4rem; box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25); }
+    .stats-card h3 { margin: 0 0 0.75rem; font-size: 1.2rem; }
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.9rem; }
+    .stat-box { background: #0b1220; border: 1px solid #1f2937; border-radius: 0.65rem; padding: 0.85rem 0.95rem; }
+    .stat-label { color: #9ca3af; font-size: 0.9rem; margin-bottom: 0.2rem; }
+    .stat-value { font-size: 1.4rem; font-weight: 700; color: #f3f4f6; }
+    .stat-note { color: #9ca3af; font-size: 0.85rem; margin-top: 0.1rem; }
+    .pill-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+    .pill { background: rgba(96, 165, 250, 0.08); border: 1px solid rgba(96, 165, 250, 0.3); border-radius: 999px; padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
+    .pill-label { color: #bfdbfe; font-size: 0.95rem; }
+    .pill-value { font-weight: 700; color: #e5e7eb; }
+    .fun-list { list-style: none; padding: 0; margin: 0.75rem 0 0; display: grid; gap: 0.45rem; }
+    .fun-list li { background: #0b1220; border: 1px dashed #1f2937; border-radius: 0.6rem; padding: 0.7rem 0.85rem; color: #d1d5db; }
+    .note { color: #9ca3af; font-size: 0.9rem; margin-top: 0.35rem; }
+    .hidden { display: none !important; }
+    .center-row { display: flex; justify-content: center; margin-top: 1.25rem; }
+    .loading { text-align: center; padding: 1.5rem; color: #9ca3af; }
+    @media (max-width: 768px) {
+      body[data-statistics-hybrid="true"] .stats-view-toggle { display: inline-flex; }
+      body[data-statistics-hybrid="true"][data-statistics-view="tutor"] [data-stat-section="student"] { display: none !important; }
+      body[data-statistics-hybrid="true"][data-statistics-view="student"] [data-stat-section="tutor"] { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="site-header"></div>
+  <script src="header-loader.js"></script>
+
+  <main class="container stats-container">
+    <div class="stats-hero">
+      <div>
+        <h1 class="stats-title">Statistics &amp; Tax Summary</h1>
+        <p class="stats-subtitle">Key numbers for tax season plus a few fun milestones for your tutoring journey.</p>
+      </div>
+      <button id="statistics-view-toggle" class="stats-view-toggle" type="button" hidden>Student view -&gt;</button>
+    </div>
+
+    <div id="stats-loading" class="loading">Loading your stats...</div>
+    <div id="stats-error" class="loading hidden">We could not load your stats. Please refresh or try again later.</div>
+
+    <div id="stats-content" class="hidden">
+      <div class="stats-grid">
+        <section class="stats-card" data-stat-section="tutor">
+          <h3>Tutor Tax Summary</h3>
+          <div class="stat-grid">
+            <div class="stat-box">
+              <div class="stat-label">Sessions completed</div>
+              <div class="stat-value" id="tutor-total-sessions">—</div>
+              <div class="stat-note">Approved/finished sessions</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Hours taught</div>
+              <div class="stat-value" id="tutor-total-hours">—</div>
+              <div class="stat-note">Calculated from session duration</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Estimated earnings</div>
+              <div class="stat-value" id="tutor-total-earnings">—</div>
+              <div class="stat-note">For your records; confirm with payouts</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Unique students</div>
+              <div class="stat-value" id="tutor-unique-students">—</div>
+              <div class="stat-note">Across all completed sessions</div>
+            </div>
+          </div>
+          <div class="pill-grid">
+            <div class="pill">
+              <span class="pill-label">Avg. session length</span>
+              <span class="pill-value" id="tutor-avg-length">—</span>
+            </div>
+            <div class="pill">
+              <span class="pill-label">Most requested subject</span>
+              <span class="pill-value" id="tutor-top-subject">—</span>
+            </div>
+            <div class="pill">
+              <span class="pill-label">First recorded session</span>
+              <span class="pill-value" id="tutor-first-session">—</span>
+            </div>
+          </div>
+          <p class="note">Numbers shown here are informational only. Always rely on your official payout records for tax filings.</p>
+          <ul class="fun-list" id="tutor-fun-list">
+            <li>Loading fun stats…</li>
+          </ul>
+        </section>
+
+        <section class="stats-card" data-stat-section="student">
+          <h3>Student Tax Summary</h3>
+          <div class="stat-grid">
+            <div class="stat-box">
+              <div class="stat-label">Sessions attended</div>
+              <div class="stat-value" id="student-total-sessions">—</div>
+              <div class="stat-note">Approved/finished sessions</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Hours of tutoring</div>
+              <div class="stat-value" id="student-total-hours">—</div>
+              <div class="stat-note">Calculated from session duration</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Total paid (est.)</div>
+              <div class="stat-value" id="student-total-paid">—</div>
+              <div class="stat-note">For receipts, check payment emails</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Unique tutors</div>
+              <div class="stat-value" id="student-unique-tutors">—</div>
+              <div class="stat-note">Across all completed sessions</div>
+            </div>
+          </div>
+          <div class="pill-grid">
+            <div class="pill">
+              <span class="pill-label">Avg. session length</span>
+              <span class="pill-value" id="student-avg-length">—</span>
+            </div>
+            <div class="pill">
+              <span class="pill-label">Most studied subject</span>
+              <span class="pill-value" id="student-top-subject">—</span>
+            </div>
+            <div class="pill">
+              <span class="pill-label">First recorded session</span>
+              <span class="pill-value" id="student-first-session">—</span>
+            </div>
+          </div>
+          <p class="note">These figures help with education credits. Confirm against invoices or receipts for filings.</p>
+          <ul class="fun-list" id="student-fun-list">
+            <li>Loading fun stats…</li>
+          </ul>
+        </section>
+      </div>
+
+      <div class="stats-card">
+        <h3>Heads up</h3>
+        <p>These dashboards summarize session history tied to your account. Export official receipts or payout reports for formal tax filings. If something looks off, double-check that all sessions were recorded and approved.</p>
+        <p class="note">Session data uses your account's recorded durations and amounts. Manually logged sessions without times or prices will be excluded from totals.</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>
+        © <span id="year"></span> Amit Tutoring ·
+        <a href="contact.html">Contact me</a>
+      </p>
+    </div>
+    <script src="core.js" defer></script>
+  </footer>
+
+  <script type="module" src="firebase-config.js"></script>
+  <script type="module" src="statistics-page.js"></script>
+</body>
+</html>

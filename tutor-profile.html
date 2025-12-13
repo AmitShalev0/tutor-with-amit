@@ -131,6 +131,16 @@
     .profile-actions button {
       flex-shrink: 0;
     }
+    .pause-banner {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(251, 191, 36, 0.4);
+      color: #fcd34d;
+      border-radius: 0.75rem;
+      padding: 0.9rem 1rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+    .pause-banner.visible { display: block; }
     .profile-body {
       display: grid;
       gap: 1.5rem;
@@ -189,6 +199,7 @@
   <script src="header-loader.js"></script>
 
   <main class="container">
+    <div id="pause-banner" class="pause-banner">☕ Sorry, I am taking a little break</div>
     <section id="profile-content" hidden>
       <div class="profile-hero">
         <div class="profile-photo-wrapper">
@@ -284,6 +295,7 @@
     const photoContainer = document.getElementById('profile-photo');
     const photoImg = document.getElementById('profile-photo-img');
     const photoInitials = document.getElementById('profile-photo-initials');
+    const pauseBanner = document.getElementById('pause-banner');
     let fallbackProfileUrl = null;
     let currentTutorId = null;
     let favoriteTutorIds = new Set();
@@ -663,6 +675,22 @@
       }
     }
 
+    function setPauseState(isPaused) {
+      const paused = isPaused === true;
+      if (pauseBanner) pauseBanner.classList.toggle('visible', paused);
+      if (bookBtn) {
+        bookBtn.disabled = paused;
+        if (paused) {
+          bookBtn.textContent = 'Bookings unavailable';
+        } else {
+          bookBtn.textContent = 'Book with me';
+        }
+      }
+      if (statusTag) {
+        statusTag.textContent = paused ? 'Paused' : 'Published';
+      }
+    }
+
     function populateProfile(tutorId, profile, travelInfo) {
       loadingMessage.hidden = true;
       errorMessage.hidden = true;
@@ -716,15 +744,14 @@
         locationRow.hidden = true;
       }
 
-      statusTag.textContent = 'Published';
+      setPauseState(profile.isPaused === true);
 
       ensureRestfulUrl(profile.slug);
 
       const profileUrl = buildProfileUrl(profile.slug);
       fallbackProfileUrl = profileUrl;
 
-      if (bookBtn) {
-        bookBtn.disabled = false;
+      if (bookBtn && bookBtn.disabled === false) {
         bookBtn.onclick = () => {
           const target = tutorId
             ? `book.html?tutor=${encodeURIComponent(tutorId)}`
