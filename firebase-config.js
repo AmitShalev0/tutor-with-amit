@@ -3,13 +3,19 @@ import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
     createUserWithEmailAndPassword,
+    deleteUser,
+    EmailAuthProvider,
     getAuth,
     GoogleAuthProvider,
     onAuthStateChanged,
+    reauthenticateWithCredential,
+    sendPasswordResetEmail,
     signInWithCustomToken,
     signInWithEmailAndPassword,
     signInWithPopup,
     signOut,
+    updateEmail,
+    updatePassword,
     updateProfile
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
@@ -87,6 +93,12 @@ window.firebaseSignUp = createUserWithEmailAndPassword;
 window.firebaseSignOut = signOut;
 window.firebaseOnAuth = onAuthStateChanged;
 window.firebaseUpdateProfile = updateProfile;
+window.firebaseSendPasswordResetEmail = sendPasswordResetEmail;
+window.firebaseReauthenticateWithCredential = reauthenticateWithCredential;
+window.firebaseUpdateEmail = updateEmail;
+window.firebaseUpdatePassword = updatePassword;
+window.firebaseDeleteUser = deleteUser;
+window.firebaseEmailAuthProvider = EmailAuthProvider;
 window.firebaseSignInWithCustomToken = signInWithCustomToken;
 window.firebaseSignInWithPopup = signInWithPopup;
 window.firebaseGoogleProvider = new GoogleAuthProvider();
@@ -116,9 +128,10 @@ window.storageDeleteObject = deleteObject;
 
 // Export for ES6 modules
 export {
-    addDoc, analytics, app, arrayRemove, arrayUnion, auth, collection, createUserWithEmailAndPassword, db, deleteDoc, deleteObject, doc,
+    addDoc, analytics, app, arrayRemove, arrayUnion, auth, collection, createUserWithEmailAndPassword, db, deleteDoc, deleteObject, deleteUser, doc,
+    EmailAuthProvider,
     functionsBase,
     getDoc,
-    getDocs, getDownloadURL, limit, onAuthStateChanged, orderBy, query, ref, serverTimestamp, setDoc, signInWithCustomToken, signInWithEmailAndPassword, signOut, storage, updateDoc, updateProfile, uploadBytes, where
+    getDocs, getDownloadURL, limit, onAuthStateChanged, orderBy, query, reauthenticateWithCredential, ref, sendPasswordResetEmail, serverTimestamp, setDoc, signInWithCustomToken, signInWithEmailAndPassword, signInWithPopup, signOut, storage, updateDoc, updateEmail, updatePassword, updateProfile, uploadBytes, where
 };
 

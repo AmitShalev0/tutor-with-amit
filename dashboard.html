@@ -6,6 +6,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="style.css" />
   <style>
+    .dashboard-container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
     .dashboard-header {
       display: flex;
       justify-content: space-between;
@@ -40,10 +44,17 @@
       color: #e0f2fe;
     }
     .dashboard-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      display: flex;
+      flex-direction: column;
       gap: 1.5rem;
       margin-bottom: 2rem;
+    }
+    .dashboard-row-two-up {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 1.5rem;
+      align-items: stretch;
+      width: 100%;
     }
     .dashboard-card {
       background: #1f2937;
@@ -149,6 +160,7 @@
       font-size: 0.9rem;
       color: #9ca3af;
     }
+    .dashboard-grid > .dashboard-row-two-up { width: 100%; }
     .subject-request-message.ok {
       color: #34d399;
     }
@@ -261,7 +273,7 @@
 <div id="site-header"></div>
 <script src="header-loader.js"></script>
 
-<main class="container">
+<main class="container dashboard-container">
   <div class="dashboard-header">
     <h2 class="welcome-text">Welcome,<br> <span id="user-name">...</span>!</h2>
     <div class="dashboard-header-actions">
@@ -273,70 +285,63 @@
 
   <div id="dashboard-content" class="hidden-content">
     <div class="dashboard-grid">
-      <!-- My Profile Card -->
-      <div class="dashboard-card" data-dashboard-section="shared">
-        <h3 id="profile-heading">My Profile</h3>
-        <div id="profile-info">
-          <div class="info-item">
-            <div class="info-label">Email</div>
-            <div id="profile-email">-</div>
+      <div class="dashboard-row-two-up">
+        <div class="dashboard-card" data-dashboard-section="student">
+          <h3>Quick Actions</h3>
+          <div class="quick-actions">
+            <button class="btn primary" onclick="window.location.href='add-student.html'">
+              + Add Student
+            </button>
+            <button class="btn primary" onclick="window.location.href='book.html'">
+              📅 Book Sessions
+            </button>
+            <button class="btn secondary" id="edit-book-form-btn" type="button" hidden>
+              📄 Booking info
+            </button>
           </div>
-          <div class="info-item">
-            <div class="info-label">Phone</div>
-            <div id="profile-phone">-</div>
+        </div>
+
+        <div class="dashboard-card" data-dashboard-section="student">
+          <h3>Can't find the subject you need?</h3>
+          <p class="subject-request-copy">Tell us the course and we'll email you as soon as we open it up.</p>
+          <form id="subject-request-form" class="subject-request-form">
+            <label class="sr-only" for="subject-request-input">Course name</label>
+            <input
+              type="text"
+              id="subject-request-input"
+              name="subjectRequest"
+              placeholder="e.g. AP Physics 2, IB French HL"
+              autocomplete="off"
+              required
+            />
+            <label class="sr-only" for="subject-request-school">School</label>
+            <input
+              type="text"
+              id="subject-request-school"
+              name="subjectRequestSchool"
+              placeholder="School (e.g. Central High)"
+              autocomplete="organization"
+              required
+            />
+            <button type="submit" class="btn primary">Notify me</button>
+          </form>
+          <p id="subject-request-message" class="subject-request-message" role="status"></p>
+        </div>
+      </div>
+
+      <div class="dashboard-row-two-up">
+        <div class="dashboard-card" data-dashboard-section="tutor">
+          <h3>Quick Actions</h3>
+          <div class="quick-actions">
+            <button class="btn primary" onclick="window.location.href='tutor-dashboard.html'">
+              Open Tutor Hub
+            </button>
+            <button class="btn secondary" id="copy-tutor-link-qa" type="button">Copy Profile Link</button>
           </div>
         </div>
-        <div class="action-buttons">
-          <button class="btn secondary" onclick="window.location.href='edit-profile.html'">Edit Profile</button>
-        </div>
-      </div>
 
-      <!-- Quick Actions Card -->
-      <div class="dashboard-card" data-dashboard-section="student">
-        <h3>Quick Actions</h3>
-        <div class="quick-actions">
-          <button class="btn primary" onclick="window.location.href='add-student.html'">
-            + Add Student
-          </button>
-          <button class="btn primary" onclick="window.location.href='book.html'">
-            📅 Book Sessions
-          </button>
-          <button class="btn secondary" id="edit-book-form-btn" type="button" hidden>
-            📄 Booking info
-          </button>
-        </div>
-      </div>
-
-      <div class="dashboard-card" data-dashboard-section="student">
-        <h3>Can't find the subject you need?</h3>
-        <p class="subject-request-copy">Tell us the course and we'll email you as soon as we open it up.</p>
-        <form id="subject-request-form" class="subject-request-form">
-          <label class="sr-only" for="subject-request-input">Course name</label>
-          <input
-            type="text"
-            id="subject-request-input"
-            name="subjectRequest"
-            placeholder="e.g. AP Physics 2, IB French HL"
-            autocomplete="off"
-            required
-          />
-          <button type="submit" class="btn primary">Notify me</button>
-        </form>
-        <p id="subject-request-message" class="subject-request-message" role="status"></p>
-      </div>
-
-      <div class="dashboard-card" id="favorite-tutors-card" data-dashboard-section="student">
-        <h3>My Favourite Tutors</h3>
-        <div id="favorite-tutors-content">
-          <p class="empty-favorites">
-            No favourite tutors yet. <a href="tutor-search.html">Find a tutor</a> to add one.
-          </p>
-        </div>
-      </div>
-
-        <!-- Tutor Snapshot Card -->
         <div class="dashboard-card hidden-card" id="tutor-card" data-dashboard-section="tutor">
-          <h3>Your Tutor Hub</h3>
+          <h3>My Tutor Hub</h3>
           <p id="tutor-card-message" class="info-item">Set up your tutor profile so families can find you.</p>
           <div id="tutor-card-details" class="hidden-card">
             <div class="info-item">
@@ -353,6 +358,7 @@
             <button class="btn secondary" id="copy-tutor-link" type="button">Copy Profile Link</button>
           </div>
         </div>
+      </div>
     </div>
 
     <!-- My Students Section -->
@@ -365,6 +371,15 @@
         <div class="empty-state">
           <p>No students added yet.</p>
         </div>
+      </div>
+    </div>
+
+    <div class="dashboard-card" id="favorite-tutors-card" data-dashboard-section="student">
+      <h3>My Favourite Tutors</h3>
+      <div id="favorite-tutors-content">
+        <p class="empty-favorites">
+          No favourite tutors yet. <a href="tutor-search.html">Find a tutor</a> to add one.
+        </p>
       </div>
     </div>
   </div>

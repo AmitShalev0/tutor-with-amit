@@ -1,5 +1,5 @@
     import { COURSE_CATALOG, COURSE_CATALOG_VERSION_VALUE, flattenCatalog, slugifyCourseLabel } from './course-catalog.js';
-    import { loadGoogleMapsApi, normalizeTutorLocation, parseTravelZoneBreaks, viewportToRectanglePath } from './maps-utils.js';
+import { loadGoogleMapsApi, normalizeTutorLocation, parseTravelZoneBreaks, viewportToRectanglePath } from './maps-utils.js';
 
     const auth = window.firebaseAuth;
     const onAuth = window.firebaseOnAuth;
@@ -2256,7 +2256,7 @@
 
       if (bookingInfoLink) {
         if (profileId) {
-          bookingInfoLink.href = `booking-info.html?tutorId=${encodeURIComponent(profileId)}`;
+          bookingInfoLink.href = `booking-settings.html?tutorId=${encodeURIComponent(profileId)}`;
           bookingInfoLink.hidden = false;
         } else {
           bookingInfoLink.hidden = true;

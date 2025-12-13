@@ -71,6 +71,19 @@
         opacity: 0.6;
         cursor: default;
     }
+    .social-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        font-weight: 600;
+    }
+    .google-btn {
+        margin-top: 0.75rem;
+        background: #fcd34d;
+        color: #111827;
+    }
+    .google-btn svg { width: 1.2rem; height: 1.2rem; }
     .error {
         margin-top: 0.75rem;
         color: #fecaca;
@@ -190,6 +203,15 @@
         <button type="submit" id="register-btn">Create Account</button>
         <div class="error" id="error"></div>
         <div class="success" id="success"></div>
+        <button type="button" class="google-btn social-btn" id="google-register-btn">
+            <svg viewBox="0 0 533.5 544.3" aria-hidden="true">
+                <path fill="#4285f4" d="M533.5 278.4c0-18.7-1.7-37-5.3-54.8H272.1v103.8h147.2c-6.4 34.8-26.1 64.3-55.6 84.1l89.8 69.7c52.5-48.3 80-119.5 80-202.8z" />
+                <path fill="#34a853" d="M272.1 544.3c73.9 0 135.9-24.4 181.1-66.1l-89.8-69.7c-24.9 16.7-56.8 26.3-91.3 26.3-70.2 0-129.7-47.4-150.9-111.1l-93.4 72.1c40.8 81 125.6 148.5 244.3 148.5z" />
+                <path fill="#fbbc04" d="M121.2 323.7c-10.5-31.4-10.5-65.4 0-96.8l-93.4-72.1c-41.1 81.8-41.1 176 0 257.8l93.4-72.1z" />
+                <path fill="#ea4335" d="M272.1 107.7c39.8-.6 78.1 14.4 107.4 42.1l80.2-80.2C407.6 24.5 347.1-.7 272.1 0 153.4 0 68.6 67.6 27.8 149.5l93.4 72.1c21.1-63.7 80.6-111 150.9-111.1z" />
+            </svg>
+            <span>Continue with Google</span>
+        </button>
     </form>
 
     <p class="hint">
@@ -218,6 +240,8 @@
     const serverTimestamp = window.firestoreServerTimestamp;
     const query = window.firestoreQuery;
     const where = window.firestoreWhere;
+    const signInWithPopup = window.firebaseSignInWithPopup;
+    const googleProvider = window.firebaseGoogleProvider;
     const getDocs = window.firestoreGetDocs;
 
     // Password visibility toggle
@@ -384,6 +408,24 @@
             btn.disabled = false;
         }
     });
+
+    const googleBtn = document.getElementById("google-register-btn");
+    if (googleBtn && signInWithPopup && googleProvider) {
+        googleBtn.addEventListener("click", async () => {
+            errorEl.textContent = "";
+            successEl.textContent = "";
+            googleBtn.disabled = true;
+            try {
+                await signInWithPopup(auth, googleProvider);
+                window.location.href = "dashboard.html";
+            } catch (err) {
+                console.error(err);
+                errorEl.textContent = "Google sign-in failed.";
+            } finally {
+                googleBtn.disabled = false;
+            }
+        });
+    }
     </script>
 </body>
 </html>

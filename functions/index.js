@@ -15,6 +15,8 @@ const fetchFn = (...args) => {
   return import('node-fetch').then(({ default: fetch }) => fetch(...args));
 };
 
+const ADMIN_UIDS = new Set(['fUXnvGI024fYp4w1AvKUcbM7p8z2']);
+
 setGlobalOptions({ region: 'us-central1' });
 
 
@@ -29,6 +31,7 @@ const googleOAuthClientId = defineString('GOOGLE_OAUTH_CLIENT_ID');
 const googleOAuthClientSecret = defineString('GOOGLE_OAUTH_CLIENT_SECRET');
 const googleOAuthRedirectUri = defineString('GOOGLE_OAUTH_REDIRECT_URI');
 const calendarProxyEmail = defineString('CALENDAR_PROXY_EMAIL', { default: '' });
+const gaPropertyId = defineString('GA_PROPERTY_ID', { default: 'properties/513904580' });
 
 const microsoftClientId = defineString('MICROSOFT_CLIENT_ID');
 const microsoftClientSecret = defineString('MICROSOFT_CLIENT_SECRET');
@@ -960,6 +963,59 @@ export const startGoogleCalendarAuth = onRequest(async (req, res) => {
   });
 
   res.json({ url: authUrl, state, expiresIn: CALENDAR_STATE_TTL_MS / 1000 });
+});
+
+export const gaPropertySummary = onRequest(async (req, res) => {
+  if (applyCors(req, res)) {
+    return;
+  }
+  if (req.method !== 'GET') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) {
+    res.status(401).json({ error: 'Authorization token required.' });
+    return;
+  }
+
+  let uid;
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    uid = decoded.uid;
+  } catch (error) {
+    logger.warn('Failed to verify ID token for GA summary', error);
+    res.status(401).json({ error: 'Invalid or expired token.' });
+    return;
+  }
+
+  if (!ADMIN_UIDS.has(uid)) {
+    res.status(403).json({ error: 'Forbidden' });
+    return;
+  }
+
+  try {
+    const authClient = await google.auth.getClient({ scopes: ['https://www.googleapis.com/auth/analytics.readonly'] });
+    const adminApi = google.analyticsadmin({ version: 'v1beta', auth: authClient });
+    const name = gaPropertyId.value();
+    const response = await adminApi.properties.get({ name });
+    const { displayName, timeZone, industryCategory, currencyCode, createTime, updateTime, serviceLevel } = response.data || {};
+    res.json({
+      name,
+      displayName,
+      timeZone,
+      industryCategory,
+      currencyCode,
+      serviceLevel,
+      createTime,
+      updateTime
+    });
+  } catch (error) {
+    logger.error('GA Admin API failed', error);
+    res.status(500).json({ error: 'Failed to fetch GA property summary' });
+  }
 });
 
 export const googleCalendarCallback = onRequest(async (req, res) => {

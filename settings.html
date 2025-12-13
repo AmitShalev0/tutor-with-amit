@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Settings – Amit Tutoring</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .settings-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+      max-width: 880px;
+    }
+    .settings-card {
+      background: var(--surface, #111827);
+      border: 1px solid var(--border, #374151);
+      border-radius: var(--radius-lg, 16px);
+      padding: 1.25rem 1.5rem;
+    }
+    .settings-card h2 {
+      margin: 0 0 0.5rem 0;
+      font-size: 1.2rem;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      margin: 0.75rem 0;
+    }
+    .field label { font-weight: 600; }
+    .field input, .field select {
+      padding: 0.65rem 0.8rem;
+      border-radius: var(--radius-sm, 8px);
+      border: 1px solid var(--border, #4b5563);
+      background: #0f172a;
+      color: #f8fafc;
+    }
+    .password-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .password-wrapper input { flex: 1; }
+    .password-toggle {
+      background: #1f2937;
+      border: 1px solid var(--border, #4b5563);
+      color: #e5e7eb;
+      border-radius: 999px;
+      padding: 0.4rem 0.65rem;
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+    }
+    .password-toggle:hover { opacity: 0.85; }
+    .actions-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 0.5rem;
+    }
+    .theme-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .theme-row label { margin: 0; display: flex; align-items: center; gap: 0.35rem; }
+    .theme-times {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+    .theme-times .field { margin: 0; }
+    .notifications-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 1rem;
+      align-items: start;
+    }
+    .notifications-headers {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 1rem;
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+    }
+    .toggle-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    .toggle input { display: none; }
+    .toggle-track {
+      position: relative;
+      width: 46px;
+      height: 24px;
+      border-radius: 999px;
+      background: #374151;
+      transition: background 0.15s ease;
+    }
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #e5e7eb;
+      transition: transform 0.15s ease, background 0.15s ease;
+    }
+    .toggle input:checked + .toggle-track { background: #2563eb; }
+    .toggle input:checked + .toggle-track::after { transform: translateX(22px); background: #f8fafc; }
+    .toggle-label { font-weight: 600; }
+    .toggle.disabled { cursor: not-allowed; opacity: 0.6; }
+    .toggle.disabled .toggle-label { font-weight: 500; }
+    .status-text { font-size: 0.9rem; color: var(--muted, #9ca3af); }
+    .danger-zone {
+      border: 1px solid #ef4444;
+      background: rgba(239, 68, 68, 0.08);
+    }
+    .danger-zone h2 { color: #fca5a5; }
+    .divider { border-top: 1px solid var(--border, #374151); margin: 1rem 0; }
+  </style>
+</head>
+<body>
+  <div id="site-header"></div>
+  <script src="header-loader.js"></script>
+
+  <main class="container">
+    <h1>Account Settings</h1>
+    <p>Manage your profile, theme, security, and account data.</p>
+
+    <div class="settings-grid">
+      <section class="settings-card">
+        <h2>Profile</h2>
+        <form id="profile-form">
+          <div class="field">
+            <label for="settings-full-name">Full name</label>
+            <input id="settings-full-name" type="text" autocomplete="name" required />
+          </div>
+          <div class="field">
+            <label for="settings-email" aria-live="polite">Email (sign-in)</label>
+            <input id="settings-email" type="email" autocomplete="email" disabled />
+            <small class="status-text">To change email update in Security section below.</small>
+          </div>
+          <div class="field">
+            <label for="settings-phone">Phone</label>
+            <input id="settings-phone" type="tel" autocomplete="tel" required />
+          </div>
+          <div class="field">
+            <label>Notifications</label>
+            <div class="notifications-headers" aria-hidden="true">
+              <div>Email</div>
+              <div>Text</div>
+            </div>
+            <div class="notifications-row">
+              <div class="toggle-list" aria-label="Email notifications">
+                <label class="toggle">
+                  <input type="checkbox" id="settings-notify-approved" />
+                  <span class="toggle-track" aria-hidden="true"></span>
+                  <span class="toggle-label">📧 Booking approved</span>
+                </label>
+                <label class="toggle">
+                  <input type="checkbox" id="settings-notify-session-deleted" />
+                  <span class="toggle-track" aria-hidden="true"></span>
+                  <span class="toggle-label">📧 Session deleted</span>
+                </label>
+                <label class="toggle">
+                  <input type="checkbox" id="settings-notify-invoice" />
+                  <span class="toggle-track" aria-hidden="true"></span>
+                  <span class="toggle-label">📧 Invoice emailed</span>
+                </label>
+                <label class="toggle">
+                  <input type="checkbox" id="settings-notify-receipt" />
+                  <span class="toggle-track" aria-hidden="true"></span>
+                  <span class="toggle-label">📧 Receipt emailed</span>
+                </label>
+              </div>
+              <div class="toggle-list" aria-label="SMS notifications (coming soon)">
+                <label class="toggle disabled">
+                  <input type="checkbox" disabled />
+                  <span class="toggle-track" aria-hidden="true"></span>
+                  <span class="toggle-label">📱 Booking approved (coming soon)</span>
+                </label>
+                <label class="toggle disabled">
+                  <input type="checkbox" disabled />
+                  <span class="toggle-track" aria-hidden="true"></span>
+                  <span class="toggle-label">📱 Session deleted (coming soon)</span>
+                </label>
+                <label class="toggle disabled">
+                  <input type="checkbox" disabled />
+                  <span class="toggle-track" aria-hidden="true"></span>
+                  <span class="toggle-label">📱 Invoice text (coming soon)</span>
+                </label>
+                <label class="toggle disabled">
+                  <input type="checkbox" disabled />
+                  <span class="toggle-track" aria-hidden="true"></span>
+                  <span class="toggle-label">📱 Receipt text (coming soon)</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="actions-row">
+            <button type="submit" class="btn primary">Save profile</button>
+            <span id="profile-status" class="status-text"></span>
+          </div>
+        </form>
+      </section>
+
+      <section class="settings-card">
+        <h2>Appearance</h2>
+        <div class="field">
+          <label for="settings-theme-toggle">Theme</label>
+          <div class="theme-row">
+            <label><input type="checkbox" id="settings-theme-toggle" /> <span id="theme-toggle-label">🌞 Light / 🌙 Dark</span></label>
+            <label><input type="checkbox" id="settings-theme-auto" /> Auto switch by hours</label>
+          </div>
+          <div class="theme-times">
+            <div class="field">
+              <label for="settings-light-time">Light hours start</label>
+              <input id="settings-light-time" type="time" />
+            </div>
+            <div class="field">
+              <label for="settings-dark-time">Dark hours start</label>
+              <input id="settings-dark-time" type="time" />
+            </div>
+          </div>
+          <small class="status-text">Theme preferences are stored on this device only.</small>
+        </div>
+      </section>
+
+      <section class="settings-card">
+        <h2>Security</h2>
+        <form id="email-form">
+          <div class="field">
+            <label for="settings-new-email">New email</label>
+            <input id="settings-new-email" type="email" autocomplete="email" />
+          </div>
+          <div class="field">
+            <label for="settings-email-password">Current password</label>
+            <div class="password-wrapper">
+              <input id="settings-email-password" type="password" autocomplete="current-password" />
+              <button type="button" class="password-toggle" aria-label="Toggle password visibility" data-target="settings-email-password">🙈</button>
+            </div>
+          </div>
+          <div class="actions-row">
+            <button type="submit" class="btn secondary">Update email</button>
+            <span id="email-status" class="status-text"></span>
+          </div>
+        </form>
+        <div class="divider"></div>
+        <form id="password-form">
+          <div class="field">
+            <label for="settings-current-password">Current password</label>
+            <div class="password-wrapper">
+              <input id="settings-current-password" type="password" autocomplete="current-password" />
+              <button type="button" class="password-toggle" aria-label="Toggle password visibility" data-target="settings-current-password">🙈</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="settings-new-password">New password</label>
+            <div class="password-wrapper">
+              <input id="settings-new-password" type="password" autocomplete="new-password" />
+              <button type="button" class="password-toggle" aria-label="Toggle password visibility" data-target="settings-new-password">🙈</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="settings-confirm-password">Confirm new password</label>
+            <div class="password-wrapper">
+              <input id="settings-confirm-password" type="password" autocomplete="new-password" />
+              <button type="button" class="password-toggle" aria-label="Toggle password visibility" data-target="settings-confirm-password">🙈</button>
+            </div>
+          </div>
+          <div class="actions-row">
+            <button type="submit" class="btn secondary">Update password</button>
+            <span id="password-status" class="status-text"></span>
+          </div>
+        </form>
+      </section>
+
+      <section class="settings-card danger-zone">
+        <h2>Delete Account</h2>
+        <p class="status-text">This will permanently delete your account data. Tutors will remove all tutor info; student session logs stay with tutors.</p>
+        <form id="delete-form">
+          <div class="field">
+            <label for="delete-confirm">Type DELETE to confirm</label>
+            <input id="delete-confirm" type="text"/>
+          </div>
+          <div class="field">
+            <label for="delete-email">Email</label>
+            <input id="delete-email" type="email"/>
+          </div>
+          <div class="field">
+            <label for="delete-password">Password</label>
+            <div class="password-wrapper">
+              <input id="delete-password" type="password"/>
+              <button type="button" class="password-toggle" aria-label="Toggle password visibility" data-target="delete-password">🙈</button>
+            </div>
+          </div>
+          <div class="actions-row">
+            <button type="submit" class="btn tertiary">Delete account</button>
+            <span id="delete-status" class="status-text"></span>
+          </div>
+        </form>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>
+        © <span id="year"></span> Amit Tutoring ·
+        <a href="contact.html">Contact me</a>
+      </p>
+    </div>
+    <script src="core.js" defer></script>
+  </footer>
+
+  <script type="module" src="firebase-config.js"></script>
+  <script type="module" src="settings-page.js"></script>
+</body>
+</html>

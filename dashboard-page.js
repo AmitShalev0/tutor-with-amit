@@ -25,6 +25,7 @@
   const tutorStatusEl = document.getElementById("tutor-status");
   const tutorLinkDisplayEl = document.getElementById("tutor-link-display");
   const copyTutorLinkBtn = document.getElementById("copy-tutor-link");
+  const copyTutorLinkBtnQA = document.getElementById("copy-tutor-link-qa");
   const homeLinkBtn = document.getElementById("home-link-btn");
   const editBookFormBtn = document.getElementById("edit-book-form-btn");
   const subjectRequestForm = document.getElementById("subject-request-form");
@@ -41,6 +42,21 @@
   let currentUser = null;
   let tutorProfileData = null;
   let hybridAccountEnabled = false;
+
+  const copyButtons = [copyTutorLinkBtn, copyTutorLinkBtnQA].filter(Boolean);
+
+  function setCopyButtons(url) {
+    copyButtons.forEach((btn) => {
+      if (!btn) return;
+      if (url) {
+        btn.disabled = false;
+        btn.dataset.profileUrl = url;
+      } else {
+        btn.disabled = true;
+        delete btn.dataset.profileUrl;
+      }
+    });
+  }
 
   window.__latestUserData = window.__latestUserData || null;
 
@@ -195,7 +211,7 @@
 
   if (editBookFormBtn) {
     editBookFormBtn.addEventListener("click", () => {
-      window.location.href = "booking-info.html";
+      window.location.href = "booking-settings.html";
     });
   }
 
@@ -234,10 +250,10 @@
       
       // Display user info
       const fullName = userData.fullName || user.displayName || "Friend";
-      userNameEl.textContent = fullName;
-      profileHeadingEl.textContent = fullName;
-      profileEmailEl.textContent = userData.email || user.email;
-      profilePhoneEl.textContent = userData.phone || "Not provided";
+      if (userNameEl) userNameEl.textContent = fullName;
+      if (profileHeadingEl) profileHeadingEl.textContent = fullName;
+      if (profileEmailEl) profileEmailEl.textContent = userData.email || user.email;
+      if (profilePhoneEl) profilePhoneEl.textContent = userData.phone || "Not provided";
 
       const hasTutorRole = !!(userData?.roles?.tutor);
       const hasStudentRole = !!(userData?.roles?.student);
@@ -305,9 +321,7 @@
       if (!profileSnapshot || !profileSnapshot.exists()) {
         tutorCardMessageEl.textContent = "Tutor profile not created yet. Open the Tutor Hub to finish setup.";
         tutorCardDetailsEl.classList.add("hidden-card");
-        if (copyTutorLinkBtn) {
-          copyTutorLinkBtn.disabled = true;
-        }
+        setCopyButtons(null);
         updateHomeLink(window.__latestUserData);
         return;
       }
@@ -322,17 +336,11 @@
       if (profileUrl) {
         tutorLinkDisplayEl.textContent = profileUrl;
         tutorCardMessageEl.textContent = "Share your link once your profile looks good.";
-        if (copyTutorLinkBtn) {
-          copyTutorLinkBtn.disabled = false;
-          copyTutorLinkBtn.dataset.profileUrl = profileUrl;
-        }
+        setCopyButtons(profileUrl);
       } else {
         tutorLinkDisplayEl.textContent = "Your profile link will appear once you publish.";
         tutorCardMessageEl.textContent = "Open the Tutor Hub to finish completing your profile.";
-        if (copyTutorLinkBtn) {
-          copyTutorLinkBtn.disabled = true;
-          delete copyTutorLinkBtn.dataset.profileUrl;
-        }
+        setCopyButtons(null);
       }
 
       tutorCardDetailsEl.classList.remove("hidden-card");
@@ -340,9 +348,7 @@
       console.error("Error loading tutor summary:", err);
       tutorCardMessageEl.textContent = "We ran into an issue loading your tutor profile.";
       tutorCardDetailsEl.classList.add("hidden-card");
-      if (copyTutorLinkBtn) {
-        copyTutorLinkBtn.disabled = true;
-      }
+      setCopyButtons(null);
     }
 
     updateHomeLink(window.__latestUserData);
@@ -540,9 +546,9 @@
     }
   }
 
-  if (copyTutorLinkBtn) {
-    copyTutorLinkBtn.addEventListener("click", async () => {
-      const url = copyTutorLinkBtn.dataset.profileUrl;
+  copyButtons.forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const url = btn.dataset.profileUrl;
       if (!url) {
         alert("Your profile link will be available once you publish your tutor page.");
         return;
@@ -550,9 +556,9 @@
       try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
           await navigator.clipboard.writeText(url);
-          copyTutorLinkBtn.textContent = "Copied!";
+          btn.textContent = "Copied!";
           setTimeout(() => {
-            copyTutorLinkBtn.textContent = "Copy Profile Link";
+            btn.textContent = "Copy Profile Link";
           }, 2000);
         } else {
           throw new Error("Clipboard API unavailable");
@@ -562,7 +568,7 @@
         prompt("Copy this link", url);
       }
     });
-  }
+  });
 
   async function loadStudents(userId) {
     try {

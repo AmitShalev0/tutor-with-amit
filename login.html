@@ -140,6 +140,16 @@
     .password-toggle:hover {
         opacity: 0.8;
     }
+    .link-button {
+        background: none;
+        border: none;
+        padding: 0;
+        color: #38bdf8;
+        cursor: pointer;
+        font: inherit;
+        text-align: left;
+    }
+    .link-button:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -156,6 +166,7 @@
             <input id="password" type="password" autocomplete="current-password" required />
             <button type="button" class="password-toggle" aria-label="Toggle password visibility" data-target="password">🙈</button>
         </div>
+        <button type="button" class="link-button" id="forgot-password-btn">Forgot password?</button>
 
         <button type="submit" id="login-btn">Log in</button>
         <div class="error" id="error"></div>
@@ -189,6 +200,7 @@
     const errorEl = document.getElementById("error");
     const linkedinBtn = document.getElementById("linkedin-login-btn");
     const googleBtn = document.getElementById("google-login-btn");
+    const forgotBtn = document.getElementById("forgot-password-btn");
 
     const auth = window.firebaseAuth;
     const signIn = window.firebaseSignIn;
@@ -197,6 +209,7 @@
     const functionsBase = window.firebaseFunctionsBase;
     const signInWithPopup = window.firebaseSignInWithPopup;
     const googleProvider = window.firebaseGoogleProvider;
+    const sendPasswordResetEmail = window.firebaseSendPasswordResetEmail;
 
     // If already logged in, go straight to the private page
     onAuth(auth, (user) => {
@@ -251,6 +264,27 @@
         }
         btn.disabled = false;
       }
+    });
+
+    forgotBtn.addEventListener("click", async () => {
+        errorEl.textContent = "";
+        const email = document.getElementById("email").value.trim();
+        if (!email) {
+            errorEl.textContent = "Enter your email above and click forgot password again.";
+            return;
+        }
+        forgotBtn.disabled = true;
+        try {
+            await sendPasswordResetEmail(auth, email);
+            errorEl.style.color = "#bbf7d0";
+            errorEl.textContent = "Reset link sent. Check your email.";
+        } catch (err) {
+            console.error(err);
+            errorEl.style.color = "#fecaca";
+            errorEl.textContent = "Couldn't send reset link. Try again.";
+        } finally {
+            forgotBtn.disabled = false;
+        }
     });
 
     async function startLinkedInSignIn() {

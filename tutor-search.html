@@ -257,6 +257,26 @@
       overflow: hidden;
     }
 
+    .card-search-bar {
+      margin: 1rem 0 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .card-search-bar label {
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    .card-search-bar input[type="text"] {
+      border-radius: 0.6rem;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.9);
+      color: #f8fafc;
+      padding: 0.7rem 0.9rem;
+    }
+
     .map-canvas-shell {
       position: relative;
     }
@@ -407,6 +427,11 @@
       </div>
       <p id="map-error" class="error-state" hidden></p>
     </section>
+
+    <div class="card-search-bar">
+      <label for="card-name-search">Quick search tutors by name</label>
+      <input id="card-name-search" type="text" placeholder="Start typing a first or last name" autocomplete="off" />
+    </div>
 
     <section id="results-container">
       <div id="loading-state" class="detail-text">Loading tutors...</div>

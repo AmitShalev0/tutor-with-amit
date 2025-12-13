@@ -16,6 +16,7 @@
     const arrayRemove = window.firestoreArrayRemove;
 
     const searchInput = document.getElementById('search-query');
+    const nameSearchInput = document.getElementById('card-name-search');
     const gradeInput = document.getElementById('grade-filter');
     const filterOnline = document.getElementById('filter-online');
     const filterInPerson = document.getElementById('filter-inperson');
@@ -183,6 +184,12 @@
 
     function normalize(text) {
       return (text || '').toLowerCase();
+    }
+
+    function matchesNamePrefix(tutor, prefix) {
+      if (!prefix) return true;
+      const parts = (tutor.fullName || '').split(/\s+/).filter(Boolean).map((p) => p.toLowerCase());
+      return parts.some((part) => part.startsWith(prefix));
     }
 
     function resolveTutorLocation(tutor) {
@@ -492,6 +499,8 @@
 
       if (!queryMatch) return false;
 
+      if (!matchesNamePrefix(tutor, filters.namePrefix)) return false;
+
       const gradeMatch = !filters.grade || (tutor.gradeLevels || []).some((level) => normalize(level).includes(filters.grade));
       if (!gradeMatch) return false;
 
@@ -669,6 +678,7 @@
     function applyFilters() {
       const filters = {
         query: normalize(searchInput.value.trim()),
+        namePrefix: normalize(nameSearchInput?.value?.trim() || ''),
         grade: normalize(gradeInput.value.trim()),
         meeting: {
           online: filterOnline.checked,
@@ -952,7 +962,7 @@
       }
     }
 
-    [searchInput, gradeInput, filterOnline, filterInPerson]
+    [searchInput, nameSearchInput, gradeInput, filterOnline, filterInPerson]
       .forEach((control) => {
         if (!control) return;
         const handler = () => applyFilters();
