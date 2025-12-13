@@ -29,7 +29,9 @@ const emailStatus = document.getElementById('email-status');
 const passwordStatus = document.getElementById('password-status');
 const deleteStatus = document.getElementById('delete-status');
 
-const fullNameInput = document.getElementById('settings-full-name');
+const firstNameInput = document.getElementById('settings-first-name');
+const middleNameInput = document.getElementById('settings-middle-name');
+const lastNameInput = document.getElementById('settings-last-name');
 const emailInput = document.getElementById('settings-email');
 const phoneInput = document.getElementById('settings-phone');
 const notifyApproved = document.getElementById('settings-notify-approved');
@@ -65,6 +67,30 @@ const statsEmailEndpoint = window.statsEmailEndpoint || window.STATS_EMAIL_ENDPO
 let currentUser = null;
 let currentUserDoc = null;
 let autoThemeIntervalId = null;
+
+function splitNameParts(name = '') {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { first: '', middle: '', last: 'last name' };
+  if (parts.length === 1) return { first: parts[0], middle: '', last: 'last name' };
+  if (parts.length === 2) return { first: parts[0], middle: '', last: parts[1] };
+  return { first: parts[0], middle: parts.slice(1, -1).join(' '), last: parts[parts.length - 1] };
+}
+
+function buildFullName(first, middle, last) {
+  return [first, middle, last].filter(Boolean).join(' ');
+}
+
+function setThemeToggleState(isLight) {
+  if (!themeToggle) return;
+  themeToggle.dataset.state = isLight ? 'on' : 'off';
+  themeToggle.setAttribute('aria-pressed', isLight ? 'true' : 'false');
+  themeToggle.classList.toggle('is-on', isLight);
+}
+
+function getThemeToggleState() {
+  if (!themeToggle) return false;
+  return themeToggle.dataset.state === 'on';
+}
 
 const THEME_KEY = 'site-theme';
 const THEME_MODE_KEY = 'site-theme-mode';
@@ -123,7 +149,10 @@ function ensureTheme() {
     themeAutoToggle.addEventListener('change', () => {
       if (themeAutoToggle.checked) {
         localStorage.setItem(THEME_MODE_KEY, 'auto');
-        if (themeToggle) themeToggle.disabled = true;
+        if (themeToggle) {
+          themeToggle.disabled = true;
+          themeToggle.classList.add('is-disabled');
+        }
         applyAutoTheme();
         startAutoThemeInterval();
       } else {
@@ -131,7 +160,8 @@ function ensureTheme() {
         stopAutoThemeInterval();
         if (themeToggle) {
           themeToggle.disabled = false;
-          const next = themeToggle.checked ? 'light' : 'dark';
+          themeToggle.classList.remove('is-disabled');
+          const next = getThemeToggleState() ? 'light' : 'dark';
           setManualTheme(next);
         }
       }
@@ -139,20 +169,26 @@ function ensureTheme() {
   }
 
   if (themeToggle) {
-    themeToggle.checked = storedTheme === 'light';
-    themeToggle.addEventListener('change', () => {
+    setThemeToggleState(storedTheme === 'light');
+    themeToggle.addEventListener('click', () => {
+      if (themeToggle.disabled) return;
       if (themeAutoToggle?.checked) {
         themeAutoToggle.checked = false;
         localStorage.setItem(THEME_MODE_KEY, 'manual');
         stopAutoThemeInterval();
       }
-      const next = themeToggle.checked ? 'light' : 'dark';
-      setManualTheme(next);
+      const next = !getThemeToggleState();
+      setThemeToggleState(next);
+      const themeValue = next ? 'light' : 'dark';
+      setManualTheme(themeValue);
     });
   }
 
   if (mode === 'auto') {
-    if (themeToggle) themeToggle.disabled = true;
+    if (themeToggle) {
+      themeToggle.disabled = true;
+      themeToggle.classList.add('is-disabled');
+    }
     applyAutoTheme();
     startAutoThemeInterval();
   } else {
@@ -171,6 +207,9 @@ function applyTheme(theme) {
   if (themeToggleLabel) {
     themeToggleLabel.textContent = theme === 'light' ? '🌞 Light mode' : '🌙 Dark mode';
   }
+  if (themeToggle) {
+    setThemeToggleState(theme === 'light');
+  }
 }
 
 function setManualTheme(theme) {
@@ -180,7 +219,8 @@ function setManualTheme(theme) {
   if (themeAutoToggle) themeAutoToggle.checked = false;
   if (themeToggle) {
     themeToggle.disabled = false;
-    themeToggle.checked = theme === 'light';
+    themeToggle.classList.remove('is-disabled');
+    setThemeToggleState(theme === 'light');
   }
 }
 
@@ -233,7 +273,13 @@ function stopAutoThemeInterval() {
 }
 
 function hydrateProfile(data = {}) {
-  fullNameInput.value = data.fullName || '';
+  const nameParts = data.firstName || data.lastName
+    ? { first: data.firstName || '', middle: data.middleName || '', last: data.lastName || 'last name' }
+    : splitNameParts(data.fullName || currentUser?.displayName || '');
+
+  if (firstNameInput) firstNameInput.value = nameParts.first;
+  if (middleNameInput) middleNameInput.value = nameParts.middle;
+  if (lastNameInput) lastNameInput.value = nameParts.last || 'last name';
   emailInput.value = currentUser?.email || data.email || '';
   phoneInput.value = data.phone || '';
   notifyApproved.checked = data.notifyBookingApproved === true;
@@ -273,8 +319,23 @@ async function loadProfile() {
 async function saveProfile(event) {
   event.preventDefault();
   setStatus(profileStatus, 'Saving...');
+
+   const firstName = firstNameInput?.value.trim();
+   const middleName = middleNameInput?.value.trim();
+   const lastName = (lastNameInput?.value.trim() || 'last name');
+
+   if (!firstName || !lastName) {
+     setStatus(profileStatus, 'First and last name are required.', 'error');
+     return;
+   }
+
+   const fullName = buildFullName(firstName, middleName, lastName);
+
   const payload = {
-    fullName: fullNameInput.value.trim(),
+    fullName,
+    firstName,
+    middleName: middleName || null,
+    lastName,
     phone: phoneInput.value.trim(),
     notifyBookingApproved: notifyApproved.checked,
     notifySessionDeleted: notifySessionDeleted.checked,

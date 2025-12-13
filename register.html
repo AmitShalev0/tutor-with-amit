@@ -165,11 +165,19 @@
     <p class="subtitle">Join Amit's tutoring families.</p>
 
     <form id="register-form">
-        <label for="full-name">Your Full Name*</label>
-         <input id="full-name" type="text" autocomplete="name" required 
-             pattern="^[A-Za-z][A-Za-z'\-]* [A-Za-z][A-Za-z'\-]*$" 
-             title="Full name must be two words, each with only letters, apostrophes, or dashes."
-             placeholder="Jane Smith" />
+           <label for="first-name">Your Name*</label>
+           <input id="first-name" type="text" autocomplete="given-name" required 
+               pattern="^[A-Za-z][A-Za-z'\- ]*$" 
+               title="First name can include letters, apostrophes, dashes, and spaces."
+               placeholder="Jane" />
+           <input id="middle-name" type="text" autocomplete="additional-name" 
+               pattern="^[A-Za-z][A-Za-z'\- ]*$" 
+               title="Middle name can include letters, apostrophes, dashes, and spaces." 
+               placeholder="Middle name (optional)" />
+           <input id="last-name" type="text" autocomplete="family-name" required 
+               pattern="^[A-Za-z][A-Za-z'\- ]*$" 
+               title="Last name can include letters, apostrophes, dashes, and spaces."
+               placeholder="Smith" />
 
         <label for="email">Email*</label>
         <input id="email" type="email" autocomplete="email" required placeholder="your.email@example.com" />
@@ -266,12 +274,22 @@
         successEl.textContent = "";
         btn.disabled = true;
 
-        const fullName = document.getElementById("full-name").value.trim();
+        const firstName = document.getElementById("first-name").value.trim();
+        const middleName = document.getElementById("middle-name").value.trim();
+        const lastName = document.getElementById("last-name").value.trim();
         const email = document.getElementById("email").value.trim();
         const phone = document.getElementById("phone").value.trim();
         const password = document.getElementById("password").value;
         const confirmPassword = document.getElementById("confirm-password").value;
         const wantsTutorProfile = document.getElementById("become-tutor").checked;
+
+        if (!firstName || !lastName) {
+            errorEl.textContent = "First and last name are required.";
+            btn.disabled = false;
+            return;
+        }
+
+        const fullName = [firstName, middleName, lastName].filter(Boolean).join(' ');
 
         // Validate passwords match
         if (password !== confirmPassword) {
@@ -306,6 +324,9 @@
             // Create user profile document in Firestore
             const userDocData = {
                 fullName: fullName,
+                firstName,
+                middleName: middleName || null,
+                lastName,
                 email: email,
                 phone: phone,
                 createdAt: createdAt,
@@ -324,6 +345,9 @@
                 const tutorProfileDoc = await addDoc(collection(db, "tutorProfiles"), {
                     userId: user.uid,
                     fullName,
+                    firstName,
+                    middleName: middleName || null,
+                    lastName,
                     slug: tutorSlug,
                     status: "draft",
                     headline: "",
@@ -349,9 +373,14 @@
             await setDoc(doc(db, "users", user.uid), userDocData);
 
             // Automatically create a student profile for the user (themselves)
+            const selfStudentName = [firstName, middleName, lastName].filter(Boolean).join(' ');
             await addDoc(collection(db, "students"), {
                 userId: user.uid,
-                studentName: fullName,
+                studentName: selfStudentName,
+                firstName,
+                middleName: middleName || null,
+                lastName,
+                normalizedFullName: selfStudentName.toLowerCase(),
                 birthdate: null, // User can update this later
                 pronouns: null,
                 subject: null,
@@ -374,6 +403,9 @@
                         type: 'user_registration',
                         userId: user.uid,
                         fullName: fullName,
+                        firstName,
+                        middleName: middleName || null,
+                        lastName,
                         email: email,
                         phone: phone
                     })

@@ -67,6 +67,45 @@
       flex-wrap: wrap;
     }
     .theme-row label { margin: 0; display: flex; align-items: center; gap: 0.35rem; }
+    .theme-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.35rem 0.45rem 0.35rem 0.35rem;
+      border-radius: 999px;
+      border: 1px solid #4b5563;
+      background: #111827;
+      color: #e5e7eb;
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, opacity 0.2s ease;
+      min-height: 40px;
+    }
+    .theme-switch:hover { transform: translateY(-1px); border-color: #60a5fa; }
+    .theme-switch.is-disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+    .theme-switch.is-on { border-color: #60a5fa; box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2); }
+    .theme-switch-track {
+      position: relative;
+      width: 48px;
+      height: 26px;
+      border-radius: 999px;
+      background: #374151;
+      transition: background 0.15s ease;
+      flex-shrink: 0;
+    }
+    .theme-switch-thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #e5e7eb;
+      transition: transform 0.18s ease, background 0.18s ease;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.35);
+    }
+    .theme-switch.is-on .theme-switch-track { background: #2563eb; }
+    .theme-switch.is-on .theme-switch-thumb { transform: translateX(22px); background: #fef3c7; }
+    .theme-switch-text { display: flex; align-items: center; gap: 0.35rem; font-weight: 600; }
     .theme-times {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -147,8 +186,12 @@
         <h2>Profile</h2>
         <form id="profile-form">
           <div class="field">
-            <label for="settings-full-name">Full name</label>
-            <input id="settings-full-name" type="text" autocomplete="name" required />
+            <label for="settings-first-name">Name</label>
+            <div class="theme-row" style="padding:0; gap:0.5rem; flex-wrap:wrap;">
+              <input id="settings-first-name" type="text" autocomplete="given-name" required placeholder="First name" style="min-width:160px;" />
+              <input id="settings-middle-name" type="text" autocomplete="additional-name" placeholder="Middle name (optional)" style="min-width:160px;" />
+              <input id="settings-last-name" type="text" autocomplete="family-name" required placeholder="Last name" style="min-width:160px;" />
+            </div>
           </div>
           <div class="field">
             <label for="settings-email" aria-live="polite">Email (sign-in)</label>
@@ -224,8 +267,11 @@
         <div class="field">
           <label for="settings-theme-toggle">Theme</label>
           <div class="theme-row">
-            <label><input type="checkbox" id="settings-theme-toggle" /> <span id="theme-toggle-label">🌞 Light / 🌙 Dark</span></label>
-            <label><input type="checkbox" id="settings-theme-auto" /> Auto switch by hours</label>
+            <button type="button" class="theme-switch" id="settings-theme-toggle" aria-pressed="false">
+              <span class="theme-switch-track"><span class="theme-switch-thumb"></span></span>
+              <span class="theme-switch-text" id="theme-toggle-label">🌞 Light / 🌙 Dark</span>
+            </button>
+            <label class="theme-auto"><input type="checkbox" id="settings-theme-auto" /> Auto switch by hours</label>
           </div>
           <div class="theme-times">
             <div class="field">

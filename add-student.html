@@ -17,12 +17,18 @@
   <p>Tell me about your student so I can plan the right support.</p>
 
   <form id="add-student-form" class="card">
-    <div class="field-row">
-      <label>Student's Full Name*</label>
-      <input type="text" name="student_name" id="student-name" placeholder="Alex Johnson" required 
-             pattern="^[a-zA-Z][a-zA-Z'-]* [a-zA-Z][a-zA-Z'-]*$" 
-             title="Student name must be two words (first and last name), each with only letters, apostrophes, or dashes." />
-    </div>
+        <div class="field-row">
+          <label>Student Name*</label>
+          <input type="text" name="student_first_name" id="student-first-name" placeholder="Alex" required 
+            pattern="^[A-Za-z][A-Za-z'\- ]*$" 
+            title="First name can include letters, apostrophes, dashes, and spaces." />
+          <input type="text" name="student_middle_name" id="student-middle-name" placeholder="Middle name (optional)" 
+            pattern="^[A-Za-z][A-Za-z'\- ]*$" 
+            title="Middle name can include letters, apostrophes, dashes, and spaces." />
+          <input type="text" name="student_last_name" id="student-last-name" placeholder="Johnson" required 
+            pattern="^[A-Za-z][A-Za-z'\- ]*$" 
+            title="Last name can include letters, apostrophes, dashes, and spaces." />
+        </div>
 
     <div class="field-row">
       <label>Birthdate*</label>
@@ -116,6 +122,8 @@
     .replace(/[\s'-]+/g, ' ')
     .replace(/\s+/g, ' ');
 
+  const buildFullName = (first, middle, last) => [first, middle, last].filter(Boolean).join(' ');
+
   // Check authentication
   onAuth(auth, (user) => {
     if (!user) {
@@ -136,9 +144,24 @@
       return;
     }
 
+    const firstName = document.getElementById("student-first-name").value.trim();
+    const middleName = document.getElementById("student-middle-name").value.trim();
+    const lastName = document.getElementById("student-last-name").value.trim() || 'last name';
+
+    if (!firstName || !lastName) {
+      msg.textContent = "First and last name are required.";
+      msg.classList.add("error");
+      return;
+    }
+
+    const studentName = buildFullName(firstName, middleName, lastName);
+
     const studentData = {
       userId: currentUser.uid,
-      studentName: document.getElementById("student-name").value.trim(),
+      studentName,
+      firstName,
+      middleName: middleName || null,
+      lastName,
       birthdate: document.getElementById("birthdate").value,
       pronouns: document.getElementById("pronouns").value || null,
       subject: document.getElementById("subject").value.trim() || null,

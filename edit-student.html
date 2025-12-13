@@ -26,12 +26,18 @@
   <p>Update student information.</p>
 
   <form id="edit-student-form" class="card">
-    <div class="field-row">
-      <label>Student's Full Name*</label>
-      <input type="text" name="student_name" id="student-name" placeholder="Alex Johnson" required 
-            pattern="^[a-zA-Z][a-zA-Z'-]* [a-zA-Z][a-zA-Z'-]*$" 
-            title="Student name must be two words (first and last name), each with only letters, apostrophes, or dashes." />
-    </div>
+        <div class="field-row">
+      <label>Student Name*</label>
+      <input type="text" name="student_first_name" id="student-first-name" placeholder="Alex" required 
+        pattern="^[A-Za-z][A-Za-z'\- ]*$" 
+        title="First name can include letters, apostrophes, dashes, and spaces." />
+      <input type="text" name="student_middle_name" id="student-middle-name" placeholder="Middle name (optional)" 
+        pattern="^[A-Za-z][A-Za-z'\- ]*$" 
+        title="Middle name can include letters, apostrophes, dashes, and spaces." />
+      <input type="text" name="student_last_name" id="student-last-name" placeholder="Johnson" required 
+        pattern="^[A-Za-z][A-Za-z'\- ]*$" 
+        title="Last name can include letters, apostrophes, dashes, and spaces." />
+        </div>
 
     <div class="field-row">
       <label>Birthdate</label>
@@ -157,6 +163,22 @@
   if (!studentId) {
     alert("No student ID provided");
     window.location.href = "dashboard.html";
+  }
+
+  function splitNameParts(name = '') {
+    const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return { first: '', middle: '', last: 'last name' };
+    if (parts.length === 1) return { first: parts[0], middle: '', last: 'last name' };
+    if (parts.length === 2) return { first: parts[0], middle: '', last: parts[1] };
+    return { first: parts[0], middle: parts.slice(1, -1).join(' '), last: parts[parts.length - 1] };
+  }
+
+  function buildFullName(first, middle, last) {
+    return [first, middle, last].filter(Boolean).join(' ');
+  }
+
+  function normalizeStudentName(value = '') {
+    return value.trim().toLowerCase().replace(/[\s'-]+/g, ' ').replace(/\s+/g, ' ');
   }
 
   function subjectGroupToLabel(group) {
@@ -435,7 +457,10 @@
       }
 
       // Fill form with existing data
-      document.getElementById("student-name").value = student.studentName || "";
+      const nameParts = splitNameParts(student.studentName || "");
+      document.getElementById("student-first-name").value = nameParts.first;
+      document.getElementById("student-middle-name").value = nameParts.middle;
+      document.getElementById("student-last-name").value = nameParts.last;
       document.getElementById("birthdate").value = student.birthdate || "";
       document.getElementById("pronouns").value = student.pronouns || "";
       document.getElementById("school").value = student.school || "";
@@ -481,8 +506,24 @@
 
     const matchedCourse = pickCourseFromGradeAndSubject(selectedGrade, selectedSubject);
 
+    const firstName = document.getElementById("student-first-name").value.trim();
+    const middleName = document.getElementById("student-middle-name").value.trim();
+    const lastName = document.getElementById("student-last-name").value.trim() || 'last name';
+
+    if (!firstName || !lastName) {
+      msg.textContent = "First and last name are required.";
+      msg.classList.add("error");
+      return;
+    }
+
+    const studentName = buildFullName(firstName, middleName, lastName);
+
     const updatedData = {
-      studentName: document.getElementById("student-name").value.trim(),
+      studentName,
+      firstName,
+      middleName: middleName || null,
+      lastName,
+      normalizedFullName: normalizeStudentName(studentName),
       birthdate: document.getElementById("birthdate").value,
       pronouns: document.getElementById("pronouns").value || null,
       subjectGrade: selectedGrade,
