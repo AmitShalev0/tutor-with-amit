@@ -60,6 +60,7 @@ const deleteEmailInput = document.getElementById('delete-email');
 const deletePasswordInput = document.getElementById('delete-password');
 const serverTimestamp = window.firestoreServerTimestamp;
 const arrayRemove = window.firestoreArrayRemove;
+const statsEmailEndpoint = window.statsEmailEndpoint || window.STATS_EMAIL_ENDPOINT || null;
 
 let currentUser = null;
 let currentUserDoc = null;
@@ -328,6 +329,63 @@ async function fetchSessionsForRole(roleField) {
   return { pendingDocs, upcoming };
 }
 
+async function fetchSessionsForStats(fields) {
+  const results = new Map();
+  for (const field of fields) {
+    try {
+      const snap = await getDocs(query(collection(db, 'sessions'), where(field, '==', currentUser.uid)));
+      snap.forEach((docSnap) => {
+        results.set(docSnap.id, { ...(docSnap.data() || {}), id: docSnap.id });
+      });
+    } catch (error) {
+      console.warn('Stats fetch skipped', field, error?.message || error);
+    }
+  }
+  return Array.from(results.values());
+}
+
+async function buildStatsSummary() {
+  const summaries = {};
+  const tutorFields = ['tutorId', 'tutorUID', 'tutorUserId', 'primaryTutorId', 'primaryTutorUid'];
+  const studentFields = ['studentId', 'studentUID', 'studentUserId', 'studentAccountId', 'userId'];
+
+  if (hasRoleFlag('tutor')) {
+    const sessions = await fetchSessionsForStats(tutorFields);
+    summaries.tutor = aggregateStats(sessions, 'tutor');
+  }
+  if (hasRoleFlag('student')) {
+    const sessions = await fetchSessionsForStats(studentFields);
+    summaries.student = aggregateStats(sessions, 'student');
+  }
+  return summaries;
+}
+
+async function sendStatsEmail(reason) {
+  if (!statsEmailEndpoint) {
+    console.warn('Stats email endpoint is not configured. Skipping stats email.');
+    return false;
+  }
+  try {
+    const summaries = await buildStatsSummary();
+    const payload = {
+      reason,
+      userId: currentUser?.uid,
+      email: currentUser?.email,
+      summaries,
+      generatedAt: new Date().toISOString()
+    };
+    await fetch(statsEmailEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return true;
+  } catch (error) {
+    console.error('Failed to send stats email', error);
+    return false;
+  }
+}
+
 async function deletePendingSessions(pendingDocs) {
   const deletions = pendingDocs.map((docSnap) => deleteDoc(docSnap.ref));
   await Promise.allSettled(deletions);
@@ -336,6 +394,165 @@ async function deletePendingSessions(pendingDocs) {
 function setRoleDeleteBusy(isBusy) {
   if (deleteTutorBtn) deleteTutorBtn.disabled = isBusy || !hasRoleFlag('tutor');
   if (deleteStudentBtn) deleteStudentBtn.disabled = isBusy || !hasRoleFlag('student');
+}
+
+function isCompletedSession(session = {}) {
+  const status = String(session.status || session.state || '').toLowerCase();
+  if (!status) return session.completed === true || session.isCompleted === true || session.paid === true;
+  const doneStatuses = ['completed', 'complete', 'finished', 'approved', 'paid', 'closed', 'done', 'confirmed'];
+  return doneStatuses.includes(status);
+}
+
+function readNumber(source, keyPath) {
+  if (!source) return null;
+  const parts = keyPath.split('.');
+  let cursor = source;
+  for (const part of parts) {
+    if (cursor && Object.prototype.hasOwnProperty.call(cursor, part)) {
+      cursor = cursor[part];
+    } else {
+      return null;
+    }
+  }
+  const num = Number(cursor);
+  return Number.isFinite(num) ? num : null;
+}
+
+function collectIds(session, fields) {
+  const ids = [];
+  fields.forEach((field) => {
+    const val = session[field];
+    if (Array.isArray(val)) {
+      val.forEach((entry) => {
+        if (entry) ids.push(String(entry));
+      });
+    } else if (val) {
+      ids.push(String(val));
+    }
+  });
+  return ids;
+}
+
+function extractSubjects(session = {}) {
+  const subjects = new Set();
+  const candidates = [session.subject, session.subjectName, session.course, session.courseName, session.className, session.topic, session.primaryTopic];
+  candidates.forEach((value) => {
+    if (typeof value === 'string' && value.trim()) {
+      subjects.add(value.trim());
+    }
+  });
+  const arrays = [session.subjects, session.subjectList, session.subjectsOffered, session.topics];
+  arrays.forEach((list) => {
+    if (Array.isArray(list)) {
+      list.filter((v) => typeof v === 'string' && v.trim()).forEach((v) => subjects.add(v.trim()));
+    }
+  });
+  return Array.from(subjects);
+}
+
+function durationHours(session = {}) {
+  const start = session.startTime?.toDate?.() || (session.startTime instanceof Date ? session.startTime : null);
+  const end = session.endTime?.toDate?.() || (session.endTime instanceof Date ? session.endTime : null);
+  if (start && end && end > start) {
+    return (end.getTime() - start.getTime()) / 3600000;
+  }
+  const durationCandidates = [session.durationMinutes, session.duration, session.lengthMinutes, session.minutes, session.sessionMinutes];
+  for (const value of durationCandidates) {
+    const num = Number(value);
+    if (Number.isFinite(num) && num > 0) {
+      return num / 60;
+    }
+  }
+  const hourCandidates = [session.hours, session.lengthHours, session.sessionHours];
+  for (const value of hourCandidates) {
+    const num = Number(value);
+    if (Number.isFinite(num) && num > 0) {
+      return num;
+    }
+  }
+  return 0;
+}
+
+function resolveAmount(session = {}, role, hours) {
+  const tutorAmountKeys = ['tutorAmount', 'tutorPayout', 'payoutAmount', 'payAmount', 'tutorPay', 'earnings', 'netEarnings', 'payout'];
+  const studentAmountKeys = ['totalAmount', 'amountPaid', 'studentPaid', 'price', 'cost', 'sessionPrice', 'chargeAmount', 'invoiceTotal'];
+  const nestedKeysTutor = ['paySummary.tutor', 'paySummary.tutorTotal', 'payment.tutor', 'payment.tutorTotal'];
+  const nestedKeysStudent = ['paySummary.total', 'paySummary.student', 'payment.total', 'payment.amount'];
+  const keys = role === 'tutor' ? tutorAmountKeys : studentAmountKeys;
+  const nested = role === 'tutor' ? nestedKeysTutor : nestedKeysStudent;
+
+  for (const key of keys) {
+    const num = readNumber(session, key);
+    if (Number.isFinite(num) && num > 0) return num;
+  }
+  for (const key of nested) {
+    const num = readNumber(session, key);
+    if (Number.isFinite(num) && num > 0) return num;
+  }
+  const rateKeys = ['hourlyRate', 'rate', 'tutorRate', 'studentRate', 'pricePerHour'];
+  for (const key of rateKeys) {
+    const rate = readNumber(session, key);
+    if (Number.isFinite(rate) && rate > 0 && Number.isFinite(hours) && hours > 0) {
+      return rate * hours;
+    }
+  }
+  return 0;
+}
+
+function aggregateStats(sessions, role) {
+  const completed = sessions.filter((session) => isCompletedSession(session));
+  const totalSessions = completed.length;
+  let totalHours = 0;
+  let totalAmount = 0;
+  const counterpartSet = new Set();
+  const durations = [];
+  const subjectCounts = new Map();
+  let firstDate = null;
+
+  completed.forEach((session) => {
+    const hours = durationHours(session);
+    if (hours > 0) {
+      totalHours += hours;
+      durations.push(hours);
+    }
+    const amount = resolveAmount(session, role, hours);
+    if (Number.isFinite(amount)) {
+      totalAmount += amount;
+    }
+
+    const counterparts = role === 'tutor'
+      ? collectIds(session, ['studentId', 'studentUID', 'studentUserId', 'studentProfileId', 'student'])
+      : collectIds(session, ['tutorId', 'tutorUID', 'tutorUserId', 'tutorProfileId', 'tutor']);
+    counterparts.forEach((id) => counterpartSet.add(id));
+
+    const subjects = extractSubjects(session);
+    subjects.forEach((subject) => {
+      const key = subject.toLowerCase();
+      subjectCounts.set(key, (subjectCounts.get(key) || 0) + 1);
+    });
+
+    const startDate = session.startTime?.toDate?.() || (session.startTime instanceof Date ? session.startTime : null);
+    if (startDate && (!firstDate || startDate < firstDate)) {
+      firstDate = startDate;
+    }
+  });
+
+  const avgLength = durations.length ? totalHours / durations.length : 0;
+  let topSubject = '—';
+  if (subjectCounts.size) {
+    const [winner] = Array.from(subjectCounts.entries()).sort((a, b) => b[1] - a[1])[0];
+    topSubject = winner ? winner.replace(/\b\w/g, (c) => c.toUpperCase()) : '—';
+  }
+
+  return {
+    totalSessions,
+    totalHours,
+    totalAmount,
+    uniqueCounterparts: counterpartSet.size,
+    avgLength,
+    firstDate,
+    topSubject
+  };
 }
 
 function hasRoleFlag(role, data = currentUserDoc) {
@@ -426,6 +643,8 @@ async function deleteRole(role) {
     if (role === 'student') {
       await cleanupStudentRecords();
     }
+
+    await sendStatsEmail(`delete-${role}-role`);
 
     const payload = {
       [`roles.${role}`]: false,
@@ -634,6 +853,8 @@ async function deleteAccount(event) {
   try {
     const cred = emailProvider.credential(email, password);
     await reauth(currentUser, cred);
+
+    await sendStatsEmail('delete-account');
 
     const userData = currentUserDoc || {};
     const roles = userData.roles || {};

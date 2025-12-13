@@ -237,6 +237,94 @@
       font-size: 0.9rem;
       color: #9ca3af;
     }
+    .qa-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+    .qa-actions { position: relative; display: flex; align-items: center; }
+    .qa-remove-btn,
+    .qa-add-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1px solid #4b5563;
+      background: #1f2937;
+      color: #f3f4f6;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    }
+    .qa-remove-btn { margin-right: 0.35rem; }
+    .qa-remove-btn:hover { transform: scale(1.06); background: #111827; border-color: #f87171; }
+    .qa-add-btn:hover { transform: scale(1.06); background: #111827; border-color: #60a5fa; }
+    .qa-add-btn.is-disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+    .qa-remove-btn.is-active { background: #b91c1c; border-color: #f87171; color: #fff; box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.25); }
+    .qa-remove-btn.is-active:hover { transform: none; }
+    .qa-menu {
+      position: absolute;
+      top: 40px;
+      right: 0;
+      background: #0b1220;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+      padding: 0.5rem;
+      min-width: 220px;
+      z-index: 20;
+      display: grid;
+      gap: 0.4rem;
+    }
+    .qa-menu button {
+      width: 100%;
+      text-align: left;
+      border: 1px solid #1f2937;
+      background: #111827;
+      color: #e5e7eb;
+      border-radius: 10px;
+      padding: 0.6rem 0.8rem;
+      cursor: pointer;
+      transition: transform 0.1s ease, border-color 0.15s ease;
+    }
+    .qa-menu button:hover { transform: translateY(-1px); border-color: #60a5fa; }
+    .qa-menu .qa-meta { display: block; color: #9ca3af; font-size: 0.85rem; margin-top: 0.2rem; }
+    .qa-menu.hidden { display: none; }
+    .qa-removal-mode .quick-actions .btn {
+      position: relative;
+      animation: qa-wiggle 0.9s ease-in-out infinite;
+      padding-right: 2.4rem;
+    }
+    .qa-remove-badge {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ef4444;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 800;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.45);
+    }
+    .qa-action-poof { animation: qa-poof 0.18s ease forwards; }
+    @keyframes qa-wiggle {
+      0%, 100% { transform: rotate(0deg); }
+      20% { transform: rotate(-2deg); }
+      40% { transform: rotate(2deg); }
+      60% { transform: rotate(-1.5deg); }
+      80% { transform: rotate(1.5deg); }
+    }
+    @keyframes qa-poof {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.03); opacity: 0.85; }
+      100% { transform: scale(0.75); opacity: 0; }
+    }
     #dashboard-content.dashboard-flip {
       animation: dashboardFlip 0.6s ease both;
     }
@@ -275,7 +363,7 @@
 
 <main class="container dashboard-container">
   <div class="dashboard-header">
-    <h2 class="welcome-text">Welcome,<br> <span id="user-name">...</span>!</h2>
+    <h2 class="welcome-text">Welcome, <span id="user-name">...</span>!</h2>
     <div class="dashboard-header-actions">
       <button class="dashboard-view-toggle" id="dashboard-view-toggle" type="button" hidden>Student Page -&gt;</button>
     </div>
@@ -287,18 +375,15 @@
     <div class="dashboard-grid">
       <div class="dashboard-row-two-up">
         <div class="dashboard-card" id="quick-actions-student" data-dashboard-section="student">
-          <h3>Quick Actions</h3>
-          <div class="quick-actions">
-            <button class="btn primary" onclick="window.location.href='add-student.html'">
-              + Add Student
-            </button>
-            <button class="btn primary" onclick="window.location.href='book.html'">
-              📅 Book Sessions
-            </button>
-            <button class="btn secondary" id="edit-book-form-btn" type="button" hidden>
-              📄 Booking info
-            </button>
+          <div class="qa-header">
+            <h3>Quick Actions</h3>
+            <div class="qa-actions">
+              <button class="qa-remove-btn" id="qa-student-remove-btn" type="button" aria-pressed="false" aria-controls="qa-student-actions">-</button>
+              <button class="qa-add-btn" id="qa-student-add-btn" type="button" aria-expanded="false" aria-controls="qa-student-menu">+</button>
+              <div class="qa-menu hidden" id="qa-student-menu" role="menu" aria-label="Add quick action (student)"></div>
+            </div>
           </div>
+          <div class="quick-actions" id="qa-student-actions"></div>
         </div>
 
         <div class="dashboard-card" data-dashboard-section="student">
@@ -323,7 +408,7 @@
               autocomplete="organization"
               required
             />
-            <button type="submit" class="btn primary">Notify me</button>
+            <button type="submit" class="btn primary">Notify us</button>
           </form>
           <p id="subject-request-message" class="subject-request-message" role="status"></p>
         </div>
@@ -331,13 +416,15 @@
 
       <div class="dashboard-row-two-up">
         <div class="dashboard-card" id="quick-actions-tutor" data-dashboard-section="tutor">
-          <h3>Quick Actions</h3>
-          <div class="quick-actions">
-            <button class="btn primary" onclick="window.location.href='tutor-dashboard.html'">
-              Open Tutor Hub
-            </button>
-            <button class="btn secondary" id="copy-tutor-link-qa" type="button">Copy Profile Link</button>
+          <div class="qa-header">
+            <h3>Quick Actions</h3>
+            <div class="qa-actions">
+              <button class="qa-remove-btn" id="qa-tutor-remove-btn" type="button" aria-pressed="false" aria-controls="qa-tutor-actions">-</button>
+              <button class="qa-add-btn" id="qa-tutor-add-btn" type="button" aria-expanded="false" aria-controls="qa-tutor-menu">+</button>
+              <div class="qa-menu hidden" id="qa-tutor-menu" role="menu" aria-label="Add quick action (tutor)"></div>
+            </div>
           </div>
+          <div class="quick-actions" id="qa-tutor-actions"></div>
         </div>
 
         <div class="dashboard-card hidden-card" id="tutor-card" data-dashboard-section="tutor">
@@ -374,6 +461,8 @@
       </div>
     </div>
 
+    <br>
+
     <div class="dashboard-card" id="favorite-tutors-card" data-dashboard-section="student">
       <h3>My Favourite Tutors</h3>
       <div id="favorite-tutors-content">
@@ -382,6 +471,8 @@
         </p>
       </div>
     </div>
+
+    <br>
 
     <div class="dashboard-card" id="statistics-card">
       <h3>Statistics &amp; Tax Summary</h3>

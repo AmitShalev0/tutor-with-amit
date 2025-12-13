@@ -26,6 +26,14 @@
   const tutorLinkDisplayEl = document.getElementById("tutor-link-display");
   const copyTutorLinkBtn = document.getElementById("copy-tutor-link");
   const copyTutorLinkBtnQA = document.getElementById("copy-tutor-link-qa");
+  const qaStudentActionsEl = document.getElementById("qa-student-actions");
+  const qaTutorActionsEl = document.getElementById("qa-tutor-actions");
+  const qaStudentAddBtn = document.getElementById("qa-student-add-btn");
+  const qaTutorAddBtn = document.getElementById("qa-tutor-add-btn");
+  const qaStudentRemoveBtn = document.getElementById("qa-student-remove-btn");
+  const qaTutorRemoveBtn = document.getElementById("qa-tutor-remove-btn");
+  const qaStudentMenu = document.getElementById("qa-student-menu");
+  const qaTutorMenu = document.getElementById("qa-tutor-menu");
   const quickActionsStudentCard = document.getElementById("quick-actions-student");
   const quickActionsTutorCard = document.getElementById("quick-actions-tutor");
   const homeLinkBtn = document.getElementById("home-link-btn");
@@ -44,8 +52,259 @@
   let currentUser = null;
   let tutorProfileData = null;
   let hybridAccountEnabled = false;
+  let favoriteTutorProfiles = [];
+  let isAdminUser = false;
+  const qaSelections = { student: new Set(), tutor: new Set() };
+  const QA_STORAGE_KEYS = { student: 'qa_student_selection', tutor: 'qa_tutor_selection' };
+  const qaRemoveMode = { student: false, tutor: false };
 
   const copyButtons = [copyTutorLinkBtn, copyTutorLinkBtnQA].filter(Boolean);
+
+  function getActionCatalog() {
+    const catalog = { student: new Map(), tutor: new Map() };
+
+    const studentActions = [
+      { id: 'add-student', label: '+ Add Student', type: 'link', href: 'add-student.html', role: 'student' },
+      { id: 'book-session', label: '📅 Book Sessions', type: 'link', href: 'book.html', role: 'student' },
+      { id: 'booking-info', label: '📄 Booking info', type: 'link', href: 'booking-settings.html', role: 'student', adminOnly: true }
+    ];
+
+    const tutorActions = [
+      { id: 'open-tutor-hub', label: 'Open Tutor Hub', type: 'link', href: 'tutor-dashboard.html', role: 'tutor' },
+      { id: 'copy-profile', label: 'Copy Profile Link', type: 'copyProfile', role: 'tutor' },
+      { id: 'open-statistics', label: 'Statistics', type: 'link', href: 'statistics.html', role: 'tutor' }
+    ];
+
+    studentActions.forEach((action) => {
+      if (action.adminOnly && !isAdminUser) return;
+      catalog.student.set(action.id, action);
+    });
+    tutorActions.forEach((action) => catalog.tutor.set(action.id, action));
+
+    favoriteTutorProfiles.forEach((tutor) => {
+      const name = tutor.fullName || 'Tutor';
+      const action = {
+        id: `book-fav-${tutor.id}`,
+        label: `Book ${name}`,
+        type: 'link',
+        href: `book.html?tutor=${encodeURIComponent(tutor.id)}`,
+        role: 'student',
+        note: 'From favourites'
+      };
+      catalog.student.set(action.id, action);
+    });
+
+    return catalog;
+  }
+
+  function loadQaSelections() {
+    ['student', 'tutor'].forEach((role) => {
+      const raw = localStorage.getItem(QA_STORAGE_KEYS[role]);
+      const set = new Set();
+      try {
+        const parsed = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [];
+        parsed.forEach((id) => set.add(id));
+      } catch (err) {
+        /* ignore */
+      }
+      qaSelections[role] = set;
+    });
+  }
+
+  function persistQaSelections(role) {
+    const arr = Array.from(qaSelections[role] || []);
+    localStorage.setItem(QA_STORAGE_KEYS[role], JSON.stringify(arr));
+  }
+
+  function ensureQaDefaults(catalog) {
+    if (!qaSelections.student.size) {
+      ['add-student', 'book-session'].forEach((id) => {
+        if (catalog.student.has(id)) qaSelections.student.add(id);
+      });
+    }
+    if (!qaSelections.tutor.size) {
+      ['open-tutor-hub', 'copy-profile'].forEach((id) => {
+        if (catalog.tutor.has(id)) qaSelections.tutor.add(id);
+      });
+    }
+  }
+
+  function pruneMissingSelections(catalog) {
+    ['student', 'tutor'].forEach((role) => {
+      const set = qaSelections[role];
+      Array.from(set).forEach((id) => {
+        if (!catalog[role].has(id)) set.delete(id);
+      });
+    });
+  }
+
+  function executeAction(action) {
+    if (!action) return;
+    if (action.type === 'link' && action.href) {
+      window.location.href = action.href;
+      return;
+    }
+    if (action.type === 'copyProfile') {
+      const btn = copyTutorLinkBtn || copyTutorLinkBtnQA;
+      if (!btn || !btn.dataset.profileUrl) {
+        alert('Your profile link will be available once you publish your tutor page.');
+        return;
+      }
+      const url = btn.dataset.profileUrl;
+      navigator.clipboard?.writeText(url).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy Profile Link'; }, 1600);
+      }).catch(() => {
+        prompt('Copy this link', url);
+      });
+    }
+  }
+
+  function renderQuickActions(role) {
+    const catalog = getActionCatalog();
+    pruneMissingSelections(catalog);
+    const target = role === 'student' ? qaStudentActionsEl : qaTutorActionsEl;
+    if (!target) return;
+    target.innerHTML = '';
+    qaSelections[role].forEach((id) => {
+      const action = catalog[role].get(id);
+      if (!action) return;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn ' + (action.type === 'link' ? 'primary' : 'secondary');
+      btn.textContent = action.label;
+
+      if (qaRemoveMode[role]) {
+        const badge = document.createElement('span');
+        badge.className = 'qa-remove-badge';
+        badge.textContent = '-';
+        btn.appendChild(badge);
+        btn.addEventListener('click', () => handleRemoveAction(role, action.id, btn));
+      } else {
+        btn.addEventListener('click', () => executeAction(action));
+      }
+      target.appendChild(btn);
+    });
+    persistQaSelections(role);
+    buildQaMenu(role);
+  }
+
+  function handleRemoveAction(role, actionId, btn) {
+    if (!qaRemoveMode[role]) return;
+    if (btn) {
+      btn.classList.add('qa-action-poof');
+      setTimeout(() => finishRemove(role, actionId), 150);
+    } else {
+      finishRemove(role, actionId);
+    }
+  }
+
+  function finishRemove(role, actionId) {
+    qaSelections[role].delete(actionId);
+    renderQuickActions(role);
+  }
+
+  function buildQaMenu(role) {
+    const catalog = getActionCatalog();
+    const menu = role === 'student' ? qaStudentMenu : qaTutorMenu;
+    if (!menu) return;
+    menu.innerHTML = '';
+    const available = Array.from(catalog[role].values()).filter((a) => !qaSelections[role].has(a.id));
+    if (!available.length) {
+      const empty = document.createElement('div');
+      empty.textContent = 'All actions added.';
+      empty.className = 'qa-meta';
+      menu.appendChild(empty);
+      return;
+    }
+    available.forEach((action) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = action.label;
+      if (action.note) {
+        const span = document.createElement('span');
+        span.className = 'qa-meta';
+        span.textContent = action.note;
+        btn.appendChild(document.createElement('br'));
+        btn.appendChild(span);
+      }
+      btn.addEventListener('click', () => {
+        qaSelections[role].add(action.id);
+        renderQuickActions(role);
+        toggleQaMenu(role, false);
+      });
+      menu.appendChild(btn);
+    });
+  }
+
+  function toggleQaMenu(role, open) {
+    const menu = role === 'student' ? qaStudentMenu : qaTutorMenu;
+    const btn = role === 'student' ? qaStudentAddBtn : qaTutorAddBtn;
+    if (qaRemoveMode[role]) return;
+    if (!menu || !btn) return;
+    const shouldOpen = typeof open === 'boolean' ? open : menu.classList.contains('hidden');
+    menu.classList.toggle('hidden', !shouldOpen);
+    btn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+    if (shouldOpen) {
+      document.addEventListener('click', handleOutsideMenuClick);
+      document.addEventListener('focusin', handleOutsideMenuFocus, true);
+    } else {
+      document.removeEventListener('click', handleOutsideMenuClick);
+      document.removeEventListener('focusin', handleOutsideMenuFocus, true);
+    }
+  }
+
+  function handleOutsideMenuClick(event) {
+    const targets = [qaStudentMenu, qaTutorMenu, qaStudentAddBtn, qaTutorAddBtn].filter(Boolean);
+    if (targets.some((el) => el === event.target || el.contains(event.target))) {
+      return;
+    }
+    toggleQaMenu('student', false);
+    toggleQaMenu('tutor', false);
+  }
+
+  function handleOutsideMenuFocus(event) {
+    const targets = [qaStudentMenu, qaTutorMenu, qaStudentAddBtn, qaTutorAddBtn].filter(Boolean);
+    if (targets.some((el) => el && el.contains(event.target))) {
+      return;
+    }
+    toggleQaMenu('student', false);
+    toggleQaMenu('tutor', false);
+  }
+
+  function refreshAllQuickActions() {
+    const catalog = getActionCatalog();
+    ensureQaDefaults(catalog);
+    pruneMissingSelections(catalog);
+    renderQuickActions('student');
+    renderQuickActions('tutor');
+  }
+
+  function setRemoveMode(role, enabled) {
+    qaRemoveMode[role] = !!enabled;
+    const card = role === 'student' ? quickActionsStudentCard : quickActionsTutorCard;
+    const addBtn = role === 'student' ? qaStudentAddBtn : qaTutorAddBtn;
+    const removeBtn = role === 'student' ? qaStudentRemoveBtn : qaTutorRemoveBtn;
+    const menu = role === 'student' ? qaStudentMenu : qaTutorMenu;
+
+    if (card) {
+      card.classList.toggle('qa-removal-mode', enabled);
+    }
+    if (addBtn) {
+      addBtn.classList.toggle('is-disabled', enabled);
+      addBtn.disabled = !!enabled;
+    }
+    if (removeBtn) {
+      removeBtn.classList.toggle('is-active', enabled);
+      removeBtn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    }
+    if (menu) {
+      toggleQaMenu(role, false);
+    }
+    renderQuickActions(role);
+  }
+
+  loadQaSelections();
 
   function reconcileQuickActions(hasTutorRole, hasStudentRole) {
     const showStudentQA = hasStudentRole || (!hasStudentRole && !hasTutorRole);
@@ -56,6 +315,13 @@
     }
     if (quickActionsTutorCard) {
       quickActionsTutorCard.style.display = showTutorQA ? "block" : "none";
+    }
+
+    if (!showStudentQA && qaRemoveMode.student) {
+      setRemoveMode('student', false);
+    }
+    if (!showTutorQA && qaRemoveMode.tutor) {
+      setRemoveMode('tutor', false);
     }
   }
 
@@ -258,8 +524,9 @@
         : [];
       window.__latestUserData = userData;
 
+      isAdminUser = isAdminUserData(userData);
       if (editBookFormBtn) {
-        editBookFormBtn.hidden = !isAdminUserData(userData);
+        editBookFormBtn.hidden = !isAdminUser;
       }
       
       // Display user info
@@ -285,6 +552,8 @@
 
       // Load students
       await loadStudents(user.uid);
+
+      refreshAllQuickActions();
 
       // Show dashboard
       loadingEl.style.display = "none";
@@ -439,6 +708,8 @@
       return;
     }
 
+    favoriteTutorProfiles = [];
+
     const favoriteIds = Array.isArray(userData?.favoriteTutorIds)
       ? userData.favoriteTutorIds.filter((id) => typeof id === 'string' && id.trim())
       : [];
@@ -458,6 +729,9 @@
       const tutors = snapshots
         .filter((snap) => snap.exists())
         .map((snap) => ({ id: snap.id, ...snap.data() }));
+
+      favoriteTutorProfiles = tutors;
+      refreshAllQuickActions();
 
       if (!tutors.length) {
         favoriteTutorsContainer.innerHTML = '<p class="empty-favorites">No favourite tutors yet. <a href="tutor-search.html">Find a tutor</a> to add one.</p>';
@@ -584,6 +858,29 @@
       }
     });
   });
+
+  if (qaStudentAddBtn) {
+    qaStudentAddBtn.addEventListener('click', () => {
+      buildQaMenu('student');
+      toggleQaMenu('student');
+    });
+  }
+  if (qaTutorAddBtn) {
+    qaTutorAddBtn.addEventListener('click', () => {
+      buildQaMenu('tutor');
+      toggleQaMenu('tutor');
+    });
+  }
+  if (qaStudentRemoveBtn) {
+    qaStudentRemoveBtn.addEventListener('click', () => {
+      setRemoveMode('student', !qaRemoveMode.student);
+    });
+  }
+  if (qaTutorRemoveBtn) {
+    qaTutorRemoveBtn.addEventListener('click', () => {
+      setRemoveMode('tutor', !qaRemoveMode.tutor);
+    });
+  }
 
   async function loadStudents(userId) {
     try {
