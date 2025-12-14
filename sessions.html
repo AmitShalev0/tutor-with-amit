@@ -172,7 +172,7 @@
   <div class="container">
     <p>
       © <span id="year"></span> Amit Tutoring ·
-      <a href="contact.html">Contact me</a>
+      <a href="contact.html">Contact us</a>
     </p>
   </div>
   <script src="admin.js" defer></script>
@@ -203,9 +203,107 @@
     const query = window.firestoreQuery;
     const where = window.firestoreWhere;
     const getDocs = window.firestoreGetDocs;
+    const doc = window.firestoreDoc;
+    const setDoc = window.firestoreSetDoc;
+    const serverTimestamp = window.firestoreServerTimestamp;
+    const getDoc = window.firestoreGetDoc;
 
     let currentUser = null;
     let allSessions = [];
+    let feedbackCache = new Map();
+
+    const ratingMetrics = [
+      { key: 'overall', label: 'Overall experience', helper: 'How was the session overall?' },
+      { key: 'clarity', label: 'Clarity of explanations', helper: 'Did the tutor explain concepts clearly?' },
+      { key: 'helpfulness', label: 'Helpfulness', helper: 'Did the tutor address your questions?' },
+      { key: 'engagement', label: 'Engagement', helper: 'Did the tutor keep you engaged?' },
+      { key: 'pacing', label: 'Pacing', helper: 'Was the session pace comfortable?' }
+    ];
+
+    function getSessionKey(session) {
+      return String(session?.id || session?.bookingId || session?.sessionId || '');
+    }
+
+    function findSessionByKey(sessionKey) {
+      const normalized = String(sessionKey || '');
+      return allSessions.find((s) => getSessionKey(s) === normalized);
+    }
+
+    function getTutorIdFromSession(session) {
+      return (
+        session?.tutorId ||
+        session?.tutorUID ||
+        session?.tutorUid ||
+        session?.tutorUserId ||
+        session?.primaryTutorId ||
+        session?.primaryTutorUid ||
+        null
+      );
+    }
+
+    function getStudentIdFromSession(session) {
+      return (
+        session?.userId ||
+        session?.studentId ||
+        session?.studentUID ||
+        session?.studentUserId ||
+        session?.studentAccountId ||
+        null
+      );
+    }
+
+    function getSessionMode(session) {
+      const raw = (
+        session?.mode ||
+        session?.deliveryMethod ||
+        session?.sessionMode ||
+        session?.sessionType ||
+        session?.modality ||
+        session?.location ||
+        ''
+      );
+      const lowered = String(raw).toLowerCase();
+      if (['in_person', 'in-person', 'inperson', 'in person', 'onsite'].includes(lowered)) return 'in_person';
+      if (['online', 'virtual', 'remote', 'zoom', 'google meet'].includes(lowered)) return 'online';
+      return 'online';
+    }
+
+    function clampRatingValue(value, fallback = 8) {
+      const num = Number.parseInt(value, 10);
+      if (!Number.isFinite(num)) return fallback;
+      return Math.min(10, Math.max(1, num));
+    }
+
+    function sessionHasEnded(session) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const now = new Date();
+      const sessionDate = getSessionDateForCompare(session?.sessionDate);
+      if (!sessionDate) return false;
+      if (sessionDate < today) return true;
+      if (sessionDate.getTime() === today.getTime()) {
+        if (session?.endTime) {
+          const [hours, minutes] = session.endTime.split(':').map(Number);
+          const sessionEnd = new Date();
+          sessionEnd.setHours(hours || 0, minutes || 0, 0, 0);
+          return now >= sessionEnd;
+        }
+        return true;
+      }
+      return false;
+    }
+
+    function canRateSession(session) {
+      const sessionKey = getSessionKey(session);
+      if (!sessionKey || !currentUser?.uid) return false;
+      const studentId = getStudentIdFromSession(session);
+      if (studentId && studentId !== currentUser.uid) return false;
+      const normalizedStatus = normalizeBookingStatus(session?.status);
+      const approvalStatus = normalizeApprovalStatus(session?.approvalStatus);
+      const treatedAsSuccessful = normalizedStatus === 'succeed_payment' || approvalStatus === 'approved';
+      if (!treatedAsSuccessful) return false;
+      return sessionHasEnded(session);
+    }
 
     // Check authentication
     onAuthStateChanged(auth, async (user) => {
@@ -593,10 +691,11 @@
               <th>Student Name</th>
               <th>Comments / Questions</th>
               <th>Invoice</th>
+              <th>Rate</th>
             </tr>
           </thead>
           <tbody>
-            ${past.map(session => renderUnifiedSessionRow(session, { showInvoiceButton: true })).join('')}
+            ${past.map(session => renderUnifiedSessionRow(session, { showInvoiceButton: true, showRateButton: true })).join('')}
           </tbody>
         </table>
       `;
@@ -617,9 +716,54 @@
   }
 
 
+  function buildRatingPanelHtml(session) {
+    const sessionKey = getSessionKey(session);
+    const canRate = canRateSession(session);
+    const disabledAttr = canRate ? '' : 'disabled';
+    const helperText = canRate
+      ? 'Ratings are private. Comments are shared with the tutor team only.'
+      : 'Ratings unlock after the session is completed and paid.';
+
+    const sliders = ratingMetrics.map(({ key, label, helper }) => `
+      <div class="rating-slider" style="margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+          <label for="rating-${key}-${sessionKey}" style="font-weight: 600; color: #e5e7eb;">${label}</label>
+          <span id="rating-${key}-value-${sessionKey}" style="font-size: 0.9rem; color: #9ca3af;">—</span>
+        </div>
+        <input type="range" id="rating-${key}-${sessionKey}" name="${key}" min="1" max="10" step="1" value="5" data-touched="false" ${disabledAttr} aria-label="${label}"
+          oninput="handleRatingInput('${sessionKey}', '${key}', this.value)"
+          style="width: 100%; margin: 6px 0;">
+        <div style="font-size: 0.85rem; color: #9ca3af;">${helper}</div>
+      </div>
+    `).join('');
+
+    return `
+      <div class="rating-panel" style="padding: 16px 18px; border-top: 1px solid rgba(255,255,255,0.08);">
+        <div style="font-weight: 700; color: #e5e7eb; margin-bottom: 12px;">Rate this session</div>
+        <form id="rating-form-${sessionKey}" onsubmit="event.preventDefault(); submitRating('${sessionKey}');">
+          ${sliders}
+          <label for="rating-comment-${sessionKey}" style="display: block; font-weight: 600; color: #e5e7eb; margin-top: 4px;">Share a comment (optional)</label>
+          <textarea id="rating-comment-${sessionKey}" name="comment" rows="3" maxlength="500" ${disabledAttr}
+            placeholder="What went well? What can we improve?"
+            style="width: 100%; margin-top: 6px; border-radius: 6px; padding: 10px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #f5f5f7;"></textarea>
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 12px;">
+            <div style="font-size: 0.85rem; color: #9ca3af;">${helperText} (Max 500 characters)</div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button type="submit" class="btn primary" ${disabledAttr} title="${helperText}">Submit rating</button>
+              <button type="button" class="btn tertiary" onclick="toggleRatingPanel('${sessionKey}')">Close</button>
+            </div>
+          </div>
+          <div id="rating-status-${sessionKey}" style="margin-top: 8px; font-size: 0.9rem; color: #d1d5db;"></div>
+        </form>
+      </div>
+    `;
+  }
+
+
   function renderUnifiedSessionRow(session, options = {}) {
     const showInvoiceButton = options.showInvoiceButton === true;
-    const columnCount = showInvoiceButton ? 5 : 4;
+    const showRateButton = options.showRateButton === true;
+    const columnCount = 4 + (showInvoiceButton ? 1 : 0) + (showRateButton ? 1 : 0);
     const dateStr = formatSessionDate(session.sessionDate);
     const timeStr = session.startTime && session.endTime 
       ? `${session.startTime} - ${session.endTime}` 
@@ -669,6 +813,8 @@
       </div>
     ` : '<div style="color: #b0b0b5; font-style: italic; padding: 12px;">No tutor notes yet</div>';
 
+    const sessionKey = getSessionKey(session);
+
     let invoiceCellHtml = '';
     if (showInvoiceButton) {
       const iconButtons = [];
@@ -692,6 +838,16 @@
         : '<td class="invoice-cell"><span class="invoice-placeholder">—</span></td>';
     }
 
+    let rateCellHtml = '';
+    if (showRateButton) {
+      const canRate = canRateSession(session);
+      const label = feedbackCache.has(sessionKey) ? 'Edit rating' : 'Rate';
+      const content = sessionKey
+        ? `<button class="btn secondary" data-rate-key="${sessionKey}" onclick="event.stopPropagation(); toggleRatingPanel('${sessionKey}')" ${canRate ? '' : 'disabled title="Ratings are available after the session is completed and paid."'}>${label}</button>`
+        : '<span class="invoice-placeholder">—</span>';
+      rateCellHtml = `<td class="invoice-cell">${content}</td>`;
+    }
+
     return `
       <tr style="cursor: pointer;" onclick="toggleTutorNotes('${session.id}')" title="Click to ${hasTutorNotes ? 'view' : 'see'} tutor notes">
         <td>${dateStr}</td>
@@ -699,6 +855,12 @@
         <td>${students}</td>
         <td>${studentCommentsHtml}</td>
         ${invoiceCellHtml}
+        ${rateCellHtml}
+      </tr>
+      <tr id="rating-row-${sessionKey}" style="display: none;">
+        <td colspan="${columnCount}" style="background: rgba(24, 32, 56, 0.6); padding: 0;">
+          ${buildRatingPanelHtml(session)}
+        </td>
       </tr>
       <tr id="tutor-notes-row-${session.id}" style="display: none;">
         <td colspan="${columnCount}" style="background: rgba(0, 0, 0, 0.2); padding: 0;">
@@ -712,6 +874,256 @@
     const row = document.getElementById(`tutor-notes-row-${sessionId}`);
     if (row) {
       row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+    }
+  };
+
+  window.toggleRatingPanel = async function(sessionKey) {
+    if (!sessionKey) return;
+    const row = document.getElementById(`rating-row-${sessionKey}`);
+    if (!row) return;
+    const isHidden = row.style.display === 'none';
+    // Hide other open panels to reduce clutter
+    document.querySelectorAll('[id^="rating-row-"]').forEach((el) => {
+      if (el !== row) el.style.display = 'none';
+    });
+    row.style.display = isHidden ? 'table-row' : 'none';
+    if (isHidden) {
+      await populateRatingForm(sessionKey);
+    }
+  };
+
+  function handleRatingInput(sessionKey, key, rawValue) {
+    const clamped = clampRatingValue(rawValue, NaN);
+    const input = document.getElementById(`rating-${key}-${sessionKey}`);
+    if (input) {
+      input.dataset.touched = 'true';
+      if (Number.isFinite(clamped)) {
+        input.value = clamped;
+      }
+    }
+    const valueEl = document.getElementById(`rating-${key}-value-${sessionKey}`);
+    if (valueEl) {
+      valueEl.textContent = Number.isFinite(clamped) ? clamped : '—';
+    }
+  }
+  window.handleRatingInput = handleRatingInput;
+
+  function setRatingFieldValue(sessionKey, key, value) {
+    const clamped = clampRatingValue(value, NaN);
+    const input = document.getElementById(`rating-${key}-${sessionKey}`);
+    if (input && Number.isFinite(clamped)) {
+      input.value = clamped;
+      input.dataset.touched = 'true';
+      const valueEl = document.getElementById(`rating-${key}-value-${sessionKey}`);
+      if (valueEl) valueEl.textContent = clamped;
+    }
+  }
+
+  function resetRatingField(sessionKey, key) {
+    const input = document.getElementById(`rating-${key}-${sessionKey}`);
+    if (input) {
+      input.dataset.touched = 'false';
+      input.value = 5;
+    }
+    const valueEl = document.getElementById(`rating-${key}-value-${sessionKey}`);
+    if (valueEl) valueEl.textContent = '—';
+  }
+
+  async function populateRatingForm(sessionKey) {
+    const session = findSessionByKey(sessionKey);
+    const form = document.getElementById(`rating-form-${sessionKey}`);
+    const statusEl = document.getElementById(`rating-status-${sessionKey}`);
+    const commentEl = document.getElementById(`rating-comment-${sessionKey}`);
+    const rateBtn = document.querySelector(`button[data-rate-key="${sessionKey}"]`);
+    if (!session || !form || !statusEl) return;
+
+    if (!canRateSession(session)) {
+      statusEl.textContent = 'Ratings unlock after the session is completed and paid.';
+      form.querySelectorAll('input, textarea, button[type="submit"]').forEach((el) => {
+        el.disabled = true;
+      });
+      return;
+    }
+
+    form.querySelectorAll('input, textarea, button[type="submit"]').forEach((el) => {
+      el.disabled = false;
+    });
+
+    statusEl.textContent = 'Loading saved rating...';
+    let feedback = feedbackCache.get(sessionKey);
+    try {
+      if (!feedback) {
+        const snap = await getDoc(doc(db, 'sessionFeedback', sessionKey));
+        if (snap.exists()) {
+          feedback = { id: snap.id, ...snap.data() };
+          feedbackCache.set(sessionKey, feedback);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load feedback', err);
+      statusEl.textContent = 'Unable to load your previous rating. You can still submit a new one.';
+    }
+
+    if (feedback?.ratings) {
+      ratingMetrics.forEach(({ key }) => setRatingFieldValue(sessionKey, key, feedback.ratings[key]));
+    } else {
+      ratingMetrics.forEach(({ key }) => resetRatingField(sessionKey, key));
+    }
+    if (feedback && commentEl) {
+      commentEl.value = feedback.comment || '';
+    } else if (commentEl) {
+      commentEl.value = '';
+    }
+
+    if (feedback) {
+      statusEl.textContent = 'You can update your rating any time.';
+      if (rateBtn) rateBtn.textContent = 'Edit rating';
+    } else {
+      statusEl.textContent = 'Slide to rate from 1-10. Higher = better. All 5 ratings are required.';
+    }
+  }
+
+  async function recomputeTutorStats(tutorId) {
+    if (!tutorId) return;
+    try {
+      const statsQuery = query(
+        collection(db, 'sessionFeedback'),
+        where('tutorId', '==', tutorId),
+        where('status.submitted', '==', true)
+      );
+      const snap = await getDocs(statsQuery);
+      const sums = { overall: 0, clarity: 0, helpfulness: 0, engagement: 0, pacing: 0 };
+      const studentIds = new Set();
+      let ratingCount = 0;
+
+      snap.forEach((docSnap) => {
+        const data = docSnap.data() || {};
+        const status = data.status || {};
+        if (status.reported || status.deletedByTutor) return;
+        const ratings = data.ratings || {};
+        ratingCount += 1;
+        const studentId = data.studentId || data.userId;
+        if (studentId) studentIds.add(String(studentId));
+        ratingMetrics.forEach(({ key }) => {
+          const val = clampRatingValue(ratings[key], NaN);
+          if (Number.isFinite(val)) {
+            sums[key] = (sums[key] || 0) + val;
+          }
+        });
+      });
+
+      const statsDoc = {
+        ratingCount,
+        distinctStudentCount: studentIds.size,
+        updatedAt: serverTimestamp()
+      };
+
+      ratingMetrics.forEach(({ key }) => {
+        const sum = sums[key] || 0;
+        const avg = ratingCount ? sum / ratingCount : 0;
+        const fieldName = `avg${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+        statsDoc[fieldName] = Number(avg.toFixed(2));
+      });
+
+      await setDoc(doc(db, 'tutorStats', tutorId), statsDoc, { merge: true });
+    } catch (err) {
+      console.error('Failed to refresh tutor stats', err);
+    }
+  }
+
+  window.submitRating = async function(sessionKey) {
+    const session = findSessionByKey(sessionKey);
+    const form = document.getElementById(`rating-form-${sessionKey}`);
+    const statusEl = document.getElementById(`rating-status-${sessionKey}`);
+    const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
+    const commentEl = document.getElementById(`rating-comment-${sessionKey}`);
+    const rateBtn = document.querySelector(`button[data-rate-key="${sessionKey}"]`);
+
+    if (!session || !form || !statusEl) return;
+    if (!canRateSession(session)) {
+      statusEl.textContent = 'Ratings unlock after the session is completed and paid.';
+      return;
+    }
+
+    const ratings = {};
+    let missingRating = false;
+    ratingMetrics.forEach(({ key }) => {
+      const input = document.getElementById(`rating-${key}-${sessionKey}`);
+      const touched = input?.dataset?.touched === 'true';
+      const value = clampRatingValue(input ? input.value : undefined, NaN);
+      if (!touched || !Number.isFinite(value)) {
+        missingRating = true;
+      }
+      ratings[key] = touched && Number.isFinite(value) ? value : null;
+    });
+
+    if (missingRating) {
+      statusEl.textContent = 'Please set all 5 ratings before submitting.';
+      if (submitBtn) submitBtn.disabled = false;
+      return;
+    }
+
+    const rawComment = (commentEl?.value || '').trim();
+    if (rawComment.length > 500) {
+      statusEl.textContent = 'Comments must be 500 characters or less.';
+      return;
+    }
+
+    statusEl.textContent = 'Saving rating...';
+    if (submitBtn) submitBtn.disabled = true;
+
+    let existing = feedbackCache.get(sessionKey);
+    try {
+      if (!existing) {
+        const snap = await getDoc(doc(db, 'sessionFeedback', sessionKey));
+        if (snap.exists()) {
+          existing = { id: snap.id, ...snap.data() };
+          feedbackCache.set(sessionKey, existing);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to check existing feedback', err);
+    }
+
+    const tutorId = getTutorIdFromSession(session);
+    const studentId = getStudentIdFromSession(session) || currentUser?.uid || null;
+    const baseStatus = existing?.status || {};
+    const payload = {
+      sessionKey,
+      sessionId: session.sessionId || session.id || session.bookingId || sessionKey,
+      bookingId: session.bookingId || session.id || null,
+      tutorId: tutorId || null,
+      tutorName: session.tutorName || session.tutor || '',
+      studentId,
+      studentFirstName: session.studentFirstName || (session.studentName ? String(session.studentName).split(' ')[0] : ''),
+      studentName: session.studentName || '',
+      mode: getSessionMode(session),
+      ratings,
+      comment: rawComment,
+      status: {
+        submitted: true,
+        shared: baseStatus.shared === true,
+        reported: baseStatus.reported === true,
+        deletedByTutor: baseStatus.deletedByTutor === true
+      },
+      updatedAt: serverTimestamp()
+    };
+
+    if (!existing?.createdAt) {
+      payload.createdAt = serverTimestamp();
+    }
+
+    try {
+      await setDoc(doc(db, 'sessionFeedback', sessionKey), payload, { merge: true });
+      feedbackCache.set(sessionKey, payload);
+      statusEl.textContent = 'Thanks! Your rating was saved.';
+      if (rateBtn) rateBtn.textContent = 'Edit rating';
+      await recomputeTutorStats(tutorId);
+    } catch (err) {
+      console.error('Failed to save rating', err);
+      statusEl.textContent = 'Unable to save rating. Please try again.';
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
     }
   };
 

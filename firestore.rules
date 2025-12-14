@@ -94,6 +94,27 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+
+    // Session feedback created by the student who attended
+    match /sessionFeedback/{feedbackId} {
+      allow read: if request.auth != null && (
+        resource.data.studentId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.tutorId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create, update: if request.auth != null && (
+        request.resource.data.studentId == request.auth.uid ||
+        request.resource.data.userId == request.auth.uid
+      );
+    }
+
+    // Tutor stats aggregations (client-updated from ratings)
+    match /tutorStats/{tutorId} {
+      allow read: if true;
+      // Allow authenticated updates; consider moving to Cloud Functions later
+      allow write: if request.auth != null || isAdmin();
+    }
     
     // Admin wildcard access to everything else
     match /{document=**} {

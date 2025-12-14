@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tutor Profile</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body { background: #0b1020; color: #e5e7eb; }
+    .home-hero { padding: 2rem 1rem; display: grid; gap: 1rem; background: radial-gradient(circle at 20% 20%, rgba(96,165,250,0.08), transparent 35%), #0b1020; border-bottom: 1px solid #1f2937; }
+    .home-hero h1 { margin: 0; font-size: 2rem; }
+    .home-meta { color: #9ca3af; margin: 0.25rem 0; }
+    .stats-pill { display: inline-flex; align-items: center; gap: 0.4rem; background: #111827; border: 1px solid #1f2937; border-radius: 999px; padding: 0.4rem 0.75rem; font-weight: 600; }
+    .section { padding: 1.5rem 1rem; max-width: 1100px; margin: 0 auto; }
+    .section h2 { margin: 0 0 0.75rem 0; }
+    .comments-carousel { position: relative; }
+    .comments-track { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(280px, 360px); gap: 1rem; overflow-x: auto; padding-bottom: 0.5rem; scrollbar-color: #4b5563 transparent; }
+    .comments-track::-webkit-scrollbar { height: 8px; }
+    .comments-track::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 999px; }
+    .comment-card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 1rem; box-shadow: 0 12px 28px rgba(0,0,0,0.25); min-height: 150px; display: flex; flex-direction: column; gap: 0.5rem; }
+    .comment-meta { display: flex; align-items: center; gap: 0.5rem; color: #9ca3af; font-size: 0.9rem; }
+    .comment-body { white-space: pre-wrap; line-height: 1.5; }
+    .empty-comments { color: #9ca3af; padding: 1rem; background: #0f172a; border-radius: 10px; border: 1px dashed #1f2937; }
+    .pill { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.65rem; border-radius: 999px; background: #1f2937; color: #e5e7eb; border: 1px solid #374151; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <div id="site-header"></div>
+  <script src="header-loader.js"></script>
+
+  <main>
+    <section class="home-hero" id="hero">
+      <div>
+        <p class="pill" id="hero-status">Loading tutor...</p>
+        <h1 id="tutor-name">Tutor</h1>
+        <p class="home-meta" id="tutor-headline">—</p>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem;">
+          <span class="stats-pill" id="rating-pill">New tutor — building reviews</span>
+          <span class="stats-pill" id="student-count-pill" hidden>0 students rated</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="comments-section">
+      <h2>What students are saying</h2>
+      <div id="comments-content" class="comments-carousel">
+        <div class="empty-comments">Loading comments...</div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="firebase-config.js"></script>
+  <script type="module" src="tutor-home.js"></script>
+</body>
+</html>

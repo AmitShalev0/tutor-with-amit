@@ -63,6 +63,8 @@
   function getActionCatalog() {
     const catalog = { student: new Map(), tutor: new Map() };
 
+    const homePath = getHomePath();
+
     const studentActions = [
       { id: 'add-student', label: '+ Add Student', type: 'link', href: 'add-student.html', role: 'student' },
       { id: 'book-session', label: '📅 Book Sessions', type: 'link', href: 'book.html', role: 'student' },
@@ -72,7 +74,8 @@
     const tutorActions = [
       { id: 'open-tutor-hub', label: 'Open Tutor Hub', type: 'link', href: 'tutor-dashboard.html', role: 'tutor' },
       { id: 'copy-profile', label: 'Copy Profile Link', type: 'copyProfile', role: 'tutor' },
-      { id: 'open-statistics', label: 'Statistics', type: 'link', href: 'statistics.html', role: 'tutor' }
+      { id: 'open-statistics', label: 'Statistics', type: 'link', href: 'statistics.html', role: 'tutor' },
+      { id: 'open-home', label: 'My Home Page', type: 'link', href: homePath, role: 'tutor' }
     ];
 
     studentActions.forEach((action) => {
@@ -123,7 +126,7 @@
       });
     }
     if (!qaSelections.tutor.size) {
-      ['open-tutor-hub', 'copy-profile'].forEach((id) => {
+      ['open-tutor-hub', 'copy-profile', 'open-home'].forEach((id) => {
         if (catalog.tutor.has(id)) qaSelections.tutor.add(id);
       });
     }
@@ -307,8 +310,13 @@
   loadQaSelections();
 
   function reconcileQuickActions(hasTutorRole, hasStudentRole) {
-    const showStudentQA = hasStudentRole || (!hasStudentRole && !hasTutorRole);
-    const showTutorQA = hasTutorRole && !hasStudentRole;
+    const isHybridMobile = hybridAccountEnabled && document.body.dataset.dashboardHybrid === "true";
+    const showStudentQA = isHybridMobile
+      ? hasStudentRole
+      : (hasStudentRole || (!hasStudentRole && !hasTutorRole));
+    const showTutorQA = isHybridMobile
+      ? hasTutorRole
+      : (hasTutorRole && !hasStudentRole);
 
     if (quickActionsStudentCard) {
       quickActionsStudentCard.style.display = showStudentQA ? "block" : "none";
@@ -682,6 +690,12 @@
     return `/home/${encodeURIComponent(slug)}/`;
   }
 
+  function getHomePath() {
+    const effectiveUser = window.__latestUserData || null;
+    const slug = resolveHomeSlugFromSources(effectiveUser, tutorProfileData);
+    return buildHomePath(slug);
+  }
+
   function updateHomeLink(userData) {
     if (!homeLinkBtn) return;
     if (userData) {
@@ -701,6 +715,7 @@
       homeLinkBtn.textContent = "Visit Main Home Page";
       homeLinkBtn.disabled = false;
     }
+    refreshAllQuickActions();
   }
 
   async function renderFavoriteTutors(userData) {
