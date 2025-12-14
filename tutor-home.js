@@ -14,6 +14,15 @@ const tutorHeadlineEl = document.getElementById('tutor-headline');
 const ratingPill = document.getElementById('rating-pill');
 const studentCountPill = document.getElementById('student-count-pill');
 const commentsContent = document.getElementById('comments-content');
+const ratingContent = document.getElementById('rating-content');
+
+const METRICS = [
+  { key: 'overall', label: 'Overall' },
+  { key: 'clarity', label: 'Clarity' },
+  { key: 'helpfulness', label: 'Helpfulness' },
+  { key: 'engagement', label: 'Engagement' },
+  { key: 'pacing', label: 'Pacing' }
+];
 
 function getSlugFromPath() {
   const parts = window.location.pathname.split('/').filter(Boolean);
@@ -52,17 +61,80 @@ async function fetchSharedComments(tutorId) {
 }
 
 function renderRating(stats) {
-  if (!stats || !Number.isFinite(stats.ratingCount) || stats.ratingCount < 5) {
+  if (!stats || !Number.isFinite(stats.ratingCount) || stats.ratingCount <= 0) {
     ratingPill.textContent = 'New tutor — building reviews';
-    ratingPill.title = 'Fewer than 5 ratings so far';
+    ratingPill.title = 'No ratings yet';
     studentCountPill.hidden = true;
+    renderRatingCards(null);
     return;
   }
+
   const avg = Number(stats.avgOverall || 0).toFixed(1);
+  const ratingCount = Math.max(1, Math.floor(stats.ratingCount));
+  const distinct = Number.isFinite(stats.distinctStudentCount) && stats.distinctStudentCount > 0
+    ? Math.floor(stats.distinctStudentCount)
+    : ratingCount;
+
   ratingPill.textContent = `${avg} / 10 overall`;
-  ratingPill.title = `Based on ${stats.ratingCount} ratings`;
+  ratingPill.title = ratingCount < 5
+    ? `Early ratings (based on ${ratingCount} ${ratingCount === 1 ? 'rating' : 'ratings'})`
+    : `Based on ${ratingCount} ratings`;
+
   studentCountPill.hidden = false;
-  studentCountPill.textContent = `${stats.distinctStudentCount || 0} students rated`;
+  studentCountPill.textContent = `${distinct} ${distinct === 1 ? 'student rated' : 'students rated'}`;
+
+  renderRatingCards(stats);
+}
+
+function renderRatingCards(stats) {
+  if (!ratingContent) return;
+
+  if (!stats || !Number.isFinite(stats.ratingCount) || stats.ratingCount <= 0) {
+    ratingContent.className = 'rating-empty';
+    ratingContent.textContent = 'No ratings yet.';
+    return;
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'rating-grid';
+
+  const makeCard = (title, value, subtitle) => {
+    const card = document.createElement('div');
+    card.className = 'rating-card';
+    card.innerHTML = `
+      <h3>${title}</h3>
+      <div class="rating-value">${value}</div>
+      <div class="rating-sub">${subtitle}</div>
+    `;
+    return card;
+  };
+
+  const overallValue = Number(stats.avgOverall || 0).toFixed(1);
+  const ratingCount = Math.max(1, Math.floor(stats.ratingCount));
+  const distinct = Number.isFinite(stats.distinctStudentCount) && stats.distinctStudentCount > 0
+    ? Math.floor(stats.distinctStudentCount)
+    : ratingCount;
+
+  grid.appendChild(
+    makeCard(
+      'Overall',
+      `${overallValue} / 10`,
+      ratingCount < 5
+        ? `Early ratings • ${ratingCount} ${ratingCount === 1 ? 'rating' : 'ratings'}`
+        : `${ratingCount} ratings • ${distinct} ${distinct === 1 ? 'student' : 'students'}`
+    )
+  );
+
+  METRICS.filter((m) => m.key !== 'overall').forEach((metric) => {
+    const field = `avg${metric.label}`;
+    const raw = stats[field];
+    const value = Number.isFinite(raw) ? Number(raw).toFixed(1) : '—';
+    grid.appendChild(makeCard(metric.label, `${value} / 10`, ''));
+  });
+
+  ratingContent.className = '';
+  ratingContent.innerHTML = '';
+  ratingContent.appendChild(grid);
 }
 
 function renderComments(comments) {

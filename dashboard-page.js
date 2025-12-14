@@ -8,6 +8,8 @@
   const collection = window.firestoreCollection;
   const query = window.firestoreQuery;
   const where = window.firestoreWhere;
+  const orderBy = window.firestoreOrderBy;
+  const limit = window.firestoreLimit;
   const deleteDoc = window.firestoreDeleteDoc;
   const updateDoc = window.firestoreUpdateDoc;
   const arrayRemove = window.firestoreArrayRemove;
@@ -46,6 +48,8 @@
     ? window.matchMedia("(max-width: 768px)")
     : null;
   const favoriteTutorsContainer = document.getElementById("favorite-tutors-content");
+  const tutorFeedbackCard = document.getElementById("tutor-feedback-card");
+  const tutorFeedbackList = document.getElementById("tutor-feedback-list");
   const DEFAULT_HOME_PATH = "/home/amitshalev/";
   const SUBJECT_INTEREST_ENDPOINT = "https://script.google.com/macros/s/AKfycbxKXmxMroW74nabysGBr4LDFhwkURxaBiDntFVnowpP5PN-Czy6cWYnfO5axE58x5_j/exec";
 
@@ -550,8 +554,12 @@
       setHybridAccountState(hasTutorRole && hasStudentRole);
       if (hasTutorRole) {
         await loadTutorSummary(userData);
+        await loadTutorFeedback(user.uid);
       } else if (tutorCardEl) {
         tutorCardEl.classList.add("hidden-card");
+        if (tutorFeedbackCard) {
+          tutorFeedbackCard.classList.add("hidden-card");
+        }
       }
 
       updateHomeLink(userData);
@@ -644,6 +652,140 @@
     }
 
     updateHomeLink(window.__latestUserData);
+  }
+
+  function formatRatingValue(value) {
+    if (typeof value !== "number") return null;
+    const rounded = Math.round(value * 10) / 10;
+    return Number.isFinite(rounded) ? rounded : null;
+  }
+
+  function formatTimestamp(timestamp) {
+    if (!timestamp) return "";
+    try {
+      const date = typeof timestamp.toDate === "function" ? timestamp.toDate() : new Date(timestamp);
+      return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    } catch (err) {
+      return "";
+    }
+  }
+
+  function renderTutorFeedbackList(items) {
+    if (!tutorFeedbackList) return;
+
+    if (!items || !items.length) {
+      tutorFeedbackList.innerHTML = '<p class="empty-state">No feedback yet. You will see student ratings here after sessions are reviewed.</p>';
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+
+    items.forEach((item) => {
+      const card = document.createElement("div");
+      card.className = "feedback-card";
+
+      const ratings = item.ratings || {};
+      const overall = formatRatingValue(ratings.overall);
+      const clarity = formatRatingValue(ratings.clarity);
+      const helpfulness = formatRatingValue(ratings.helpfulness);
+      const engagement = formatRatingValue(ratings.engagement);
+      const pacing = formatRatingValue(ratings.pacing);
+
+      const header = document.createElement("div");
+      header.className = "feedback-card-header";
+
+      const score = document.createElement("div");
+      score.className = "feedback-score";
+      score.textContent = overall ? `${overall}/10` : "-";
+
+      const meta = document.createElement("div");
+      meta.className = "feedback-meta";
+      const metaParts = [];
+      const studentLabel = item.studentName || item.studentId || "Student";
+      metaParts.push(studentLabel);
+      const updatedAt = formatTimestamp(item.updatedAt || item.createdAt);
+      if (updatedAt) metaParts.push(updatedAt);
+      if (item.status && item.status.shared === true) {
+        metaParts.push("Shared");
+      }
+      meta.textContent = metaParts.join(" • ");
+
+      header.appendChild(score);
+      header.appendChild(meta);
+
+      const comment = document.createElement("p");
+      comment.className = "feedback-comment";
+      comment.textContent = item.comment || "No comment provided.";
+
+      const breakdown = document.createElement("div");
+      breakdown.className = "feedback-breakdown";
+      const parts = [];
+      if (clarity) parts.push(`Clarity ${clarity}`);
+      if (helpfulness) parts.push(`Helpfulness ${helpfulness}`);
+      if (engagement) parts.push(`Engagement ${engagement}`);
+      if (pacing) parts.push(`Pacing ${pacing}`);
+      breakdown.textContent = parts.join(" • ");
+
+      card.appendChild(header);
+      card.appendChild(comment);
+      if (parts.length) {
+        card.appendChild(breakdown);
+      }
+
+      frag.appendChild(card);
+    });
+
+    tutorFeedbackList.innerHTML = "";
+    tutorFeedbackList.appendChild(frag);
+  }
+
+  async function loadTutorFeedback(tutorUid) {
+    if (!tutorFeedbackCard || !tutorFeedbackList) {
+      return;
+    }
+
+    if (!tutorUid) {
+      tutorFeedbackCard.classList.add("hidden-card");
+      return;
+    }
+
+    tutorFeedbackCard.classList.remove("hidden-card");
+    tutorFeedbackList.innerHTML = '<p class="loading">Loading feedback…</p>';
+
+    try {
+      const feedbackQuery = query(
+        collection(db, "sessionFeedback"),
+        where("tutorId", "==", tutorUid),
+        where("status.submitted", "==", true)
+      );
+
+      const snapshot = await getDocs(feedbackQuery);
+      const feedbackItems = [];
+
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() || {};
+        const status = data.status || {};
+        if (status.reported || status.deletedByTutor) {
+          return;
+        }
+        feedbackItems.push({ id: docSnap.id, ...data });
+      });
+
+      const sorted = feedbackItems.sort((a, b) => {
+        const toMs = (value) => {
+          if (!value) return 0;
+          if (typeof value.toDate === "function") return value.toDate().getTime();
+          const parsed = new Date(value).getTime();
+          return Number.isFinite(parsed) ? parsed : 0;
+        };
+        return toMs(b.updatedAt || b.createdAt) - toMs(a.updatedAt || a.createdAt);
+      });
+
+      renderTutorFeedbackList(sorted.slice(0, 20));
+    } catch (err) {
+      console.error("Error loading tutor feedback:", err);
+      tutorFeedbackList.innerHTML = '<p class="error">Unable to load feedback right now.</p>';
+    }
   }
 
   function sanitizeSlug(value) {

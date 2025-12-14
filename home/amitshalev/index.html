@@ -54,6 +54,39 @@
       display: flex;
       flex-wrap: wrap;
       gap: 0.5rem;
+    .rating-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+    .rating-card {
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 1rem;
+      padding: 1rem 1.1rem;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.25);
+    }
+    .rating-card h3 {
+      margin: 0 0 0.25rem 0;
+      font-size: 1.05rem;
+    }
+    .rating-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+    }
+    .rating-sub {
+      color: #94a3b8;
+      font-size: 0.9rem;
+      margin-top: 0.25rem;
+    }
+    .rating-empty {
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px dashed rgba(148, 163, 184, 0.35);
+      border-radius: 1rem;
+      padding: 1rem;
+      color: #94a3b8;
+      text-align: center;
+    }
       align-items: center;
     }
     .summary-mode-tags,
@@ -76,6 +109,11 @@
       font-size: 0.78rem;
     }
     .summary-actions {
+
+    <section class="home-section" id="ratings-section">
+      <h2 class="section-title">Student Ratings</h2>
+      <div id="rating-content" class="rating-empty">Loading ratings...</div>
+    </section>
       display: flex;
       flex-wrap: wrap;
       gap: 0.85rem;
@@ -352,6 +390,15 @@
     const summaryBookBtn = document.getElementById("summary-book-btn");
     const summaryRateBtn = document.getElementById("summary-rate-btn");
     const summaryBioEl = document.getElementById("summary-bio");
+    const ratingContent = document.getElementById("rating-content");
+
+    const RATING_METRICS = [
+      { key: "overall", label: "Overall" },
+      { key: "clarity", label: "Clarity" },
+      { key: "helpfulness", label: "Helpfulness" },
+      { key: "engagement", label: "Engagement" },
+      { key: "pacing", label: "Pacing" }
+    ];
 
     const authBtn = document.getElementById("auth-action-btn");
     const heroActions = document.getElementById("hero-actions");
@@ -819,6 +866,68 @@
       };
     }
 
+    function renderRatings(stats) {
+      if (!ratingContent) return;
+      if (!stats || !Number.isFinite(stats.ratingCount) || stats.ratingCount <= 0) {
+        ratingContent.className = "rating-empty";
+        ratingContent.textContent = "No ratings yet.";
+        return;
+      }
+
+      const grid = document.createElement("div");
+      grid.className = "rating-grid";
+
+      const makeCard = (title, value, subtitle) => {
+        const card = document.createElement("div");
+        card.className = "rating-card";
+        card.innerHTML = `
+          <h3>${title}</h3>
+          <div class="rating-value">${value}</div>
+          <div class="rating-sub">${subtitle}</div>
+        `;
+        return card;
+      };
+
+      const ratingCount = Math.max(1, Math.floor(stats.ratingCount));
+      const distinct = Number.isFinite(stats.distinctStudentCount) && stats.distinctStudentCount > 0
+        ? Math.floor(stats.distinctStudentCount)
+        : ratingCount;
+
+      const overallValue = Number(stats.avgOverall || 0).toFixed(1);
+      const overallSubtitle = ratingCount < 5
+        ? `Early ratings • ${ratingCount} ${ratingCount === 1 ? "rating" : "ratings"}`
+        : `${ratingCount} ratings • ${distinct} ${distinct === 1 ? "student" : "students"}`;
+
+      grid.appendChild(makeCard("Overall", `${overallValue} / 10`, overallSubtitle));
+
+      RATING_METRICS.filter((m) => m.key !== "overall").forEach((metric) => {
+        const field = `avg${metric.label}`;
+        const raw = stats[field];
+        const value = Number.isFinite(raw) ? Number(raw).toFixed(1) : "—";
+        grid.appendChild(makeCard(metric.label, `${value} / 10`, ""));
+      });
+
+      ratingContent.className = "";
+      ratingContent.innerHTML = "";
+      ratingContent.appendChild(grid);
+    }
+
+    async function loadRatings(tutorId) {
+      if (!tutorId || !getDocFn || !docFn) {
+        return;
+      }
+      try {
+        const snap = await getDocFn(docFn(db, "tutorStats", tutorId));
+        renderRatings(snap.exists() ? snap.data() : null);
+      } catch (error) {
+        console.warn("Unable to load ratings", error);
+        if (ratingContent) {
+          ratingContent.className = "rating-empty";
+          ratingContent.textContent = "Ratings unavailable right now.";
+        }
+      }
+    }
+
     function buildSlugCandidates() {
       const candidates = new Set();
       const homeSlug = document.body.dataset.homeSlug || null;
@@ -892,6 +1001,8 @@
             ? `/book.html?tutor=${encodeURIComponent(currentTutorId)}`
             : "/book.html";
         }
+
+        loadRatings(currentTutorId);
 
         updateFavoriteButtonState();
       } catch (error) {

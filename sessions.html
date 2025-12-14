@@ -871,26 +871,70 @@
   }
 
   window.toggleTutorNotes = function(sessionId) {
+    closeAllRatingPanels();
     const row = document.getElementById(`tutor-notes-row-${sessionId}`);
     if (row) {
       row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
     }
   };
 
+  function closeAllRatingPanels() {
+    document.querySelectorAll('[id^="rating-row-"]').forEach((el) => {
+      el.style.display = 'none';
+    });
+  }
+
+  function closeRatingPanel(sessionKey) {
+    const row = document.getElementById(`rating-row-${sessionKey}`);
+    if (row) {
+      row.style.display = 'none';
+    }
+  }
+
   window.toggleRatingPanel = async function(sessionKey) {
     if (!sessionKey) return;
     const row = document.getElementById(`rating-row-${sessionKey}`);
     if (!row) return;
+    const rateBtn = document.querySelector(`button[data-rate-key="${sessionKey}"]`);
+    const isLocked = rateBtn?.dataset?.locked === 'true';
     const isHidden = row.style.display === 'none';
     // Hide other open panels to reduce clutter
     document.querySelectorAll('[id^="rating-row-"]').forEach((el) => {
       if (el !== row) el.style.display = 'none';
     });
+    if (isLocked && !isHidden) {
+      row.style.display = 'none';
+      return;
+    }
+    if (isLocked && isHidden) {
+      // When locked, pressing the Rated button should simply retract (no open)
+      return;
+    }
     row.style.display = isHidden ? 'table-row' : 'none';
     if (isHidden) {
       await populateRatingForm(sessionKey);
     }
   };
+
+  function disableRatingForm(sessionKey, message) {
+    const form = document.getElementById(`rating-form-${sessionKey}`);
+    const statusEl = document.getElementById(`rating-status-${sessionKey}`);
+    const rateBtn = document.querySelector(`button[data-rate-key="${sessionKey}"]`);
+    if (form) {
+      form.querySelectorAll('input[type="range"], textarea, button[type="submit"]').forEach((el) => {
+        el.disabled = true;
+        el.setAttribute('aria-disabled', 'true');
+      });
+    }
+    if (statusEl && message) {
+      statusEl.textContent = message;
+    }
+    if (rateBtn) {
+      rateBtn.textContent = 'Rated';
+      rateBtn.title = 'Thanks for submitting your rating.';
+      rateBtn.dataset.locked = 'true';
+    }
+  }
 
   function handleRatingInput(sessionKey, key, rawValue) {
     const clamped = clampRatingValue(rawValue, NaN);
@@ -976,8 +1020,7 @@
     }
 
     if (feedback) {
-      statusEl.textContent = 'You can update your rating any time.';
-      if (rateBtn) rateBtn.textContent = 'Edit rating';
+      disableRatingForm(sessionKey, 'Thank you for rating! This session is locked.');
     } else {
       statusEl.textContent = 'Slide to rate from 1-10. Higher = better. All 5 ratings are required.';
     }
@@ -1116,8 +1159,7 @@
     try {
       await setDoc(doc(db, 'sessionFeedback', sessionKey), payload, { merge: true });
       feedbackCache.set(sessionKey, payload);
-      statusEl.textContent = 'Thanks! Your rating was saved.';
-      if (rateBtn) rateBtn.textContent = 'Edit rating';
+      disableRatingForm(sessionKey, 'Thanks! Your rating was submitted.');
       await recomputeTutorStats(tutorId);
     } catch (err) {
       console.error('Failed to save rating', err);
